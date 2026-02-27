@@ -1,5 +1,7 @@
 # Game Dev Bootcamp
 
+**[Browse the interactive course &rarr; seanking11.github.io/gamebootcamp](https://seanking11.github.io/gamebootcamp/)**
+
 A comprehensive game development course built for software developers. 38 genre modules covering every major game genre — from Pong to Sandbox. Build MVP versions of classic games, learn the mechanics that make them tick, and understand the history that shaped them.
 
 ## What's Inside
