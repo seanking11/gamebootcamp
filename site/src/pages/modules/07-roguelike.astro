@@ -99,6 +99,19 @@ function createCorridors(node):
     connectWithCorridor(leftCenter, rightCenter)
     return midpoint(leftCenter, rightCenter)</code></pre>
     <p>The BSP approach guarantees every room is reachable (because corridors follow the tree structure) and prevents rooms from overlapping (because the tree partitions space). The result is a grid of tiles where each cell is either <code>WALL</code>, <code>FLOOR</code>, or <code>CORRIDOR</code>.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: BSP Dungeon Generator</div>
+      <p class="demo-hint">Click "Generate" to create a full dungeon instantly using BSP, or use "Step" to watch the algorithm split, place rooms, and connect corridors one stage at a time. Rooms appear as lit areas; corridors link them.</p>
+      <canvas id="demo-bsp" width="760" height="500"></canvas>
+      <div class="demo-controls">
+        <button id="bsp-generate-btn">Generate</button>
+        <button id="bsp-step-btn">Step</button>
+        <button id="bsp-reset-btn">Reset</button>
+        <label>Min room size: <input type="range" id="bsp-minsize" min="4" max="10" value="6" /> <span class="value-display" id="bsp-minsize-val">6</span></label>
+      </div>
+    </div>
+
     <p><strong>Why it matters:</strong> BSP trees are a fundamental spatial data structure. Understanding recursive partitioning here teaches you how to subdivide space efficiently &mdash; a technique used in physics engines, rendering pipelines, and spatial queries throughout game development.</p>
 
     <hr />
@@ -120,6 +133,18 @@ function createCorridors(node):
             world.updateEffects()         // poison ticks, cooldowns, etc.
             world.incrementTurn()</code></pre>
     <p>The key insight: the entire world is frozen until the player commits to an action. Then all entities process in sequence. This makes the game fully deterministic given the same inputs &mdash; you could replay an entire run from a seed + input log.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Turn-Based Movement</div>
+      <p class="demo-hint">Arrow keys move the player (amber @) one tile per press. After you move, each enemy (red) takes one step toward you. The turn counter advances only when you act. Notice how nothing moves until you commit to a direction &mdash; this is fundamentally different from real-time movement.</p>
+      <canvas id="demo-turns" width="760" height="400"></canvas>
+      <div class="demo-controls">
+        <span class="value-display" id="turns-turn-display">Turn: 0</span>
+        <span class="value-display" id="turns-status-display">Your move</span>
+        <button id="turns-reset-btn">New Dungeon</button>
+      </div>
+    </div>
+
     <p><strong>Why it matters:</strong> This is the command pattern in practice. Each action is a discrete, self-contained operation against a world state. The deterministic, sequential nature of turn-based processing makes the game reproducible and debuggable &mdash; you can replay an entire run from a seed and an input log.</p>
 
     <hr />
@@ -153,6 +178,18 @@ function castRay(origin, angle, maxRadius, tileGrid):
 
         if tileGrid[tileX][tileY].blocksLight:
             return  // ray stops at walls</code></pre>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Field of View</div>
+      <p class="demo-hint">Arrow keys move the player (amber dot) through a dark dungeon. Only tiles within the FOV radius are lit. Walls block vision. Previously visible tiles fade to dark gray. Adjust the radius slider to see how FOV range changes exploration.</p>
+      <canvas id="demo-fov" width="760" height="500"></canvas>
+      <div class="demo-controls">
+        <label>FOV Radius: <input type="range" id="fov-radius" min="3" max="15" value="8" /> <span class="value-display" id="fov-radius-val">8</span></label>
+        <button id="fov-reset-btn">New Dungeon</button>
+        <span class="value-display" id="fov-pos-display">Position: --</span>
+      </div>
+    </div>
+
     <p>For smoother results, look into <strong>recursive shadowcasting</strong>, which processes octants of the circle and handles edge cases (peeking around corners) more elegantly. But the raycasting approach above is sufficient for an MVP.</p>
     <p><strong>Why it matters:</strong> FOV is a spatial query: "given a point, what other points are reachable under constraints?" This is a core problem in game development that appears in AI sight lines, lighting systems, and stealth mechanics. Mastering it here gives you a reusable tool for any game that needs line-of-sight calculations.</p>
 
@@ -422,3 +459,744 @@ function resolveCombat(attacker, defender, world):
     </nav>
   </div>
 </BaseLayout>
+
+<script>
+// ============================================================
+// DEMO 1: BSP DUNGEON GENERATOR
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-bsp');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const COLS = 48, ROWS = 30;
+  const TW = Math.floor(W / COLS), TH = Math.floor(H / ROWS);
+
+  const WALL = 0, FLOOR = 1, CORRIDOR = 2;
+
+  let grid = [];
+  let nodes = [];
+  let stepPhase = 0; // 0=idle, 1=splitting, 2=rooms, 3=corridors, 4=done
+  let splitQueue = [];
+  let corridorQueue = [];
+  let minRoomSize = 6;
+
+  const minSizeSlider = document.getElementById('bsp-minsize');
+  const minSizeVal = document.getElementById('bsp-minsize-val');
+  minSizeSlider.addEventListener('input', function() {
+    minRoomSize = parseInt(this.value);
+    minSizeVal.textContent = this.value;
+  });
+
+  function initGrid() {
+    grid = [];
+    for (let r = 0; r < ROWS; r++) {
+      grid[r] = [];
+      for (let c = 0; c < COLS; c++) {
+        grid[r][c] = WALL;
+      }
+    }
+  }
+
+  function makeNode(x, y, w, h) {
+    return { x: x, y: y, w: w, h: h, left: null, right: null, room: null, splitAxis: null, splitPos: null };
+  }
+
+  function canSplit(node) {
+    return node.w >= minRoomSize * 2 + 1 || node.h >= minRoomSize * 2 + 1;
+  }
+
+  function splitNode(node) {
+    if (!canSplit(node)) return false;
+    let horiz;
+    if (node.w >= minRoomSize * 2 + 1 && node.h >= minRoomSize * 2 + 1) {
+      horiz = node.h > node.w ? true : node.w > node.h ? false : Math.random() < 0.5;
+    } else if (node.w >= minRoomSize * 2 + 1) {
+      horiz = false;
+    } else {
+      horiz = true;
+    }
+
+    if (horiz) {
+      let sp = minRoomSize + Math.floor(Math.random() * (node.h - minRoomSize * 2));
+      node.splitAxis = 'h';
+      node.splitPos = node.y + sp;
+      node.left = makeNode(node.x, node.y, node.w, sp);
+      node.right = makeNode(node.x, node.y + sp, node.w, node.h - sp);
+    } else {
+      let sp = minRoomSize + Math.floor(Math.random() * (node.w - minRoomSize * 2));
+      node.splitAxis = 'v';
+      node.splitPos = node.x + sp;
+      node.left = makeNode(node.x, node.y, sp, node.h);
+      node.right = makeNode(node.x + sp, node.y, node.w - sp, node.h);
+    }
+    return true;
+  }
+
+  function getLeaves(node) {
+    if (!node) return [];
+    if (!node.left && !node.right) return [node];
+    return getLeaves(node.left).concat(getLeaves(node.right));
+  }
+
+  function placeRoom(leaf) {
+    let rw = minRoomSize - 2 + Math.floor(Math.random() * Math.max(1, leaf.w - minRoomSize + 1));
+    let rh = minRoomSize - 2 + Math.floor(Math.random() * Math.max(1, leaf.h - minRoomSize + 1));
+    rw = Math.min(rw, leaf.w - 2);
+    rh = Math.min(rh, leaf.h - 2);
+    rw = Math.max(rw, 3);
+    rh = Math.max(rh, 3);
+    let rx = leaf.x + 1 + Math.floor(Math.random() * Math.max(1, leaf.w - rw - 1));
+    let ry = leaf.y + 1 + Math.floor(Math.random() * Math.max(1, leaf.h - rh - 1));
+    leaf.room = { x: rx, y: ry, w: rw, h: rh };
+    for (let r = ry; r < ry + rh && r < ROWS; r++) {
+      for (let c = rx; c < rx + rw && c < COLS; c++) {
+        grid[r][c] = FLOOR;
+      }
+    }
+  }
+
+  function roomCenter(room) {
+    return { x: Math.floor(room.x + room.w / 2), y: Math.floor(room.y + room.h / 2) };
+  }
+
+  function connectRooms(r1, r2) {
+    let c1 = roomCenter(r1);
+    let c2 = roomCenter(r2);
+    let cx = c1.x, cy = c1.y;
+    while (cx !== c2.x) {
+      if (cy >= 0 && cy < ROWS && cx >= 0 && cx < COLS && grid[cy][cx] === WALL) grid[cy][cx] = CORRIDOR;
+      cx += cx < c2.x ? 1 : -1;
+    }
+    while (cy !== c2.y) {
+      if (cy >= 0 && cy < ROWS && cx >= 0 && cx < COLS && grid[cy][cx] === WALL) grid[cy][cx] = CORRIDOR;
+      cy += cy < c2.y ? 1 : -1;
+    }
+  }
+
+  function getRoom(node) {
+    if (node.room) return node.room;
+    if (node.left) { let r = getRoom(node.left); if (r) return r; }
+    if (node.right) { let r = getRoom(node.right); if (r) return r; }
+    return null;
+  }
+
+  function connectTree(node) {
+    if (!node || (!node.left && !node.right)) return;
+    if (node.left && node.right) {
+      let r1 = getRoom(node.left);
+      let r2 = getRoom(node.right);
+      if (r1 && r2) connectRooms(r1, r2);
+    }
+    connectTree(node.left);
+    connectTree(node.right);
+  }
+
+  let root = null;
+
+  function reset() {
+    initGrid();
+    nodes = [];
+    root = makeNode(0, 0, COLS, ROWS);
+    nodes.push(root);
+    stepPhase = 0;
+    splitQueue = [root];
+    corridorQueue = [];
+    draw();
+  }
+
+  function generateFull() {
+    initGrid();
+    root = makeNode(0, 0, COLS, ROWS);
+    let queue = [root];
+    while (queue.length > 0) {
+      let n = queue.shift();
+      if (splitNode(n)) {
+        queue.push(n.left);
+        queue.push(n.right);
+      }
+    }
+    let leaves = getLeaves(root);
+    leaves.forEach(function(l) { placeRoom(l); });
+    connectTree(root);
+    stepPhase = 4;
+    draw();
+  }
+
+  function step() {
+    if (stepPhase === 0 || stepPhase === 1) {
+      // splitting phase
+      stepPhase = 1;
+      let nextQueue = [];
+      let didSplit = false;
+      for (let i = 0; i < splitQueue.length; i++) {
+        let n = splitQueue[i];
+        if (splitNode(n)) {
+          nextQueue.push(n.left);
+          nextQueue.push(n.right);
+          didSplit = true;
+        }
+      }
+      splitQueue = nextQueue;
+      if (!didSplit || splitQueue.length === 0) {
+        stepPhase = 2;
+      }
+      draw();
+    } else if (stepPhase === 2) {
+      // place rooms
+      let leaves = getLeaves(root);
+      leaves.forEach(function(l) { placeRoom(l); });
+      stepPhase = 3;
+      draw();
+    } else if (stepPhase === 3) {
+      // connect corridors
+      connectTree(root);
+      stepPhase = 4;
+      draw();
+    }
+  }
+
+  function drawPartitions(node) {
+    if (!node) return;
+    if (node.splitAxis) {
+      ctx.strokeStyle = 'rgba(245,158,11,0.35)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      if (node.splitAxis === 'h') {
+        ctx.moveTo(node.x * TW, node.splitPos * TH);
+        ctx.lineTo((node.x + node.w) * TW, node.splitPos * TH);
+      } else {
+        ctx.moveTo(node.splitPos * TW, node.y * TH);
+        ctx.lineTo(node.splitPos * TW, (node.y + node.h) * TH);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    // draw leaf outlines
+    if (!node.left && !node.right) {
+      ctx.strokeStyle = 'rgba(59,130,246,0.3)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(node.x * TW + 1, node.y * TH + 1, node.w * TW - 2, node.h * TH - 2);
+    }
+    drawPartitions(node.left);
+    drawPartitions(node.right);
+  }
+
+  function draw() {
+    ctx.fillStyle = '#0d0d0f';
+    ctx.fillRect(0, 0, W, H);
+
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        let t = grid[r][c];
+        if (t === FLOOR) {
+          ctx.fillStyle = '#2a2520';
+          ctx.fillRect(c * TW, r * TH, TW, TH);
+          // lit warm glow
+          ctx.fillStyle = 'rgba(245,158,11,0.08)';
+          ctx.fillRect(c * TW, r * TH, TW, TH);
+        } else if (t === CORRIDOR) {
+          ctx.fillStyle = '#1e1a16';
+          ctx.fillRect(c * TW, r * TH, TW, TH);
+        } else {
+          // wall -- subtle grid lines
+          ctx.fillStyle = '#111114';
+          ctx.fillRect(c * TW, r * TH, TW - 1, TH - 1);
+        }
+      }
+    }
+
+    // draw BSP partition lines on top
+    if (root) drawPartitions(root);
+
+    // status text
+    ctx.fillStyle = '#71717a';
+    ctx.font = '12px "JetBrains Mono", monospace';
+    let label = stepPhase === 0 ? 'Ready -- click Generate or Step' :
+                stepPhase === 1 ? 'Splitting space...' :
+                stepPhase === 2 ? 'Splits done -- step to place rooms' :
+                stepPhase === 3 ? 'Rooms placed -- step to connect corridors' :
+                'Dungeon complete';
+    ctx.fillText(label, 8, H - 8);
+  }
+
+  document.getElementById('bsp-generate-btn').addEventListener('click', generateFull);
+  document.getElementById('bsp-step-btn').addEventListener('click', step);
+  document.getElementById('bsp-reset-btn').addEventListener('click', reset);
+
+  reset();
+})();
+
+// ============================================================
+// DEMO 2: FIELD OF VIEW
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-fov');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const COLS = 48, ROWS = 32;
+  const TW = Math.floor(W / COLS), TH = Math.floor(H / ROWS);
+
+  const WALL = 0, FLOOR = 1;
+  // visibility: 0=unseen, 1=seen(explored), 2=visible
+  let tileType = [];
+  let visibility = [];
+  let playerX = 2, playerY = 2;
+  let fovRadius = 8;
+
+  const radiusSlider = document.getElementById('fov-radius');
+  const radiusVal = document.getElementById('fov-radius-val');
+  const posDisplay = document.getElementById('fov-pos-display');
+  radiusSlider.addEventListener('input', function() {
+    fovRadius = parseInt(this.value);
+    radiusVal.textContent = this.value;
+    computeFOV();
+    draw();
+  });
+
+  // BSP dungeon for this demo
+  function generateDungeon() {
+    tileType = [];
+    visibility = [];
+    for (let r = 0; r < ROWS; r++) {
+      tileType[r] = [];
+      visibility[r] = [];
+      for (let c = 0; c < COLS; c++) {
+        tileType[r][c] = WALL;
+        visibility[r][c] = 0;
+      }
+    }
+
+    let minSize = 5;
+    function makeN(x, y, w, h) { return { x: x, y: y, w: w, h: h, left: null, right: null, room: null }; }
+
+    function split(nd) {
+      if (nd.w < minSize * 2 + 1 && nd.h < minSize * 2 + 1) return;
+      let horiz;
+      if (nd.w >= minSize * 2 + 1 && nd.h >= minSize * 2 + 1) horiz = Math.random() < 0.5;
+      else if (nd.h >= minSize * 2 + 1) horiz = true;
+      else horiz = false;
+
+      if (horiz) {
+        let sp = minSize + Math.floor(Math.random() * (nd.h - minSize * 2));
+        nd.left = makeN(nd.x, nd.y, nd.w, sp);
+        nd.right = makeN(nd.x, nd.y + sp, nd.w, nd.h - sp);
+      } else {
+        let sp = minSize + Math.floor(Math.random() * (nd.w - minSize * 2));
+        nd.left = makeN(nd.x, nd.y, sp, nd.h);
+        nd.right = makeN(nd.x + sp, nd.y, nd.w - sp, nd.h);
+      }
+      split(nd.left);
+      split(nd.right);
+    }
+
+    function getLeaves(nd) {
+      if (!nd) return [];
+      if (!nd.left && !nd.right) return [nd];
+      return getLeaves(nd.left).concat(getLeaves(nd.right));
+    }
+
+    function placeRoom(leaf) {
+      let rw = 3 + Math.floor(Math.random() * Math.max(1, leaf.w - 4));
+      let rh = 3 + Math.floor(Math.random() * Math.max(1, leaf.h - 4));
+      rw = Math.min(rw, leaf.w - 2); rh = Math.min(rh, leaf.h - 2);
+      rw = Math.max(rw, 3); rh = Math.max(rh, 3);
+      let rx = leaf.x + 1 + Math.floor(Math.random() * Math.max(1, leaf.w - rw - 1));
+      let ry = leaf.y + 1 + Math.floor(Math.random() * Math.max(1, leaf.h - rh - 1));
+      leaf.room = { x: rx, y: ry, w: rw, h: rh };
+      for (let r = ry; r < ry + rh && r < ROWS; r++)
+        for (let c = rx; c < rx + rw && c < COLS; c++)
+          tileType[r][c] = FLOOR;
+    }
+
+    function getRoom(nd) {
+      if (nd.room) return nd.room;
+      if (nd.left) { let r = getRoom(nd.left); if (r) return r; }
+      if (nd.right) { let r = getRoom(nd.right); if (r) return r; }
+      return null;
+    }
+
+    function carveCorridor(r1, r2) {
+      let x1 = Math.floor(r1.x + r1.w / 2), y1 = Math.floor(r1.y + r1.h / 2);
+      let x2 = Math.floor(r2.x + r2.w / 2), y2 = Math.floor(r2.y + r2.h / 2);
+      let cx = x1, cy = y1;
+      while (cx !== x2) {
+        if (cy >= 0 && cy < ROWS && cx >= 0 && cx < COLS) tileType[cy][cx] = FLOOR;
+        cx += cx < x2 ? 1 : -1;
+      }
+      while (cy !== y2) {
+        if (cy >= 0 && cy < ROWS && cx >= 0 && cx < COLS) tileType[cy][cx] = FLOOR;
+        cy += cy < y2 ? 1 : -1;
+      }
+    }
+
+    function connectTree(nd) {
+      if (!nd || (!nd.left && !nd.right)) return;
+      if (nd.left && nd.right) {
+        let r1 = getRoom(nd.left), r2 = getRoom(nd.right);
+        if (r1 && r2) carveCorridor(r1, r2);
+      }
+      connectTree(nd.left);
+      connectTree(nd.right);
+    }
+
+    let root = makeN(0, 0, COLS, ROWS);
+    split(root);
+    let leaves = getLeaves(root);
+    leaves.forEach(function(l) { placeRoom(l); });
+    connectTree(root);
+
+    // place player in first room
+    let firstRoom = leaves[0].room;
+    playerX = Math.floor(firstRoom.x + firstRoom.w / 2);
+    playerY = Math.floor(firstRoom.y + firstRoom.h / 2);
+  }
+
+  function computeFOV() {
+    // clear visible
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++)
+        if (visibility[r][c] === 2) visibility[r][c] = 1;
+
+    // raycast FOV
+    let steps = 360;
+    for (let i = 0; i < steps; i++) {
+      let angle = (i / steps) * Math.PI * 2;
+      let dx = Math.cos(angle);
+      let dy = Math.sin(angle);
+      let x = playerX + 0.5;
+      let y = playerY + 0.5;
+      for (let d = 0; d < fovRadius; d++) {
+        x += dx;
+        y += dy;
+        let tx = Math.floor(x);
+        let ty = Math.floor(y);
+        if (tx < 0 || tx >= COLS || ty < 0 || ty >= ROWS) break;
+        visibility[ty][tx] = 2;
+        if (tileType[ty][tx] === WALL) break;
+      }
+    }
+    // player tile always visible
+    visibility[playerY][playerX] = 2;
+  }
+
+  function draw() {
+    ctx.fillStyle = '#0a0a0b';
+    ctx.fillRect(0, 0, W, H);
+
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        let vis = visibility[r][c];
+        let isFloor = tileType[r][c] === FLOOR;
+        if (vis === 0) {
+          // unseen -- black
+          continue;
+        } else if (vis === 1) {
+          // explored but not visible -- dark
+          ctx.fillStyle = isFloor ? '#1a1a1e' : '#151518';
+          ctx.fillRect(c * TW, r * TH, TW, TH);
+        } else {
+          // visible
+          if (isFloor) {
+            ctx.fillStyle = '#2a2520';
+            ctx.fillRect(c * TW, r * TH, TW, TH);
+            // warm glow falloff
+            let dist = Math.sqrt((c - playerX) * (c - playerX) + (r - playerY) * (r - playerY));
+            let glow = Math.max(0, 1 - dist / fovRadius);
+            ctx.fillStyle = 'rgba(245,158,11,' + (glow * 0.15) + ')';
+            ctx.fillRect(c * TW, r * TH, TW, TH);
+          } else {
+            ctx.fillStyle = '#28282e';
+            ctx.fillRect(c * TW, r * TH, TW, TH);
+            // wall highlight
+            ctx.fillStyle = 'rgba(160,160,180,0.08)';
+            ctx.fillRect(c * TW, r * TH, TW, TH);
+          }
+        }
+      }
+    }
+
+    // player
+    ctx.fillStyle = '#f59e0b';
+    ctx.beginPath();
+    ctx.arc(playerX * TW + TW / 2, playerY * TH + TH / 2, TW * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+
+    // fov radius circle outline
+    ctx.strokeStyle = 'rgba(245,158,11,0.15)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(playerX * TW + TW / 2, playerY * TH + TH / 2, fovRadius * TW, 0, Math.PI * 2);
+    ctx.stroke();
+
+    posDisplay.textContent = 'Position: ' + playerX + ',' + playerY;
+  }
+
+  function movePlayer(dx, dy) {
+    let nx = playerX + dx;
+    let ny = playerY + dy;
+    if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS) return;
+    if (tileType[ny][nx] === WALL) return;
+    playerX = nx;
+    playerY = ny;
+    computeFOV();
+    draw();
+  }
+
+  document.addEventListener('keydown', function(e) {
+    // only respond if the fov canvas is roughly in view
+    let rect = canvas.getBoundingClientRect();
+    if (rect.bottom < 0 || rect.top > window.innerHeight) return;
+
+    let handled = true;
+    switch (e.key) {
+      case 'ArrowUp': movePlayer(0, -1); break;
+      case 'ArrowDown': movePlayer(0, 1); break;
+      case 'ArrowLeft': movePlayer(-1, 0); break;
+      case 'ArrowRight': movePlayer(1, 0); break;
+      default: handled = false;
+    }
+    if (handled) e.preventDefault();
+  });
+
+  document.getElementById('fov-reset-btn').addEventListener('click', function() {
+    generateDungeon();
+    computeFOV();
+    draw();
+  });
+
+  generateDungeon();
+  computeFOV();
+  draw();
+})();
+
+// ============================================================
+// DEMO 3: TURN-BASED MOVEMENT
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-turns');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const COLS = 38, ROWS = 20;
+  const TW = Math.floor(W / COLS), TH = Math.floor(H / ROWS);
+
+  const WALL = 0, FLOOR = 1;
+  let grid = [];
+  let playerX, playerY;
+  let enemies = [];
+  let turnCount = 0;
+
+  const turnDisplay = document.getElementById('turns-turn-display');
+  const statusDisplay = document.getElementById('turns-status-display');
+
+  function generateSimpleDungeon() {
+    grid = [];
+    for (let r = 0; r < ROWS; r++) {
+      grid[r] = [];
+      for (let c = 0; c < COLS; c++) {
+        grid[r][c] = WALL;
+      }
+    }
+
+    // carve a few rooms
+    let rooms = [];
+    function carveRoom(rx, ry, rw, rh) {
+      let room = { x: rx, y: ry, w: rw, h: rh };
+      for (let r = ry; r < ry + rh && r < ROWS; r++)
+        for (let c = rx; c < rx + rw && c < COLS; c++)
+          grid[r][c] = FLOOR;
+      rooms.push(room);
+    }
+
+    carveRoom(2, 2, 8, 6);
+    carveRoom(14, 1, 10, 5);
+    carveRoom(28, 2, 8, 6);
+    carveRoom(2, 12, 9, 6);
+    carveRoom(15, 13, 8, 5);
+    carveRoom(27, 12, 9, 6);
+
+    // connect rooms with corridors
+    for (let i = 0; i < rooms.length - 1; i++) {
+      let r1 = rooms[i], r2 = rooms[i + 1];
+      let x1 = Math.floor(r1.x + r1.w / 2), y1 = Math.floor(r1.y + r1.h / 2);
+      let x2 = Math.floor(r2.x + r2.w / 2), y2 = Math.floor(r2.y + r2.h / 2);
+      let cx = x1, cy = y1;
+      while (cx !== x2) { grid[cy][cx] = FLOOR; cx += cx < x2 ? 1 : -1; }
+      while (cy !== y2) { grid[cy][cx] = FLOOR; cy += cy < y2 ? 1 : -1; }
+    }
+    // extra corridor
+    let r0 = rooms[0], rLast = rooms[rooms.length - 1];
+    let x1 = Math.floor(r0.x + r0.w / 2), y1 = Math.floor(r0.y + r0.h / 2);
+    let x2 = Math.floor(rLast.x + rLast.w / 2), y2 = Math.floor(rLast.y + rLast.h / 2);
+    let cx = x1, cy = y1;
+    while (cy !== y2) { grid[cy][cx] = FLOOR; cy += cy < y2 ? 1 : -1; }
+    while (cx !== x2) { grid[cy][cx] = FLOOR; cx += cx < x2 ? 1 : -1; }
+
+    // place player in first room
+    playerX = rooms[0].x + 2;
+    playerY = rooms[0].y + 2;
+
+    // place enemies in other rooms
+    enemies = [];
+    for (let i = 2; i < rooms.length; i++) {
+      if (enemies.length >= 3) break;
+      let rm = rooms[i];
+      enemies.push({
+        x: rm.x + Math.floor(rm.w / 2),
+        y: rm.y + Math.floor(rm.h / 2),
+        glyph: i % 2 === 0 ? 'g' : 's',
+        color: i % 2 === 0 ? '#22c55e' : '#a855f7'
+      });
+    }
+
+    turnCount = 0;
+  }
+
+  function moveEnemies() {
+    enemies.forEach(function(e) {
+      let dx = 0, dy = 0;
+      if (e.x < playerX) dx = 1;
+      else if (e.x > playerX) dx = -1;
+      if (e.y < playerY) dy = 1;
+      else if (e.y > playerY) dy = -1;
+
+      // try to move -- prefer axis with larger distance
+      let distX = Math.abs(e.x - playerX);
+      let distY = Math.abs(e.y - playerY);
+
+      let moved = false;
+      if (distX >= distY && dx !== 0) {
+        let nx = e.x + dx;
+        if (nx >= 0 && nx < COLS && grid[e.y][nx] === FLOOR && !(nx === playerX && e.y === playerY)) {
+          // check no other enemy there
+          let blocked = enemies.some(function(o) { return o !== e && o.x === nx && o.y === e.y; });
+          if (!blocked) { e.x = nx; moved = true; }
+        }
+      }
+      if (!moved && dy !== 0) {
+        let ny = e.y + dy;
+        if (ny >= 0 && ny < ROWS && grid[ny][e.x] === FLOOR && !(e.x === playerX && ny === playerY)) {
+          let blocked = enemies.some(function(o) { return o !== e && o.x === e.x && o.y === ny; });
+          if (!blocked) { e.y = ny; moved = true; }
+        }
+      }
+      if (!moved && dx !== 0) {
+        let nx = e.x + dx;
+        if (nx >= 0 && nx < COLS && grid[e.y][nx] === FLOOR && !(nx === playerX && e.y === playerY)) {
+          let blocked = enemies.some(function(o) { return o !== e && o.x === nx && o.y === e.y; });
+          if (!blocked) { e.x = nx; }
+        }
+      }
+    });
+  }
+
+  function draw() {
+    ctx.fillStyle = '#0d0d0f';
+    ctx.fillRect(0, 0, W, H);
+
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        if (grid[r][c] === FLOOR) {
+          ctx.fillStyle = '#1e1b18';
+          ctx.fillRect(c * TW, r * TH, TW, TH);
+        } else {
+          ctx.fillStyle = '#141417';
+          ctx.fillRect(c * TW, r * TH, TW - 1, TH - 1);
+        }
+      }
+    }
+
+    // enemies
+    enemies.forEach(function(e) {
+      ctx.fillStyle = e.color;
+      ctx.font = 'bold ' + (TH - 2) + 'px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(e.glyph, e.x * TW + TW / 2, e.y * TH + TH / 2);
+    });
+
+    // player
+    ctx.fillStyle = '#f59e0b';
+    ctx.font = 'bold ' + (TH - 2) + 'px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('@', playerX * TW + TW / 2, playerY * TH + TH / 2);
+
+    // turn order sidebar
+    ctx.fillStyle = '#141416';
+    ctx.fillRect(W - 140, 0, 140, 20 + (enemies.length + 1) * 22);
+    ctx.fillStyle = '#71717a';
+    ctx.font = '11px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('Turn Order:', W - 132, 14);
+    ctx.fillStyle = '#f59e0b';
+    ctx.fillText('1. Player (@)', W - 132, 36);
+    enemies.forEach(function(e, i) {
+      ctx.fillStyle = e.color;
+      ctx.fillText((i + 2) + '. Enemy (' + e.glyph + ')', W - 132, 36 + (i + 1) * 22);
+    });
+
+    turnDisplay.textContent = 'Turn: ' + turnCount;
+  }
+
+  function tryMovePlayer(dx, dy) {
+    let nx = playerX + dx;
+    let ny = playerY + dy;
+    if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS) return;
+    if (grid[ny][nx] === WALL) return;
+
+    // check if enemy is there (bump attack would go here)
+    let blocked = enemies.some(function(e) { return e.x === nx && e.y === ny; });
+    if (blocked) {
+      // simple bump -- remove enemy
+      enemies = enemies.filter(function(e) { return !(e.x === nx && e.y === ny); });
+      statusDisplay.textContent = 'Enemy defeated!';
+    } else {
+      playerX = nx;
+      playerY = ny;
+      statusDisplay.textContent = 'Your move';
+    }
+
+    turnCount++;
+    // enemies move after player
+    moveEnemies();
+    draw();
+
+    // check if enemy adjacent -- warning
+    let adjacent = enemies.some(function(e) {
+      return Math.abs(e.x - playerX) <= 1 && Math.abs(e.y - playerY) <= 1;
+    });
+    if (adjacent) statusDisplay.textContent = 'Enemy nearby!';
+  }
+
+  document.addEventListener('keydown', function(e) {
+    let rect = canvas.getBoundingClientRect();
+    if (rect.bottom < 0 || rect.top > window.innerHeight) return;
+
+    let handled = true;
+    switch (e.key) {
+      case 'ArrowUp': tryMovePlayer(0, -1); break;
+      case 'ArrowDown': tryMovePlayer(0, 1); break;
+      case 'ArrowLeft': tryMovePlayer(-1, 0); break;
+      case 'ArrowRight': tryMovePlayer(1, 0); break;
+      default: handled = false;
+    }
+    if (handled) e.preventDefault();
+  });
+
+  document.getElementById('turns-reset-btn').addEventListener('click', function() {
+    generateSimpleDungeon();
+    draw();
+    statusDisplay.textContent = 'Your move';
+  });
+
+  generateSimpleDungeon();
+  draw();
+})();
+</script>

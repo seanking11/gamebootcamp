@@ -78,6 +78,26 @@ function rotateCW(matrix):
     return transposed</code></pre>
     <p><strong>Why it matters:</strong> This is pure data transformation &mdash; no game engine magic, no sprite rotation. You are manipulating an array, checking it against the grid for collisions, and writing it back. The "wall kick" system in modern Tetris (where the game tries alternate positions if a rotation would collide) is essentially a retry strategy with fallback offsets &mdash; try the default position first, and if it collides, attempt a series of alternate placements before giving up.</p>
 
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Piece Rotation Demo</div>
+      <p class="demo-hint">Select a tetromino from the dropdown, then click Rotate CW or CCW. Watch the matrix transformation: transpose the rows and columns, then reverse each row (CW) or each column (CCW). The step-by-step view shows the intermediate state.</p>
+      <canvas id="demo-rotation" width="760" height="300"></canvas>
+      <div class="demo-controls">
+        <select id="rot-piece-select">
+          <option value="T">T-piece</option>
+          <option value="I">I-piece</option>
+          <option value="O">O-piece</option>
+          <option value="S">S-piece</option>
+          <option value="Z">Z-piece</option>
+          <option value="J">J-piece</option>
+          <option value="L">L-piece</option>
+        </select>
+        <button id="rot-cw-btn">Rotate CW</button>
+        <button id="rot-ccw-btn">Rotate CCW</button>
+        <span class="value-display" id="rot-step-display">Original</span>
+      </div>
+    </div>
+
     <hr />
 
     <h4>3. Gravity Within the Grid</h4>
@@ -116,6 +136,17 @@ function clearLines():
         updateScore(linesCleared)
         collapseRows(completed)</code></pre>
     <p><strong>Why it matters:</strong> This is event detection and propagation. You scan for a condition, emit an event (lines cleared), and trigger side effects (score update, row collapse, possible combo tracking). A state change in one part of the system triggers a cascade of downstream updates. Getting the detection loop right (especially if you later add chain/cascade scoring) is an exercise in recursive or iterative event processing.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Line Clear Animation</div>
+      <p class="demo-hint">A pre-filled grid with one row almost complete. Click the "Drop Piece" button to drop the missing block into place. Watch the completed line flash, clear with animation, and see the blocks above cascade down. The cascade detection log shows each step.</p>
+      <canvas id="demo-lineclear" width="760" height="400"></canvas>
+      <div class="demo-controls">
+        <button id="lc-drop-btn">Drop Piece</button>
+        <button id="lc-reset-btn">Reset</button>
+        <span class="value-display" id="lc-status">Ready -- click Drop Piece</span>
+      </div>
+    </div>
 
     <hr />
 
@@ -198,6 +229,23 @@ function onLinesClear(count):
     level = floor(totalLines / 10)
     dropTimer.setInterval(getDropInterval(level))</code></pre>
     <p><strong>Why it matters:</strong> This is dynamic configuration of a scheduled process. The speed curve is a difficulty function, and designing it well is a form of system tuning: too aggressive and the game feels unfair; too gentle and it feels boring. The math is simple, but the feel requires iteration and testing.</p>
+
+    <hr />
+
+    <h3>Putting It All Together</h3>
+    <p>Below is a fully playable mini Tetris combining every concept above: grid state, piece rotation, gravity, line clearing, preview queue, lock delay, scoring, and speed progression. Use the arrow keys to move and rotate, down to soft drop, and space for hard drop.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Mini Tetris</div>
+      <p class="demo-hint">Arrow Left/Right to move. Arrow Up to rotate. Arrow Down to soft drop. Space for hard drop. The next piece preview shows what is coming. Score increases with line clears, and speed ramps up with each level.</p>
+      <canvas id="demo-tetris" width="400" height="500"></canvas>
+      <div class="demo-controls">
+        <button id="tetris-restart-btn">Restart</button>
+        <span class="value-display" id="tetris-score">Score: 0</span>
+        <span class="value-display" id="tetris-level">Level: 0</span>
+        <span class="value-display" id="tetris-lines">Lines: 0</span>
+      </div>
+    </div>
 
     <hr />
 
@@ -315,3 +363,734 @@ function onLinesClear(count):
     </nav>
   </div>
 </BaseLayout>
+
+<script>
+// ============================================================
+// TETROMINO DATA (shared across demos)
+// ============================================================
+const PIECE_DEFS = {
+  T: { matrix: [[0,1,0],[1,1,1],[0,0,0]], color: '#a855f7' },
+  I: { matrix: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#06b6d4' },
+  O: { matrix: [[1,1],[1,1]], color: '#eab308' },
+  S: { matrix: [[0,1,1],[1,1,0],[0,0,0]], color: '#22c55e' },
+  Z: { matrix: [[1,1,0],[0,1,1],[0,0,0]], color: '#ef4444' },
+  J: { matrix: [[1,0,0],[1,1,1],[0,0,0]], color: '#3b82f6' },
+  L: { matrix: [[0,0,1],[1,1,1],[0,0,0]], color: '#f97316' }
+};
+
+function deepCopy(m) { return m.map(r => [...r]); }
+
+function transpose(m) {
+  const s = m.length;
+  const t = Array.from({length: s}, () => Array(s).fill(0));
+  for (let r = 0; r < s; r++)
+    for (let c = 0; c < s; c++)
+      t[c][r] = m[r][c];
+  return t;
+}
+
+function rotateCW(m) {
+  const t = transpose(m);
+  return t.map(r => [...r].reverse());
+}
+
+function rotateCCW(m) {
+  const t = transpose(m);
+  t.reverse();
+  return t;
+}
+
+// ============================================================
+// DEMO 1: PIECE ROTATION DEMO
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-rotation');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const select = document.getElementById('rot-piece-select');
+  const cwBtn = document.getElementById('rot-cw-btn');
+  const ccwBtn = document.getElementById('rot-ccw-btn');
+  const stepDisp = document.getElementById('rot-step-display');
+
+  let currentKey = 'T';
+  let currentMatrix = deepCopy(PIECE_DEFS.T.matrix);
+  let animPhase = 'none'; // 'none', 'original', 'transposed', 'reversed'
+  let transposedMatrix = null;
+  let resultMatrix = null;
+  let animTimer = null;
+  let rotDir = 'cw';
+
+  function getColor() { return PIECE_DEFS[currentKey].color; }
+
+  function drawGrid(x, y, matrix, cellSize, color, label, alpha) {
+    const s = matrix.length;
+    const gridW = s * cellSize;
+    const gridH = s * cellSize;
+    ctx.save();
+    ctx.globalAlpha = alpha || 1;
+    // Background
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(x, y, gridW, gridH);
+    // Cells
+    for (let r = 0; r < s; r++) {
+      for (let c = 0; c < s; c++) {
+        if (matrix[r][c]) {
+          ctx.fillStyle = color;
+          ctx.fillRect(x + c * cellSize + 1, y + r * cellSize + 1, cellSize - 2, cellSize - 2);
+        }
+      }
+    }
+    // Grid lines
+    ctx.strokeStyle = '#333355';
+    ctx.lineWidth = 1;
+    for (let r = 0; r <= s; r++) {
+      ctx.beginPath(); ctx.moveTo(x, y + r * cellSize); ctx.lineTo(x + gridW, y + r * cellSize); ctx.stroke();
+    }
+    for (let c = 0; c <= s; c++) {
+      ctx.beginPath(); ctx.moveTo(x + c * cellSize, y); ctx.lineTo(x + c * cellSize, y + gridH); ctx.stroke();
+    }
+    // Label
+    if (label) {
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '13px "Inter", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, x + gridW / 2, y + gridH + 20);
+    }
+    ctx.restore();
+  }
+
+  function drawArrow(x1, y1, x2, y2, label) {
+    ctx.save();
+    ctx.strokeStyle = '#d4a017';
+    ctx.fillStyle = '#d4a017';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    // Arrowhead
+    const angle = Math.atan2(y2 - y1, x2 - x1);
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - 10 * Math.cos(angle - 0.4), y2 - 10 * Math.sin(angle - 0.4));
+    ctx.lineTo(x2 - 10 * Math.cos(angle + 0.4), y2 - 10 * Math.sin(angle + 0.4));
+    ctx.closePath(); ctx.fill();
+    if (label) {
+      ctx.font = '11px "Inter", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, (x1 + x2) / 2, y1 - 10);
+    }
+    ctx.restore();
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#0f0f1a';
+    ctx.fillRect(0, 0, W, H);
+
+    const s = currentMatrix.length;
+    const cellSize = Math.min(50, Math.floor(200 / s));
+    const gridW = s * cellSize;
+
+    if (animPhase === 'none') {
+      // Show just the current piece centered
+      const cx = (W - gridW) / 2;
+      const cy = (H - gridW) / 2 - 15;
+      drawGrid(cx, cy, currentMatrix, cellSize, getColor(), 'Current Orientation', 1);
+      // Show matrix values
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '12px "JetBrains Mono", monospace';
+      ctx.textAlign = 'left';
+      const matStr = currentMatrix.map(r => '[' + r.join(', ') + ']').join('\n');
+      const lines = matStr.split('\n');
+      const textX = cx + gridW + 30;
+      const textY = cy + 15;
+      for (let i = 0; i < lines.length; i++) {
+        ctx.fillText(lines[i], textX, textY + i * 18);
+      }
+    } else {
+      // Show 3-step transformation
+      const totalW = gridW * 3 + 120;
+      const startX = (W - totalW) / 2;
+      const gridY = (H - gridW) / 2 - 15;
+      const arrowY = gridY + gridW / 2;
+
+      // Step 1: Original
+      drawGrid(startX, gridY, currentMatrix, cellSize, getColor(), 'Original', animPhase === 'original' ? 1 : 0.5);
+      drawArrow(startX + gridW + 10, arrowY, startX + gridW + 50, arrowY, 'Transpose');
+
+      // Step 2: Transposed
+      if (transposedMatrix) {
+        drawGrid(startX + gridW + 60, gridY, transposedMatrix, cellSize, getColor(),
+          'Transposed', animPhase === 'transposed' ? 1 : (animPhase === 'reversed' ? 0.5 : 0.3));
+        const lbl = rotDir === 'cw' ? 'Reverse rows' : 'Reverse cols';
+        drawArrow(startX + gridW * 2 + 70, arrowY, startX + gridW * 2 + 110, arrowY, lbl);
+      }
+
+      // Step 3: Result
+      if (resultMatrix) {
+        drawGrid(startX + gridW * 2 + 120, gridY, resultMatrix, cellSize, getColor(),
+          rotDir === 'cw' ? 'Rotated CW' : 'Rotated CCW', animPhase === 'reversed' ? 1 : 0.3);
+      }
+    }
+  }
+
+  function animateRotation(dir) {
+    rotDir = dir;
+    if (animTimer) clearTimeout(animTimer);
+    transposedMatrix = transpose(currentMatrix);
+    if (dir === 'cw') {
+      resultMatrix = transposedMatrix.map(r => [...r].reverse());
+    } else {
+      resultMatrix = [...transposedMatrix].reverse();
+    }
+    animPhase = 'original';
+    stepDisp.textContent = 'Step 1: Original matrix';
+    render();
+    animTimer = setTimeout(() => {
+      animPhase = 'transposed';
+      stepDisp.textContent = 'Step 2: Transposed (swap rows/cols)';
+      render();
+      animTimer = setTimeout(() => {
+        animPhase = 'reversed';
+        stepDisp.textContent = dir === 'cw' ? 'Step 3: Reverse each row = CW' : 'Step 3: Reverse each col = CCW';
+        render();
+        animTimer = setTimeout(() => {
+          currentMatrix = deepCopy(resultMatrix);
+          animPhase = 'none';
+          stepDisp.textContent = 'Rotation complete';
+          render();
+        }, 1200);
+      }, 1000);
+    }, 1000);
+  }
+
+  cwBtn.addEventListener('click', () => animateRotation('cw'));
+  ccwBtn.addEventListener('click', () => animateRotation('ccw'));
+  select.addEventListener('change', () => {
+    currentKey = select.value;
+    currentMatrix = deepCopy(PIECE_DEFS[currentKey].matrix);
+    animPhase = 'none';
+    if (animTimer) clearTimeout(animTimer);
+    stepDisp.textContent = 'Original';
+    render();
+  });
+
+  render();
+})();
+
+// ============================================================
+// DEMO 2: LINE CLEAR ANIMATION
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-lineclear');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const dropBtn = document.getElementById('lc-drop-btn');
+  const resetBtn = document.getElementById('lc-reset-btn');
+  const statusEl = document.getElementById('lc-status');
+
+  const COLS = 10, ROWS = 12;
+  const CELL = Math.floor(Math.min((W - 200) / COLS, (H - 40) / ROWS));
+  const GRID_W = COLS * CELL, GRID_H = ROWS * CELL;
+  const OX = (W - GRID_W) / 2, OY = (H - GRID_H) / 2;
+
+  const COLORS = ['#ef4444','#f97316','#eab308','#22c55e','#06b6d4','#3b82f6','#a855f7'];
+
+  let grid, fallingPiece, state, flashTimer, cascadeLog;
+
+  function initGrid() {
+    grid = Array.from({length: ROWS}, () => Array(COLS).fill(0));
+    // Fill bottom rows with blocks, leave one gap in the bottom two rows
+    for (let r = ROWS - 3; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        grid[r][c] = COLORS[Math.floor(Math.random() * COLORS.length)];
+      }
+    }
+    // Create a gap in the bottom row at col 4 for the piece to fill
+    grid[ROWS - 1][4] = 0;
+    grid[ROWS - 2][4] = 0;
+    // Make row ROWS-3 almost full (gap at col 4)
+    for (let c = 0; c < COLS; c++) {
+      if (c !== 4) grid[ROWS - 3][c] = COLORS[Math.floor(Math.random() * COLORS.length)];
+    }
+    // Add some scattered blocks above
+    for (let r = ROWS - 5; r < ROWS - 3; r++) {
+      for (let c = 0; c < COLS; c++) {
+        if (Math.random() > 0.5) {
+          grid[r][c] = COLORS[Math.floor(Math.random() * COLORS.length)];
+        }
+      }
+    }
+    fallingPiece = { col: 4, row: 0, color: '#06b6d4', cells: [[0,0],[1,0]] }; // vertical I-2
+    state = 'ready';
+    flashTimer = 0;
+    cascadeLog = [];
+    statusEl.textContent = 'Ready -- click Drop Piece';
+  }
+
+  function getCompletedRows() {
+    const completed = [];
+    for (let r = 0; r < ROWS; r++) {
+      if (grid[r].every(c => c !== 0)) completed.push(r);
+    }
+    return completed;
+  }
+
+  let animFrame = null;
+  let dropY = 0;
+  let clearingRows = [];
+  let flashCount = 0;
+
+  function startDrop() {
+    if (state !== 'ready') return;
+    state = 'dropping';
+    dropY = 0;
+    statusEl.textContent = 'Dropping piece...';
+    animateDrop();
+  }
+
+  function animateDrop() {
+    // Find target row
+    let targetRow = 0;
+    for (let r = 0; r < ROWS; r++) {
+      let blocked = false;
+      for (const [dr, dc] of fallingPiece.cells) {
+        const tr = r + dr, tc = fallingPiece.col + dc;
+        if (tr >= ROWS || (grid[tr] && grid[tr][tc] !== 0)) blocked = true;
+      }
+      if (blocked) break;
+      targetRow = r;
+    }
+
+    if (dropY < targetRow) {
+      dropY++;
+      render();
+      animFrame = setTimeout(animateDrop, 40);
+    } else {
+      // Lock piece
+      for (const [dr, dc] of fallingPiece.cells) {
+        const r = targetRow + dr, c = fallingPiece.col + dc;
+        if (r >= 0 && r < ROWS) grid[r][c] = fallingPiece.color;
+      }
+      fallingPiece = null;
+      statusEl.textContent = 'Piece locked. Checking for completed rows...';
+      setTimeout(checkAndClear, 500);
+    }
+  }
+
+  function checkAndClear() {
+    clearingRows = getCompletedRows();
+    if (clearingRows.length > 0) {
+      cascadeLog.push('Detected ' + clearingRows.length + ' completed row(s): ' + clearingRows.join(', '));
+      statusEl.textContent = 'Line(s) detected! Flashing rows ' + clearingRows.join(', ');
+      flashCount = 0;
+      flashLines();
+    } else {
+      state = 'done';
+      statusEl.textContent = 'No more lines to clear. Done!';
+      render();
+    }
+  }
+
+  function flashLines() {
+    flashCount++;
+    render();
+    if (flashCount < 6) {
+      animFrame = setTimeout(flashLines, 120);
+    } else {
+      // Remove rows and collapse
+      cascadeLog.push('Clearing rows and collapsing...');
+      for (const r of clearingRows.sort((a, b) => b - a)) {
+        grid.splice(r, 1);
+        grid.unshift(Array(COLS).fill(0));
+      }
+      statusEl.textContent = 'Rows cleared. Checking for cascades...';
+      setTimeout(checkAndClear, 600);
+    }
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#0f0f1a';
+    ctx.fillRect(0, 0, W, H);
+
+    // Draw grid
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const x = OX + c * CELL, y = OY + r * CELL;
+        if (grid[r][c]) {
+          // Flash effect on clearing rows
+          if (clearingRows.includes(r) && flashCount % 2 === 1) {
+            ctx.fillStyle = '#ffffff';
+          } else {
+            ctx.fillStyle = grid[r][c];
+          }
+          ctx.fillRect(x + 1, y + 1, CELL - 2, CELL - 2);
+        } else {
+          ctx.fillStyle = '#1a1a2e';
+          ctx.fillRect(x + 1, y + 1, CELL - 2, CELL - 2);
+        }
+      }
+    }
+
+    // Grid lines
+    ctx.strokeStyle = '#333355';
+    ctx.lineWidth = 0.5;
+    for (let r = 0; r <= ROWS; r++) {
+      ctx.beginPath(); ctx.moveTo(OX, OY + r * CELL); ctx.lineTo(OX + GRID_W, OY + r * CELL); ctx.stroke();
+    }
+    for (let c = 0; c <= COLS; c++) {
+      ctx.beginPath(); ctx.moveTo(OX + c * CELL, OY); ctx.lineTo(OX + c * CELL, OY + GRID_H); ctx.stroke();
+    }
+
+    // Falling piece
+    if (fallingPiece && state === 'dropping') {
+      ctx.fillStyle = fallingPiece.color;
+      for (const [dr, dc] of fallingPiece.cells) {
+        const x = OX + (fallingPiece.col + dc) * CELL;
+        const y = OY + (dropY + dr) * CELL;
+        ctx.fillRect(x + 1, y + 1, CELL - 2, CELL - 2);
+      }
+    }
+
+    // Cascade log on the right
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '11px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    const logX = OX + GRID_W + 20;
+    ctx.fillStyle = '#d4a017';
+    ctx.font = 'bold 12px "Inter", sans-serif';
+    ctx.fillText('Cascade Log:', logX, OY + 15);
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '11px "JetBrains Mono", monospace';
+    for (let i = 0; i < cascadeLog.length; i++) {
+      const text = cascadeLog[i];
+      // Word wrap at ~25 chars
+      const maxW = W - logX - 10;
+      ctx.fillText(text, logX, OY + 35 + i * 18, maxW);
+    }
+  }
+
+  dropBtn.addEventListener('click', startDrop);
+  resetBtn.addEventListener('click', () => {
+    if (animFrame) clearTimeout(animFrame);
+    initGrid();
+    render();
+  });
+
+  initGrid();
+  render();
+})();
+
+// ============================================================
+// DEMO 3: MINI TETRIS
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-tetris');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const restartBtn = document.getElementById('tetris-restart-btn');
+  const scoreDisp = document.getElementById('tetris-score');
+  const levelDisp = document.getElementById('tetris-level');
+  const linesDisp = document.getElementById('tetris-lines');
+
+  const COLS = 10, ROWS = 20;
+  const CELL = Math.floor(Math.min((W - 120) / COLS, (H - 20) / ROWS));
+  const GRID_W = COLS * CELL, GRID_H = ROWS * CELL;
+  const OX = 10, OY = (H - GRID_H) / 2;
+  const PREVIEW_X = OX + GRID_W + 15;
+  const PREVIEW_Y = OY + 10;
+
+  const PIECES = [
+    { name: 'I', matrix: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#06b6d4' },
+    { name: 'O', matrix: [[1,1],[1,1]], color: '#eab308' },
+    { name: 'T', matrix: [[0,1,0],[1,1,1],[0,0,0]], color: '#a855f7' },
+    { name: 'S', matrix: [[0,1,1],[1,1,0],[0,0,0]], color: '#22c55e' },
+    { name: 'Z', matrix: [[1,1,0],[0,1,1],[0,0,0]], color: '#ef4444' },
+    { name: 'J', matrix: [[1,0,0],[1,1,1],[0,0,0]], color: '#3b82f6' },
+    { name: 'L', matrix: [[0,0,1],[1,1,1],[0,0,0]], color: '#f97316' }
+  ];
+
+  let grid, piece, pieceRow, pieceCol, pieceColor;
+  let nextPiece, nextColor;
+  let score, level, totalLines, gameOver;
+  let dropTimer, dropInterval, lastDrop;
+  let bag = [];
+  let running = false;
+
+  function shuffleBag() {
+    bag = [...PIECES].sort(() => Math.random() - 0.5);
+  }
+
+  function getNextFromBag() {
+    if (bag.length === 0) shuffleBag();
+    return bag.pop();
+  }
+
+  function init() {
+    grid = Array.from({length: ROWS}, () => Array(COLS).fill(0));
+    score = 0; level = 0; totalLines = 0; gameOver = false;
+    dropInterval = 800;
+    lastDrop = performance.now();
+    bag = [];
+    shuffleBag();
+    const first = getNextFromBag();
+    piece = deepCopy(first.matrix);
+    pieceColor = first.color;
+    const nxt = getNextFromBag();
+    nextPiece = deepCopy(nxt.matrix);
+    nextColor = nxt.color;
+    pieceRow = 0;
+    pieceCol = Math.floor((COLS - piece[0].length) / 2);
+    running = true;
+    updateDisplays();
+  }
+
+  function updateDisplays() {
+    scoreDisp.textContent = 'Score: ' + score;
+    levelDisp.textContent = 'Level: ' + level;
+    linesDisp.textContent = 'Lines: ' + totalLines;
+  }
+
+  function collides(mat, row, col) {
+    for (let r = 0; r < mat.length; r++) {
+      for (let c = 0; c < mat[r].length; c++) {
+        if (mat[r][c]) {
+          const gr = row + r, gc = col + c;
+          if (gr < 0 || gr >= ROWS || gc < 0 || gc >= COLS) return true;
+          if (grid[gr][gc]) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  function lock() {
+    for (let r = 0; r < piece.length; r++) {
+      for (let c = 0; c < piece[r].length; c++) {
+        if (piece[r][c]) {
+          const gr = pieceRow + r, gc = pieceCol + c;
+          if (gr >= 0 && gr < ROWS && gc >= 0 && gc < COLS) {
+            grid[gr][gc] = pieceColor;
+          }
+        }
+      }
+    }
+    clearLines();
+    spawnNext();
+  }
+
+  function clearLines() {
+    let cleared = 0;
+    for (let r = ROWS - 1; r >= 0; r--) {
+      if (grid[r].every(c => c !== 0)) {
+        grid.splice(r, 1);
+        grid.unshift(Array(COLS).fill(0));
+        cleared++;
+        r++; // recheck same index
+      }
+    }
+    if (cleared > 0) {
+      const pts = [0, 100, 300, 500, 800];
+      score += (pts[cleared] || 800) * (level + 1);
+      totalLines += cleared;
+      level = Math.floor(totalLines / 10);
+      const intervals = [800,720,630,550,470,380,300,220,130,100,83,83,83,67,67,67,50,50,50,33];
+      dropInterval = intervals[Math.min(level, intervals.length - 1)];
+      updateDisplays();
+    }
+  }
+
+  function spawnNext() {
+    piece = nextPiece;
+    pieceColor = nextColor;
+    const nxt = getNextFromBag();
+    nextPiece = deepCopy(nxt.matrix);
+    nextColor = nxt.color;
+    pieceRow = 0;
+    pieceCol = Math.floor((COLS - piece[0].length) / 2);
+    if (collides(piece, pieceRow, pieceCol)) {
+      gameOver = true;
+      running = false;
+    }
+  }
+
+  function getGhostRow() {
+    let r = pieceRow;
+    while (!collides(piece, r + 1, pieceCol)) r++;
+    return r;
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#0f0f1a';
+    ctx.fillRect(0, 0, W, H);
+
+    // Grid background
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(OX, OY, GRID_W, GRID_H);
+
+    // Locked blocks
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        if (grid[r][c]) {
+          ctx.fillStyle = grid[r][c];
+          ctx.fillRect(OX + c * CELL + 1, OY + r * CELL + 1, CELL - 2, CELL - 2);
+        }
+      }
+    }
+
+    if (!gameOver && piece) {
+      // Ghost piece
+      const ghostR = getGhostRow();
+      ctx.globalAlpha = 0.25;
+      for (let r = 0; r < piece.length; r++) {
+        for (let c = 0; c < piece[r].length; c++) {
+          if (piece[r][c]) {
+            ctx.fillStyle = pieceColor;
+            ctx.fillRect(OX + (pieceCol + c) * CELL + 1, OY + (ghostR + r) * CELL + 1, CELL - 2, CELL - 2);
+          }
+        }
+      }
+      ctx.globalAlpha = 1;
+
+      // Active piece
+      for (let r = 0; r < piece.length; r++) {
+        for (let c = 0; c < piece[r].length; c++) {
+          if (piece[r][c]) {
+            ctx.fillStyle = pieceColor;
+            ctx.fillRect(OX + (pieceCol + c) * CELL + 1, OY + (pieceRow + r) * CELL + 1, CELL - 2, CELL - 2);
+          }
+        }
+      }
+    }
+
+    // Grid lines
+    ctx.strokeStyle = '#333355';
+    ctx.lineWidth = 0.5;
+    for (let r = 0; r <= ROWS; r++) {
+      ctx.beginPath(); ctx.moveTo(OX, OY + r * CELL); ctx.lineTo(OX + GRID_W, OY + r * CELL); ctx.stroke();
+    }
+    for (let c = 0; c <= COLS; c++) {
+      ctx.beginPath(); ctx.moveTo(OX + c * CELL, OY); ctx.lineTo(OX + c * CELL, OY + GRID_H); ctx.stroke();
+    }
+
+    // Next piece preview
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = 'bold 12px "Inter", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('NEXT', PREVIEW_X, PREVIEW_Y);
+    if (nextPiece) {
+      const preCell = Math.min(CELL, 18);
+      ctx.fillStyle = '#1a1a2e';
+      ctx.fillRect(PREVIEW_X, PREVIEW_Y + 8, preCell * 4 + 4, preCell * 4 + 4);
+      for (let r = 0; r < nextPiece.length; r++) {
+        for (let c = 0; c < nextPiece[r].length; c++) {
+          if (nextPiece[r][c]) {
+            ctx.fillStyle = nextColor;
+            ctx.fillRect(PREVIEW_X + 2 + c * preCell + 1, PREVIEW_Y + 10 + r * preCell + 1, preCell - 2, preCell - 2);
+          }
+        }
+      }
+    }
+
+    // Score / Level / Lines on right side
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '12px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('Score: ' + score, PREVIEW_X, PREVIEW_Y + 110);
+    ctx.fillText('Level: ' + level, PREVIEW_X, PREVIEW_Y + 130);
+    ctx.fillText('Lines: ' + totalLines, PREVIEW_X, PREVIEW_Y + 150);
+
+    if (gameOver) {
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      ctx.fillRect(OX, OY + GRID_H / 2 - 30, GRID_W, 60);
+      ctx.fillStyle = '#ef4444';
+      ctx.font = 'bold 24px "Inter", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('GAME OVER', OX + GRID_W / 2, OY + GRID_H / 2 + 8);
+    }
+  }
+
+  function gameLoop(now) {
+    if (!running) { render(); return; }
+    if (now - lastDrop > dropInterval) {
+      if (!collides(piece, pieceRow + 1, pieceCol)) {
+        pieceRow++;
+      } else {
+        lock();
+      }
+      lastDrop = now;
+    }
+    render();
+    requestAnimationFrame(gameLoop);
+  }
+
+  // Input handling
+  document.addEventListener('keydown', (e) => {
+    if (!running || gameOver) return;
+    // Only handle if the tetris canvas is somewhat visible
+    const rect = canvas.getBoundingClientRect();
+    if (rect.bottom < 0 || rect.top > window.innerHeight) return;
+
+    switch (e.key) {
+      case 'ArrowLeft':
+        if (!collides(piece, pieceRow, pieceCol - 1)) pieceCol--;
+        e.preventDefault();
+        break;
+      case 'ArrowRight':
+        if (!collides(piece, pieceRow, pieceCol + 1)) pieceCol++;
+        e.preventDefault();
+        break;
+      case 'ArrowDown':
+        if (!collides(piece, pieceRow + 1, pieceCol)) {
+          pieceRow++;
+          score += 1;
+          lastDrop = performance.now();
+          updateDisplays();
+        }
+        e.preventDefault();
+        break;
+      case 'ArrowUp':
+        const rotated = rotateCW(piece);
+        if (!collides(rotated, pieceRow, pieceCol)) {
+          piece = rotated;
+        } else if (!collides(rotated, pieceRow, pieceCol - 1)) {
+          piece = rotated; pieceCol--;
+        } else if (!collides(rotated, pieceRow, pieceCol + 1)) {
+          piece = rotated; pieceCol++;
+        }
+        e.preventDefault();
+        break;
+      case ' ':
+        while (!collides(piece, pieceRow + 1, pieceCol)) {
+          pieceRow++;
+          score += 2;
+        }
+        lock();
+        lastDrop = performance.now();
+        updateDisplays();
+        e.preventDefault();
+        break;
+    }
+  });
+
+  restartBtn.addEventListener('click', () => {
+    init();
+    requestAnimationFrame(gameLoop);
+  });
+
+  // Start on scroll into view
+  const observer = new IntersectionObserver((entries) => {
+    if (entries[0].isIntersecting && !running && !gameOver) {
+      init();
+      requestAnimationFrame(gameLoop);
+    }
+  }, { threshold: 0.3 });
+  observer.observe(canvas);
+
+  init();
+  render();
+})();
+</script>

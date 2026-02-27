@@ -1,0 +1,884 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 29: Management / Tycoon">
+  <div class="container page-content">
+
+    <!-- Module Header -->
+    <div class="module-header">
+      <div class="module-number">Module 29</div>
+      <h1>Management / Tycoon</h1>
+      <p class="module-theme">Build and run a business where every system pulls against every other | Theme Park Tycoon</p>
+    </div>
+
+    <blockquote>
+      "The player should feel like a plate-spinner at the circus &mdash; the moment one plate is stable, two others start wobbling."
+    </blockquote>
+
+    <!-- ============================================================ -->
+    <!-- WEEK 1: HISTORY & DESIGN THEORY                              -->
+    <!-- ============================================================ -->
+
+    <h2>Week 1: History &amp; Design Theory</h2>
+
+    <h3>The Origin</h3>
+    <p>
+      The management genre was born from a single question Will Wright asked in 1989: what if the player was not a character inside the world but the invisible hand shaping it? <strong>SimCity</strong> gave players a blank grid and a budget, then let them zone residential, commercial, and industrial areas while watching simulated citizens move in, commute, complain, and leave. There was no win condition. The game was the system itself, and the joy came from watching your decisions ripple through interconnected feedback loops.
+    </p>
+
+    <h3>How the Genre Evolved</h3>
+    <p>
+      <strong>SimCity (1989)</strong> &mdash; Will Wright established the template: a grid-based world, zoning mechanics, budgets, and a simulation that runs on its own while the player nudges it with infrastructure decisions. Traffic jams, fires, and crime emerged not from scripts but from the interplay of systems.
+    </p>
+    <p>
+      <strong>RollerCoaster Tycoon (1999)</strong> &mdash; Chris Sawyer, working almost entirely in assembly language, narrowed the scope from an entire city to a single theme park and deepened every system. Guests had individual needs &mdash; hunger, thirst, nausea, excitement &mdash; and would pathfind to rides, food stalls, and bathrooms. The financial model was razor-sharp.
+    </p>
+    <p>
+      <strong>Two Point Hospital (2018)</strong> &mdash; Two Point Studios modernized the tycoon formula with clarity of information. The breakthrough was in UI design &mdash; overlays, graphs, and dashboards that made the simulation legible to the player without dumbing it down.
+    </p>
+
+    <h3>What Makes It "Great"</h3>
+    <p>
+      A great management game creates a web of systems where every decision has second-order consequences. Hiring more staff costs money, which means raising prices, which lowers satisfaction, which reduces visitors, which reduces income. The player is constantly triangulating between competing pressures, and the game never tells them the "right" answer.
+    </p>
+
+    <h3>The Essential Mechanic</h3>
+    <p>
+      <strong>Balancing interconnected systems</strong> where optimizing one often worsens another.
+    </p>
+
+    <hr />
+
+    <!-- ============================================================ -->
+    <!-- WEEK 2: BUILD THE MVP                                        -->
+    <!-- ============================================================ -->
+
+    <h2>Week 2: Build the MVP</h2>
+
+    <h3>What You're Building</h3>
+    <p>
+      A Mini Theme Park Tycoon played on a grid. The player places attractions (rides, food stalls, restrooms) using a budget. Visitors arrive, pathfind to attractions based on their needs, queue up, get served, and eventually leave. The player earns income from ticket sales and pays maintenance costs. If cash drops below zero, the park goes bankrupt.
+    </p>
+
+    <h3>Core Concepts</h3>
+
+    <!-- ==================== CONCEPT 1: SIMULATION LOOP ==================== -->
+
+    <h4>1. Simulation Loop</h4>
+    <p>
+      Entities (visitors) have internal needs and behaviors that tick forward each update cycle. Every frame, each visitor evaluates its current state &mdash; hungry, bored, needs restroom &mdash; and acts on the most pressing need. The simulation loop is the heartbeat of the entire game.
+    </p>
+    <pre is:raw><code>function simulationTick(deltaTime, speedMultiplier):
+    scaledDelta = deltaTime * speedMultiplier
+
+    if shouldSpawnVisitor(park.reputation):
+        visitor = createVisitor(park.entrance)
+        park.visitors.add(visitor)
+
+    for each visitor in park.visitors:
+        visitor.hunger += HUNGER_RATE * scaledDelta
+        visitor.boredom += BOREDOM_RATE * scaledDelta
+        visitor.bladder += BLADDER_RATE * scaledDelta
+        updateVisitorBehavior(visitor, scaledDelta)
+
+    park.cash += calculateIncome(scaledDelta)
+    park.cash -= calculateExpenses(scaledDelta)</code></pre>
+    <p>
+      <strong>Why it matters:</strong> The simulation loop is what makes a management game feel alive. Without it, placing buildings on a grid is just a puzzle. With it, the grid becomes a living system that responds to your design choices.
+    </p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Theme Park Simulation Loop</div>
+      <p class="demo-hint">Watch customers (colored dots) arrive, pathfind to attractions, queue, get served, and leave. Adjust the arrival rate and service speed with sliders. The satisfaction graph updates in real time.</p>
+      <canvas id="demo-sim-loop" width="760" height="500"></canvas>
+      <div class="demo-controls">
+        <label>Arrival Rate: <input type="range" id="sim-arrival" min="1" max="10" value="4" /></label>
+        <span class="value-display" id="sim-arrival-val">4/min</span>
+        <label style="margin-left:1rem;">Service Speed: <input type="range" id="sim-service" min="1" max="10" value="5" /></label>
+        <span class="value-display" id="sim-service-val">5x</span>
+        <span class="value-display" id="sim-visitors-count">Visitors: 0</span>
+      </div>
+    </div>
+
+    <!-- ==================== CONCEPT 2: SATISFACTION ==================== -->
+
+    <h4>2. Satisfaction / Demand Modeling</h4>
+    <p>
+      Visitor happiness is a function of multiple weighted inputs. Each visitor tracks individual satisfaction based on how well their needs are met, wait times, and variety. Aggregate satisfaction becomes the park's reputation, which controls visitor inflow.
+    </p>
+    <pre is:raw><code>function calculateVisitorSatisfaction(visitor):
+    satisfaction = BASE_SATISFACTION
+    if visitor.hunger &gt; HUNGER_THRESHOLD:
+        satisfaction -= (visitor.hunger - HUNGER_THRESHOLD) * HUNGER_PENALTY
+    if visitor.boredom &gt; BOREDOM_THRESHOLD:
+        satisfaction -= (visitor.boredom - BOREDOM_THRESHOLD) * BOREDOM_PENALTY
+    satisfaction -= visitor.totalWaitTime * WAIT_PENALTY
+    satisfaction += countUniqueRidesVisited(visitor) * VARIETY_BONUS
+    return clamp(satisfaction, 0, 100)</code></pre>
+    <p>
+      <strong>Why it matters:</strong> Satisfaction modeling is what transforms a placement game into a management game. When the player realizes that cheap food lowers wait times but tanks quality satisfaction &mdash; that is the moment they start truly managing.
+    </p>
+
+    <!-- ==================== CONCEPT 3: PLACEMENT ==================== -->
+
+    <h4>3. Placement and Zoning</h4>
+    <p>
+      The player places facilities on a grid, each with a zone of influence. Placement determines traffic flow, queue lengths, and whether visitors can find what they need.
+    </p>
+    <pre is:raw><code>function placeFacility(grid, facility, gridX, gridY):
+    for dx in range(facility.width):
+        for dy in range(facility.height):
+            if grid[gridX + dx][gridY + dy].occupied:
+                return PLACEMENT_BLOCKED
+    // Place and register zone of influence
+    for each cell in getCellsInRadius(gridX, gridY, facility.influenceRadius):
+        cell.nearbyFacilities.add(facility)
+    park.cash -= facility.buildCost</code></pre>
+    <p>
+      <strong>Why it matters:</strong> Placement is the player's primary design tool. Good placement reduces visitor walking time and prevents bottlenecks. Bad placement creates frustrated visitors wandering past empty stalls.
+    </p>
+
+    <!-- ==================== CONCEPT 4: FINANCIAL MODEL ==================== -->
+
+    <h4>4. Financial Model</h4>
+    <p>
+      Income and expenses flow continuously. Rides generate ticket revenue per visitor served, food stalls earn per sale, and the park pays maintenance costs per facility per tick. Cash flow is displayed in real time, and if cash hits zero, the game ends.
+    </p>
+    <pre is:raw><code>function calculateIncome(scaledDelta):
+    income = 0
+    for each facility in park.facilities:
+        if facility.type == RIDE:
+            income += facility.visitorsServedThisTick * facility.ticketPrice
+        else if facility.type == FOOD_STALL:
+            income += facility.salesThisTick * facility.itemPrice
+    income += park.newVisitorsThisTick * park.entryFee
+    return income</code></pre>
+    <p>
+      <strong>Why it matters:</strong> The financial model is the constraint that makes placement meaningful. Without money, placing buildings is free and the game is trivial. With a budget, every ride is an investment that must pay for itself.
+    </p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Financial Dashboard</div>
+      <p class="demo-hint">Click the grid to place or remove attractions. Each type has a cost and generates revenue. Watch the income vs. expenses chart update in real-time. Try to keep cash positive!</p>
+      <canvas id="demo-financial" width="760" height="500"></canvas>
+      <div class="demo-controls">
+        <button id="fin-ride-btn" style="background:#3b82f6;color:#fff;border:none;padding:0.3rem 0.8rem;border-radius:4px;cursor:pointer;">Place Ride ($500)</button>
+        <button id="fin-food-btn" style="background:#22c55e;color:#fff;border:none;padding:0.3rem 0.8rem;border-radius:4px;cursor:pointer;">Place Food ($200)</button>
+        <button id="fin-rest-btn" style="background:#a855f7;color:#fff;border:none;padding:0.3rem 0.8rem;border-radius:4px;cursor:pointer;">Place Restroom ($150)</button>
+        <button id="fin-remove-btn" style="background:#ef4444;color:#fff;border:none;padding:0.3rem 0.8rem;border-radius:4px;cursor:pointer;">Remove Mode</button>
+        <span class="value-display" id="fin-cash">Cash: $2000</span>
+      </div>
+    </div>
+
+    <!-- ==================== CONCEPT 5: TIME ACCELERATION ==================== -->
+
+    <h4>5. Time Acceleration</h4>
+    <p>
+      The player can toggle simulation speed between 1x, 2x, and 4x by multiplying the delta time. The key challenge is ensuring nothing breaks at higher speeds.
+    </p>
+    <pre is:raw><code>SPEED_OPTIONS = [1.0, 2.0, 4.0]
+
+function gameLoop(deltaTime):
+    scaledDelta = min(deltaTime * multiplier, MAX_TICK_DELTA)
+    if scaledDelta &gt; TICK_THRESHOLD:
+        subTicks = ceil(scaledDelta / TICK_THRESHOLD)
+        for i in range(subTicks):
+            simulationTick(scaledDelta / subTicks)
+    else:
+        simulationTick(scaledDelta)</code></pre>
+    <p>
+      <strong>Why it matters:</strong> Management games involve waiting. Time acceleration lets the player skip the boring parts while maintaining the simulation's integrity.
+    </p>
+
+    <!-- ==================== CONCEPT 6: UI ==================== -->
+
+    <h4>6. UI for Complex Systems</h4>
+    <p>
+      A management game lives or dies by its information architecture. The player must see park-wide stats at a glance, drill down into individual facility performance, and spot problems before they cascade.
+    </p>
+    <pre is:raw><code>function renderDashboard(park):
+    drawText("Cash: $" + formatNumber(park.cash))
+    drawText("Visitors: " + park.visitors.length)
+    drawText("Reputation: " + round(park.reputation) + "%")
+    cashFlow = getCashFlowPerMinute()
+    color = cashFlow &gt;= 0 ? GREEN : RED
+    drawText(formatCashFlow(cashFlow) + "/min", color)</code></pre>
+    <p>
+      <strong>Why it matters:</strong> The simulation can be deep and accurate, but if the player cannot read it, they cannot play it. UI is not a cosmetic layer &mdash; it is the player's primary interface with the simulation.
+    </p>
+
+    <!-- ==================== CONCEPT 7: EMERGENT BEHAVIOR ==================== -->
+
+    <h4>7. Emergent Behavior from Simple Rules</h4>
+    <p>
+      Each visitor follows simple individual rules &mdash; find the nearest facility that satisfies my most pressing need, walk there, queue, get served, repeat. But when hundreds of visitors follow these rules simultaneously, patterns emerge: traffic jams near popular rides, dead zones, rush-hour surges at food stalls.
+    </p>
+    <pre is:raw><code>function updateVisitorBehavior(visitor, scaledDelta):
+    switch visitor.state:
+        case DECIDING:
+            need = getMostPressingNeed(visitor)
+            facility = findNearestFacility(visitor, need.type)
+            if facility: visitor.state = WALKING
+            else: visitor.state = LEAVING
+        case WALKING:
+            moveToward(visitor, visitor.target.position)
+            if arrived: visitor.state = QUEUING
+        case QUEUING:
+            visitor.waitTime += scaledDelta
+            if visitor.waitTime &gt; MAX_WAIT:
+                visitor.state = DECIDING  // give up
+        case LEAVING:
+            moveToward(visitor, park.exit)</code></pre>
+    <p>
+      <strong>Why it matters:</strong> Emergent behavior is the magic of management games. When a player notices that visitors leaving the roller coaster always flood the nearby food stall, they did not read that in a tutorial &mdash; they observed it in the simulation.
+    </p>
+
+    <hr />
+
+    <!-- ==================== STRETCH GOALS ==================== -->
+
+    <h3>Stretch Goals</h3>
+    <ul>
+      <li><strong>Loan system</strong> &mdash; Borrow money at interest to fund expansion.</li>
+      <li><strong>Staff entities</strong> &mdash; Hire janitors and mechanics that must be routed to facilities.</li>
+      <li><strong>Random events</strong> &mdash; Rainstorms lower outdoor ride satisfaction, VIP visitors with high expectations.</li>
+      <li><strong>Heatmap overlay</strong> &mdash; Show real-time traffic patterns across the park.</li>
+    </ul>
+
+    <h3>MVP Spec</h3>
+    <table>
+      <thead>
+        <tr><th>Component</th><th>Minimum Viable Version</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Grid</td><td>16x16 tile map</td></tr>
+        <tr><td>Facilities</td><td>3 types: Ride, Food Stall, Restroom</td></tr>
+        <tr><td>Visitors</td><td>Spawn at entrance, pathfind to needs, queue, get served, leave</td></tr>
+        <tr><td>Satisfaction</td><td>Per-visitor score based on needs met, wait times, variety</td></tr>
+        <tr><td>Financial Model</td><td>Entry fee + per-use charges, maintenance costs, bankruptcy = game over</td></tr>
+        <tr><td>Time Controls</td><td>1x / 2x / 4x speed toggle</td></tr>
+        <tr><td>UI</td><td>Top bar (cash, visitors, reputation), facility panel on click</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliverable</h3>
+    <p>
+      A playable management simulation where the player places three facility types on a grid, watches visitors autonomously navigate to satisfy their needs, manages cash flow, and can accelerate time. The game must demonstrate emergent visitor behavior, a functional financial model, and a clear dashboard.
+    </p>
+
+    <hr />
+
+    <!-- ==================== DISCUSSION QUESTIONS ==================== -->
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li><strong>The Information Problem:</strong> RollerCoaster Tycoon lets you click on any guest to see their thoughts. Two Point Hospital uses overlays. Which approach better serves the player, and at what scale does one break down?</li>
+      <li><strong>Depth vs. Readability:</strong> Adding more interconnected systems makes the simulation richer but harder to understand. Where is the line between "deep" and "opaque"?</li>
+      <li><strong>Emergent Behavior as a Design Tool:</strong> What if simple rules produce degenerate strategies (e.g., one of each facility at the entrance)? How do you design rules that produce interesting emergent behavior?</li>
+      <li><strong>The Tycoon Difficulty Curve:</strong> How do you design difficulty scaling that stays challenging without feeling punitive?</li>
+    </ol>
+
+    <!-- Module Navigation -->
+    <div class="module-nav">
+      <a href={`${base}modules/28-simulation-racing`}>&larr; Previous Module</a>
+      <a href={`${base}modules/30-farming-life-sim`}>Next Module &rarr;</a>
+    </div>
+
+  </div>
+</BaseLayout>
+
+<script>
+// ============================================================
+// DEMO 1: THEME PARK SIMULATION LOOP
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-sim-loop');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const arrivalSlider = document.getElementById('sim-arrival');
+  const serviceSlider = document.getElementById('sim-service');
+  const arrivalVal = document.getElementById('sim-arrival-val');
+  const serviceVal = document.getElementById('sim-service-val');
+  const visitorsCount = document.getElementById('sim-visitors-count');
+
+  // Park layout
+  const parkX = 20, parkY = 20, parkW = 460, parkH = 460;
+  const graphX = 500, graphY = 20, graphW = 240, graphH = 200;
+
+  // Facilities (fixed positions)
+  const facilities = [
+    { x: 120, y: 100, w: 50, h: 50, type: 'ride', color: '#3b82f6', label: 'Ride', queue: [], serviceTime: 3, serveTimer: 0, serving: null },
+    { x: 300, y: 100, w: 50, h: 50, type: 'food', color: '#22c55e', label: 'Food', queue: [], serviceTime: 2, serveTimer: 0, serving: null },
+    { x: 200, y: 280, w: 50, h: 50, type: 'ride', color: '#3b82f6', label: 'Ride 2', queue: [], serviceTime: 3, serveTimer: 0, serving: null },
+    { x: 350, y: 350, w: 40, h: 40, type: 'restroom', color: '#a855f7', label: 'WC', queue: [], serviceTime: 1.5, serveTimer: 0, serving: null },
+    { x: 100, y: 350, w: 50, h: 50, type: 'food', color: '#22c55e', label: 'Food 2', queue: [], serviceTime: 2, serveTimer: 0, serving: null }
+  ];
+
+  const entrance = { x: 50, y: parkH - 30 };
+  const exit = { x: parkW - 30, y: parkH - 30 };
+
+  let visitors = [];
+  let spawnTimer = 0;
+  let satisfactionHistory = [];
+  let simTime = 0;
+  let nextId = 0;
+
+  function createVisitor() {
+    return {
+      id: nextId++,
+      x: entrance.x + Math.random() * 20,
+      y: entrance.y + Math.random() * 20,
+      state: 'deciding',
+      target: null,
+      hunger: 0,
+      boredom: 80 + Math.random() * 20,
+      bladder: 0,
+      satisfaction: 80,
+      waitTime: 0,
+      visitedCount: 0,
+      color: `hsl(${Math.random() * 360}, 60%, 60%)`,
+      speed: 1.2 + Math.random() * 0.6
+    };
+  }
+
+  function getMostPressingNeed(v) {
+    const needs = [
+      { type: 'ride', urgency: v.boredom },
+      { type: 'food', urgency: v.hunger },
+      { type: 'restroom', urgency: v.bladder }
+    ];
+    needs.sort((a, b) => b.urgency - a.urgency);
+    return needs[0];
+  }
+
+  function findFacility(v, type) {
+    const candidates = facilities.filter(f => f.type === type);
+    if (candidates.length === 0) return null;
+    // Nearest
+    let best = null, bestDist = Infinity;
+    for (const f of candidates) {
+      const dx = (f.x + f.w / 2) - v.x;
+      const dy = (f.y + f.h / 2) - v.y;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d < bestDist) { bestDist = d; best = f; }
+    }
+    return best;
+  }
+
+  function moveToward(v, tx, ty, dt) {
+    const dx = tx - v.x;
+    const dy = ty - v.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 3) return true;
+    const speed = v.speed * 60 * dt;
+    v.x += (dx / dist) * Math.min(speed, dist);
+    v.y += (dy / dist) * Math.min(speed, dist);
+    return false;
+  }
+
+  function draw() {
+    const arrivalRate = parseInt(arrivalSlider.value);
+    const serviceSpeed = parseInt(serviceSlider.value);
+    arrivalVal.textContent = arrivalRate + '/min';
+    serviceVal.textContent = serviceSpeed + 'x';
+
+    const dt = 1 / 60;
+    simTime += dt;
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Draw park background
+    ctx.fillStyle = '#0f0f12';
+    ctx.fillRect(parkX, parkY, parkW, parkH);
+    ctx.strokeStyle = '#27272a';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(parkX, parkY, parkW, parkH);
+
+    // Draw paths
+    ctx.strokeStyle = '#1e1e24';
+    ctx.lineWidth = 12;
+    ctx.beginPath();
+    ctx.moveTo(entrance.x, entrance.y);
+    ctx.lineTo(200, 200);
+    ctx.lineTo(350, 200);
+    ctx.lineTo(exit.x, exit.y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(200, 200);
+    ctx.lineTo(200, 100);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(350, 200);
+    ctx.lineTo(350, 100);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(200, 200);
+    ctx.lineTo(100, 350);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(350, 200);
+    ctx.lineTo(350, 350);
+    ctx.stroke();
+
+    // Draw facilities
+    for (const f of facilities) {
+      ctx.fillStyle = f.color + '33';
+      ctx.fillRect(f.x, f.y, f.w, f.h);
+      ctx.strokeStyle = f.color;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(f.x, f.y, f.w, f.h);
+      ctx.fillStyle = f.color;
+      ctx.font = '600 10px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(f.label, f.x + f.w / 2, f.y - 5);
+      // Queue count
+      ctx.fillStyle = '#a1a1aa';
+      ctx.font = '500 9px "JetBrains Mono", monospace';
+      ctx.fillText('Q:' + f.queue.length, f.x + f.w / 2, f.y + f.h + 12);
+    }
+
+    // Entrance/Exit labels
+    ctx.fillStyle = '#71717a';
+    ctx.font = '500 10px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('ENTER', entrance.x, entrance.y + 18);
+    ctx.fillText('EXIT', exit.x, exit.y + 18);
+
+    // Spawn visitors
+    spawnTimer += dt * arrivalRate;
+    while (spawnTimer >= 1) {
+      spawnTimer -= 1;
+      if (visitors.length < 80) {
+        visitors.push(createVisitor());
+      }
+    }
+
+    // Update facilities (serve visitors)
+    for (const f of facilities) {
+      const sdt = dt * serviceSpeed;
+      if (f.serving) {
+        f.serveTimer -= sdt;
+        if (f.serveTimer <= 0) {
+          // Done serving
+          const v = f.serving;
+          v.visitedCount++;
+          if (f.type === 'ride') v.boredom = Math.max(0, v.boredom - 50);
+          if (f.type === 'food') v.hunger = Math.max(0, v.hunger - 60);
+          if (f.type === 'restroom') v.bladder = Math.max(0, v.bladder - 70);
+          v.satisfaction = Math.min(100, v.satisfaction + 5);
+          v.state = 'deciding';
+          f.serving = null;
+        }
+      }
+      if (!f.serving && f.queue.length > 0) {
+        f.serving = f.queue.shift();
+        f.serveTimer = f.serviceTime;
+        f.serving.state = 'being_served';
+      }
+    }
+
+    // Update visitors
+    for (const v of visitors) {
+      v.hunger += 3 * dt;
+      v.boredom += 2 * dt;
+      v.bladder += 1.5 * dt;
+
+      switch (v.state) {
+        case 'deciding': {
+          if (v.visitedCount >= 3 + Math.floor(Math.random() * 3) || v.satisfaction < 20) {
+            v.state = 'leaving';
+            break;
+          }
+          const need = getMostPressingNeed(v);
+          const fac = findFacility(v, need.type);
+          if (fac) {
+            v.target = fac;
+            v.state = 'walking';
+          } else {
+            v.state = 'leaving';
+          }
+          break;
+        }
+        case 'walking': {
+          if (v.target) {
+            const arrived = moveToward(v, v.target.x + v.target.w / 2, v.target.y + v.target.h / 2, dt);
+            if (arrived) {
+              v.state = 'queuing';
+              v.target.queue.push(v);
+              v.waitTime = 0;
+            }
+          }
+          break;
+        }
+        case 'queuing': {
+          v.waitTime += dt;
+          if (v.waitTime > 8) {
+            // Leave queue
+            if (v.target) {
+              v.target.queue = v.target.queue.filter(q => q.id !== v.id);
+            }
+            v.satisfaction -= 15;
+            v.state = 'deciding';
+          }
+          break;
+        }
+        case 'being_served':
+          break;
+        case 'leaving': {
+          const done = moveToward(v, exit.x, exit.y, dt);
+          if (done) v.state = 'gone';
+          break;
+        }
+      }
+
+      // Satisfaction penalties
+      if (v.hunger > 50) v.satisfaction -= 0.5 * dt;
+      if (v.boredom > 60) v.satisfaction -= 0.3 * dt;
+      if (v.bladder > 40) v.satisfaction -= 0.4 * dt;
+      v.satisfaction = Math.max(0, Math.min(100, v.satisfaction));
+    }
+
+    // Remove gone visitors
+    visitors = visitors.filter(v => v.state !== 'gone');
+
+    // Draw visitors
+    for (const v of visitors) {
+      ctx.beginPath();
+      ctx.arc(v.x, v.y, 4, 0, Math.PI * 2);
+      ctx.fillStyle = v.state === 'queuing' ? '#f59e0b' : v.state === 'being_served' ? '#fff' : v.color;
+      ctx.fill();
+    }
+
+    visitorsCount.textContent = 'Visitors: ' + visitors.length;
+
+    // Satisfaction graph
+    if (visitors.length > 0) {
+      const avgSat = visitors.reduce((s, v) => s + v.satisfaction, 0) / visitors.length;
+      satisfactionHistory.push(avgSat);
+      if (satisfactionHistory.length > graphW) satisfactionHistory.shift();
+    }
+
+    // Draw graph background
+    ctx.fillStyle = '#111114';
+    ctx.fillRect(graphX, graphY, graphW, graphH);
+    ctx.strokeStyle = '#27272a';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(graphX, graphY, graphW, graphH);
+
+    ctx.fillStyle = '#a1a1aa';
+    ctx.font = '600 11px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('Avg Satisfaction', graphX + 5, graphY - 5);
+
+    // Draw graph lines
+    if (satisfactionHistory.length > 1) {
+      ctx.beginPath();
+      for (let i = 0; i < satisfactionHistory.length; i++) {
+        const x = graphX + (i / graphW) * graphW;
+        const y = graphY + graphH - (satisfactionHistory[i] / 100) * graphH;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = '#22c55e';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+
+    // 50% line
+    ctx.strokeStyle = '#3f3f46';
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(graphX, graphY + graphH / 2);
+    ctx.lineTo(graphX + graphW, graphY + graphH / 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#71717a';
+    ctx.font = '500 9px "JetBrains Mono", monospace';
+    ctx.fillText('50%', graphX + graphW + 4, graphY + graphH / 2 + 3);
+    ctx.fillText('100%', graphX + graphW + 4, graphY + 10);
+    ctx.fillText('0%', graphX + graphW + 4, graphY + graphH);
+
+    // Legend below graph
+    const legY = graphY + graphH + 30;
+    ctx.fillStyle = '#a1a1aa';
+    ctx.font = '500 10px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('Dot Colors:', graphX, legY);
+    const states = [
+      { color: '#71717a', label: 'Walking' },
+      { color: '#f59e0b', label: 'Queuing' },
+      { color: '#ffffff', label: 'Being Served' }
+    ];
+    let lx = graphX;
+    let ly = legY + 16;
+    for (const s of states) {
+      ctx.beginPath();
+      ctx.arc(lx + 5, ly, 4, 0, Math.PI * 2);
+      ctx.fillStyle = s.color;
+      ctx.fill();
+      ctx.fillStyle = '#a1a1aa';
+      ctx.fillText(s.label, lx + 14, ly + 3);
+      ly += 18;
+    }
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+
+// ============================================================
+// DEMO 2: FINANCIAL DASHBOARD
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-financial');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const rideBtn = document.getElementById('fin-ride-btn');
+  const foodBtn = document.getElementById('fin-food-btn');
+  const restBtn = document.getElementById('fin-rest-btn');
+  const removeBtn = document.getElementById('fin-remove-btn');
+  const cashDisplay = document.getElementById('fin-cash');
+
+  const GRID_SIZE = 8;
+  const CELL = 45;
+  const gridOffX = 20;
+  const gridOffY = 50;
+  const chartX = 400;
+  const chartY = 50;
+  const chartW = 340;
+  const chartH = 180;
+
+  let cash = 2000;
+  let placementMode = 'ride';
+  let grid = [];
+  for (let r = 0; r < GRID_SIZE; r++) {
+    grid[r] = [];
+    for (let c = 0; c < GRID_SIZE; c++) {
+      grid[r][c] = null;
+    }
+  }
+
+  const FACILITY_TYPES = {
+    ride: { cost: 500, revenue: 8, maintenance: 2, color: '#3b82f6', label: 'R' },
+    food: { cost: 200, revenue: 5, maintenance: 1, color: '#22c55e', label: 'F' },
+    restroom: { cost: 150, revenue: 2, maintenance: 0.5, color: '#a855f7', label: 'W' }
+  };
+
+  let incomeHistory = [];
+  let expenseHistory = [];
+  let cashHistory = [];
+  let simTime = 0;
+
+  rideBtn.addEventListener('click', () => placementMode = 'ride');
+  foodBtn.addEventListener('click', () => placementMode = 'food');
+  restBtn.addEventListener('click', () => placementMode = 'restroom');
+  removeBtn.addEventListener('click', () => placementMode = 'remove');
+
+  function getGridCell(e) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = W / rect.width;
+    const scaleY = H / rect.height;
+    const mx = (e.clientX - rect.left) * scaleX;
+    const my = (e.clientY - rect.top) * scaleY;
+    const c = Math.floor((mx - gridOffX) / CELL);
+    const r = Math.floor((my - gridOffY) / CELL);
+    if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) return { r, c };
+    return null;
+  }
+
+  canvas.addEventListener('click', function(e) {
+    const cell = getGridCell(e);
+    if (!cell) return;
+
+    if (placementMode === 'remove') {
+      if (grid[cell.r][cell.c]) {
+        // Refund 50%
+        const type = grid[cell.r][cell.c];
+        cash += Math.floor(FACILITY_TYPES[type].cost * 0.5);
+        grid[cell.r][cell.c] = null;
+      }
+    } else {
+      if (grid[cell.r][cell.c]) return; // occupied
+      const ft = FACILITY_TYPES[placementMode];
+      if (cash < ft.cost) return; // can't afford
+      cash -= ft.cost;
+      grid[cell.r][cell.c] = placementMode;
+    }
+  });
+
+  function countFacilities() {
+    let counts = { ride: 0, food: 0, restroom: 0 };
+    for (let r = 0; r < GRID_SIZE; r++) {
+      for (let c = 0; c < GRID_SIZE; c++) {
+        if (grid[r][c]) counts[grid[r][c]]++;
+      }
+    }
+    return counts;
+  }
+
+  function draw() {
+    const dt = 1 / 60;
+    simTime += dt;
+    ctx.clearRect(0, 0, W, H);
+
+    // Calculate financials
+    const counts = countFacilities();
+    let tickIncome = 0;
+    let tickExpense = 0;
+    for (const [type, count] of Object.entries(counts)) {
+      const ft = FACILITY_TYPES[type];
+      tickIncome += count * ft.revenue * dt;
+      tickExpense += count * ft.maintenance * dt;
+    }
+    cash += tickIncome - tickExpense;
+    cashDisplay.textContent = 'Cash: $' + Math.round(cash);
+
+    // Record history
+    if (Math.floor(simTime * 4) > incomeHistory.length) {
+      const totalIncome = Object.entries(counts).reduce((s, [t, c]) => s + c * FACILITY_TYPES[t].revenue, 0);
+      const totalExpense = Object.entries(counts).reduce((s, [t, c]) => s + c * FACILITY_TYPES[t].maintenance, 0);
+      incomeHistory.push(totalIncome);
+      expenseHistory.push(totalExpense);
+      cashHistory.push(cash);
+      if (incomeHistory.length > chartW / 2) {
+        incomeHistory.shift();
+        expenseHistory.shift();
+        cashHistory.shift();
+      }
+    }
+
+    // Draw title
+    ctx.fillStyle = '#a1a1aa';
+    ctx.font = '600 13px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('Park Grid (click to place)', gridOffX, gridOffY - 10);
+
+    // Highlight active mode
+    ctx.fillStyle = '#71717a';
+    ctx.font = '500 11px "JetBrains Mono", monospace';
+    ctx.fillText('Mode: ' + placementMode.toUpperCase(), gridOffX, gridOffY - 28);
+
+    // Draw grid
+    for (let r = 0; r < GRID_SIZE; r++) {
+      for (let c = 0; c < GRID_SIZE; c++) {
+        const x = gridOffX + c * CELL;
+        const y = gridOffY + r * CELL;
+
+        ctx.fillStyle = '#111114';
+        ctx.fillRect(x, y, CELL - 2, CELL - 2);
+        ctx.strokeStyle = '#27272a';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x, y, CELL - 2, CELL - 2);
+
+        if (grid[r][c]) {
+          const ft = FACILITY_TYPES[grid[r][c]];
+          ctx.fillStyle = ft.color + '44';
+          ctx.fillRect(x + 2, y + 2, CELL - 6, CELL - 6);
+          ctx.strokeStyle = ft.color;
+          ctx.lineWidth = 2;
+          ctx.strokeRect(x + 2, y + 2, CELL - 6, CELL - 6);
+          ctx.fillStyle = ft.color;
+          ctx.font = '700 16px "JetBrains Mono", monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(ft.label, x + CELL / 2 - 1, y + CELL / 2);
+          ctx.textBaseline = 'alphabetic';
+        }
+      }
+    }
+
+    // Draw chart background
+    ctx.fillStyle = '#111114';
+    ctx.fillRect(chartX, chartY, chartW, chartH);
+    ctx.strokeStyle = '#27272a';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(chartX, chartY, chartW, chartH);
+
+    ctx.fillStyle = '#a1a1aa';
+    ctx.font = '600 11px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('Income vs Expenses ($/sec)', chartX + 5, chartY - 5);
+
+    // Draw chart data
+    if (incomeHistory.length > 1) {
+      const maxVal = Math.max(20, ...incomeHistory, ...expenseHistory);
+
+      // Income line (green)
+      ctx.beginPath();
+      for (let i = 0; i < incomeHistory.length; i++) {
+        const x = chartX + (i / (incomeHistory.length - 1)) * chartW;
+        const y = chartY + chartH - (incomeHistory[i] / maxVal) * chartH;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = '#22c55e';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Expense line (red)
+      ctx.beginPath();
+      for (let i = 0; i < expenseHistory.length; i++) {
+        const x = chartX + (i / (expenseHistory.length - 1)) * chartW;
+        const y = chartY + chartH - (expenseHistory[i] / maxVal) * chartH;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // Chart legend
+    const legY2 = chartY + chartH + 20;
+    ctx.fillStyle = '#22c55e';
+    ctx.fillRect(chartX, legY2, 12, 3);
+    ctx.fillStyle = '#a1a1aa';
+    ctx.font = '500 10px Inter, sans-serif';
+    ctx.fillText('Income', chartX + 16, legY2 + 5);
+
+    ctx.fillStyle = '#ef4444';
+    ctx.fillRect(chartX + 80, legY2, 12, 3);
+    ctx.fillStyle = '#a1a1aa';
+    ctx.fillText('Expenses', chartX + 96, legY2 + 5);
+
+    // Cash flow summary
+    const totalIncome2 = Object.entries(counts).reduce((s, [t, c]) => s + c * FACILITY_TYPES[t].revenue, 0);
+    const totalExpense2 = Object.entries(counts).reduce((s, [t, c]) => s + c * FACILITY_TYPES[t].maintenance, 0);
+    const flow = totalIncome2 - totalExpense2;
+
+    const summY = chartY + chartH + 50;
+    ctx.fillStyle = '#a1a1aa';
+    ctx.font = '600 12px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('Income:   $' + totalIncome2.toFixed(1) + '/s', chartX, summY);
+    ctx.fillText('Expenses: $' + totalExpense2.toFixed(1) + '/s', chartX, summY + 18);
+    ctx.fillStyle = flow >= 0 ? '#22c55e' : '#ef4444';
+    ctx.fillText('Net Flow: ' + (flow >= 0 ? '+' : '') + '$' + flow.toFixed(1) + '/s', chartX, summY + 36);
+
+    // Facilities count
+    ctx.fillStyle = '#a1a1aa';
+    ctx.font = '500 11px Inter, sans-serif';
+    ctx.fillText('Rides: ' + counts.ride + '  Food: ' + counts.food + '  WC: ' + counts.restroom, chartX, summY + 64);
+
+    // Bankruptcy warning
+    if (cash < 0) {
+      ctx.fillStyle = 'rgba(239,68,68,0.15)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#ef4444';
+      ctx.font = '700 24px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('BANKRUPT!', W / 2, H / 2);
+      ctx.font = '500 13px Inter, sans-serif';
+      ctx.fillText('Remove facilities to reduce costs', W / 2, H / 2 + 28);
+    }
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+</script>

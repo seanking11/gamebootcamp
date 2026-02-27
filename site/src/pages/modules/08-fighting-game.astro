@@ -90,6 +90,20 @@ function checkHit(attacker, defender):
                 return { hit: true, damage: hitbox.damage,
                          hitstun: hitbox.hitstun }
     return { hit: false }</code></pre>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Hitbox / Hurtbox Visualizer</div>
+      <p class="demo-hint">Watch the left fighter perform a punch attack. The blue outlines are hurtboxes (where the character can be hit). The red filled rectangle is the hitbox (where the attack deals damage) -- it only appears during active frames. Toggle visibility with the checkboxes. The frame counter shows exactly which phase the attack is in.</p>
+      <canvas id="demo-hitbox" width="760" height="400"></canvas>
+      <div class="demo-controls">
+        <button id="hb-attack-btn">Punch</button>
+        <label><input type="checkbox" id="hb-show-hurtbox" checked /> Hurtboxes</label>
+        <label><input type="checkbox" id="hb-show-hitbox" checked /> Hitboxes</label>
+        <label><input type="checkbox" id="hb-show-pushbox" /> Pushbox</label>
+        <span class="value-display" id="hb-frame-display">Idle</span>
+      </div>
+    </div>
+
     <p>Hitboxes and hurtboxes are offset relative to the character's position and must flip horizontally when the character faces the other direction.</p>
     <p><strong>Why it matters:</strong> This is the separation of concerns principle applied to collision. Different collision layers serve different gameplay purposes &mdash; physics separation (pushbox), vulnerability detection (hurtbox), and damage dealing (hitbox) are independent systems that happen to operate on the same entities. Keeping them separate makes each system simpler to reason about and debug.</p>
 
@@ -143,6 +157,20 @@ function updateAttack(fighter, dt):
         fighter.currentAttack = null                 // attack complete
         fighter.hitboxes = []
         fighter.state = STANDING                     // return to neutral</code></pre>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Frame Data Timeline</div>
+      <p class="demo-hint">A horizontal timeline showing the three phases of an attack. The playhead animates through startup (yellow), active (red), and recovery (blue). Drag the sliders to adjust each phase and see how it changes total frame count and frame advantage.</p>
+      <canvas id="demo-framedata" width="760" height="200"></canvas>
+      <div class="demo-controls">
+        <label>Startup: <input type="range" id="fd-startup" min="1" max="15" value="4" /> <span class="value-display" id="fd-startup-val">4</span></label>
+        <label>Active: <input type="range" id="fd-active" min="1" max="10" value="3" /> <span class="value-display" id="fd-active-val">3</span></label>
+        <label>Recovery: <input type="range" id="fd-recovery" min="1" max="25" value="8" /> <span class="value-display" id="fd-recovery-val">8</span></label>
+        <button id="fd-play-btn">Play</button>
+        <span class="value-display" id="fd-total-display">Total: 15f</span>
+      </div>
+    </div>
+
     <p>The numbers define the game's entire balance. A fast light attack (4f startup) can interrupt a slow heavy attack (10f startup), but the heavy attack deals far more damage. This creates a constant risk-reward calculus.</p>
     <p><strong>Why it matters:</strong> Frame data is a contract. Every attack publishes exactly how long it takes to start, how long it threatens, and how long the attacker is vulnerable afterward. Understanding that every action has a cost measured in time &mdash; and that your opponent can exploit your committed time &mdash; is a foundational systems-thinking skill that applies far beyond fighting games.</p>
 
@@ -260,6 +288,18 @@ function parseInput(buffer, currentFrame):
         return "normal_kick"
 
     return null</code></pre>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Input Buffer Demo</div>
+      <p class="demo-hint">Try the special move: press Down, then Down+Right, then Right, then P (punch) within the time window. Your inputs appear in the buffer. When the correct sequence is detected, "SPECIAL MOVE!" flashes. The buffer window shrinks in real time -- too slow and inputs expire. Arrow keys for directions, P for punch.</p>
+      <canvas id="demo-inputbuf" width="760" height="300"></canvas>
+      <div class="demo-controls">
+        <span class="value-display" id="ib-status">Waiting for input...</span>
+        <label>Buffer window: <input type="range" id="ib-window" min="10" max="40" value="20" /> <span class="value-display" id="ib-window-val">20</span>f</label>
+        <button id="ib-clear-btn">Clear Buffer</button>
+      </div>
+    </div>
+
     <p>The input buffer also enables <strong>input leniency</strong>: accepting slightly imprecise inputs (e.g., skipping <code>DOWN_FORWARD</code> if <code>DOWN</code> and <code>FORWARD</code> are close enough) so the game does not feel unresponsive.</p>
     <p><strong>Why it matters:</strong> This is pattern matching on a time-windowed stream of events. The input buffer stores recent history, and the command parser scans it for known sequences within a timing window. Getting this right determines whether the game feels responsive or frustrating &mdash; leniency tuning is one of the most important "feel" adjustments in a fighting game.</p>
 
@@ -586,3 +626,788 @@ function renderHealthBar(fighter, side):
     </nav>
   </div>
 </BaseLayout>
+
+<script>
+// ============================================================
+// DEMO 1: HITBOX / HURTBOX VISUALIZER
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-hitbox');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const GROUND_Y = 320;
+  const showHurtbox = document.getElementById('hb-show-hurtbox');
+  const showHitbox = document.getElementById('hb-show-hitbox');
+  const showPushbox = document.getElementById('hb-show-pushbox');
+  const frameDisplay = document.getElementById('hb-frame-display');
+
+  // Fighter data
+  const fighter1 = {
+    x: 240, y: GROUND_Y, facing: 1,
+    bodyW: 50, bodyH: 100, headW: 34, headH: 24,
+    color: '#3b82f6',
+    attacking: false, attackFrame: 0,
+    // punch frame data
+    startup: 4, active: 3, recovery: 8, totalFrames: 15,
+    // hitbox during active frames
+    hitboxDef: { ox: 48, oy: -60, w: 50, h: 18 },
+    // arm animation
+    armExtend: 0
+  };
+
+  const fighter2 = {
+    x: 520, y: GROUND_Y, facing: -1,
+    bodyW: 50, bodyH: 100, headW: 34, headH: 24,
+    color: '#ef4444',
+    attacking: false, attackFrame: 0,
+    armExtend: 0
+  };
+
+  let hitDetected = false;
+  let hitFlashTimer = 0;
+  let animFrameId = null;
+
+  function startAttack() {
+    fighter1.attacking = true;
+    fighter1.attackFrame = 0;
+    hitDetected = false;
+  }
+
+  function getPhase(f) {
+    if (!f.attacking) return 'idle';
+    if (f.attackFrame <= f.startup) return 'startup';
+    if (f.attackFrame <= f.startup + f.active) return 'active';
+    if (f.attackFrame <= f.totalFrames) return 'recovery';
+    return 'idle';
+  }
+
+  function drawFighter(f, label) {
+    let bx = f.x - f.bodyW / 2;
+    let by = f.y - f.bodyH;
+
+    // body rectangle
+    ctx.fillStyle = f.color;
+    ctx.fillRect(bx, by, f.bodyW, f.bodyH);
+
+    // head
+    let hx = f.x - f.headW / 2;
+    let hy = by - f.headH - 2;
+    ctx.fillRect(hx, hy, f.headW, f.headH);
+
+    // arm
+    let armBaseY = by + 25;
+    let armBaseX = f.facing === 1 ? f.x + f.bodyW / 2 : f.x - f.bodyW / 2;
+    let armLen = 10 + f.armExtend * 45;
+    let armEndX = armBaseX + f.facing * armLen;
+
+    ctx.strokeStyle = f.color;
+    ctx.lineWidth = 10;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(armBaseX, armBaseY);
+    ctx.lineTo(armEndX, armBaseY);
+    ctx.stroke();
+
+    // fist
+    if (f.armExtend > 0.3) {
+      ctx.fillStyle = f.color;
+      ctx.beginPath();
+      ctx.arc(armEndX, armBaseY, 8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // label
+    ctx.fillStyle = '#71717a';
+    ctx.font = '12px "Inter", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, f.x, f.y + 20);
+
+    // pushbox
+    if (showPushbox.checked) {
+      ctx.strokeStyle = 'rgba(34,197,94,0.6)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.strokeRect(bx - 5, by - f.headH - 7, f.bodyW + 10, f.bodyH + f.headH + 12);
+      ctx.setLineDash([]);
+      // label
+      ctx.fillStyle = 'rgba(34,197,94,0.7)';
+      ctx.font = '9px "JetBrains Mono", monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText('pushbox', bx - 5, by - f.headH - 12);
+    }
+
+    // hurtboxes
+    if (showHurtbox.checked) {
+      ctx.strokeStyle = 'rgba(59,130,246,0.8)';
+      ctx.lineWidth = 2;
+      // body hurtbox
+      ctx.strokeRect(bx + 2, by + 2, f.bodyW - 4, f.bodyH - 4);
+      // head hurtbox
+      ctx.strokeRect(hx + 2, hy + 2, f.headW - 4, f.headH - 4);
+      // labels
+      ctx.fillStyle = 'rgba(59,130,246,0.7)';
+      ctx.font = '9px "JetBrains Mono", monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText('hurtbox (body)', bx + 2, by - 4);
+      ctx.fillText('hurtbox (head)', hx + 2, hy - 4);
+    }
+
+    // hitbox (only during active frames)
+    if (f.attacking && showHitbox.checked) {
+      let phase = getPhase(f);
+      if (phase === 'active') {
+        let hbx = f.facing === 1 ? f.x + f.hitboxDef.ox : f.x - f.hitboxDef.ox - f.hitboxDef.w;
+        let hby = f.y + f.hitboxDef.oy;
+        ctx.fillStyle = 'rgba(239,68,68,0.4)';
+        ctx.fillRect(hbx, hby, f.hitboxDef.w, f.hitboxDef.h);
+        ctx.strokeStyle = 'rgba(239,68,68,0.9)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(hbx, hby, f.hitboxDef.w, f.hitboxDef.h);
+        // label
+        ctx.fillStyle = 'rgba(239,68,68,0.9)';
+        ctx.font = '9px "JetBrains Mono", monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText('HITBOX (active)', hbx, hby - 4);
+
+        // collision check with fighter2 hurtboxes
+        let f2bx = fighter2.x - fighter2.bodyW / 2 + 2;
+        let f2by = fighter2.y - fighter2.bodyH + 2;
+        let f2bw = fighter2.bodyW - 4;
+        let f2bh = fighter2.bodyH - 4;
+        if (hbx < f2bx + f2bw && hbx + f.hitboxDef.w > f2bx &&
+            hby < f2by + f2bh && hby + f.hitboxDef.h > f2by) {
+          if (!hitDetected) {
+            hitDetected = true;
+            hitFlashTimer = 20;
+          }
+        }
+      }
+    }
+  }
+
+  function update() {
+    // update attack animation
+    if (fighter1.attacking) {
+      fighter1.attackFrame++;
+      let phase = getPhase(fighter1);
+      if (phase === 'startup') {
+        fighter1.armExtend = fighter1.attackFrame / fighter1.startup * 0.3;
+        frameDisplay.textContent = 'Startup: frame ' + fighter1.attackFrame + '/' + fighter1.startup;
+        frameDisplay.style.color = '#eab308';
+      } else if (phase === 'active') {
+        fighter1.armExtend = 1.0;
+        let af = fighter1.attackFrame - fighter1.startup;
+        frameDisplay.textContent = 'ACTIVE: frame ' + af + '/' + fighter1.active;
+        frameDisplay.style.color = '#ef4444';
+      } else if (phase === 'recovery') {
+        let rf = fighter1.attackFrame - fighter1.startup - fighter1.active;
+        let prog = rf / fighter1.recovery;
+        fighter1.armExtend = 1.0 - prog;
+        frameDisplay.textContent = 'Recovery: frame ' + rf + '/' + fighter1.recovery;
+        frameDisplay.style.color = '#3b82f6';
+      } else {
+        fighter1.attacking = false;
+        fighter1.armExtend = 0;
+        frameDisplay.textContent = 'Idle';
+        frameDisplay.style.color = '#71717a';
+      }
+    }
+
+    if (hitFlashTimer > 0) hitFlashTimer--;
+  }
+
+  function draw() {
+    ctx.fillStyle = '#0d0d0f';
+    ctx.fillRect(0, 0, W, H);
+
+    // stage floor
+    ctx.fillStyle = '#1a1a1e';
+    ctx.fillRect(0, GROUND_Y, W, H - GROUND_Y);
+    ctx.strokeStyle = '#27272a';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, GROUND_Y);
+    ctx.lineTo(W, GROUND_Y);
+    ctx.stroke();
+
+    // hit flash
+    if (hitFlashTimer > 0 && hitFlashTimer % 4 < 2) {
+      ctx.fillStyle = 'rgba(239,68,68,0.08)';
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    drawFighter(fighter1, 'P1 (Attacker)');
+    drawFighter(fighter2, 'P2 (Defender)');
+
+    // HIT indicator
+    if (hitFlashTimer > 0) {
+      ctx.fillStyle = '#ef4444';
+      ctx.font = 'bold 36px "Inter", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('HIT!', W / 2, 60);
+      ctx.fillStyle = '#71717a';
+      ctx.font = '14px "JetBrains Mono", monospace';
+      ctx.fillText('Hitbox overlapped hurtbox', W / 2, 84);
+    }
+
+    // frame counter bar at top
+    if (fighter1.attacking) {
+      let barY = 10;
+      let barH = 12;
+      let barW = 400;
+      let barX = (W - barW) / 2;
+      let total = fighter1.totalFrames;
+      let frameW = barW / total;
+
+      for (let i = 0; i < total; i++) {
+        let col;
+        if (i < fighter1.startup) col = '#eab308';
+        else if (i < fighter1.startup + fighter1.active) col = '#ef4444';
+        else col = '#3b82f6';
+
+        ctx.fillStyle = i < fighter1.attackFrame ? col : col + '40';
+        ctx.fillRect(barX + i * frameW, barY, frameW - 1, barH);
+      }
+
+      // playhead
+      let phx = barX + fighter1.attackFrame * frameW;
+      ctx.fillStyle = '#fafafa';
+      ctx.fillRect(phx - 1, barY - 2, 2, barH + 4);
+    }
+  }
+
+  let lastTime = 0;
+  let frameDelta = 0;
+  const FRAME_TIME = 1000 / 30; // slower for visibility
+
+  function loop(time) {
+    frameDelta += time - lastTime;
+    lastTime = time;
+    if (frameDelta >= FRAME_TIME) {
+      frameDelta -= FRAME_TIME;
+      update();
+      draw();
+    }
+    animFrameId = requestAnimationFrame(loop);
+  }
+
+  document.getElementById('hb-attack-btn').addEventListener('click', function() {
+    if (!fighter1.attacking) startAttack();
+  });
+
+  draw();
+  animFrameId = requestAnimationFrame(loop);
+})();
+
+// ============================================================
+// DEMO 2: FRAME DATA TIMELINE
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-framedata');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  let startup = 4, active = 3, recovery = 8;
+  let playhead = -1;
+  let playing = false;
+  let animId = null;
+
+  const startupSlider = document.getElementById('fd-startup');
+  const activeSlider = document.getElementById('fd-active');
+  const recoverySlider = document.getElementById('fd-recovery');
+  const startupVal = document.getElementById('fd-startup-val');
+  const activeVal = document.getElementById('fd-active-val');
+  const recoveryVal = document.getElementById('fd-recovery-val');
+  const totalDisplay = document.getElementById('fd-total-display');
+
+  function updateValues() {
+    startup = parseInt(startupSlider.value);
+    active = parseInt(activeSlider.value);
+    recovery = parseInt(recoverySlider.value);
+    startupVal.textContent = startup;
+    activeVal.textContent = active;
+    recoveryVal.textContent = recovery;
+    let total = startup + active + recovery;
+    totalDisplay.textContent = 'Total: ' + total + 'f';
+    draw();
+  }
+
+  startupSlider.addEventListener('input', updateValues);
+  activeSlider.addEventListener('input', updateValues);
+  recoverySlider.addEventListener('input', updateValues);
+
+  function draw() {
+    ctx.fillStyle = '#0d0d0f';
+    ctx.fillRect(0, 0, W, H);
+
+    let total = startup + active + recovery;
+    let marginX = 60;
+    let marginY = 50;
+    let barH = 60;
+    let barW = W - marginX * 2;
+    let frameW = barW / total;
+
+    // draw frame blocks
+    for (let i = 0; i < total; i++) {
+      let col;
+      let label;
+      if (i < startup) {
+        col = '#eab308'; label = 'startup';
+      } else if (i < startup + active) {
+        col = '#ef4444'; label = 'active';
+      } else {
+        col = '#3b82f6'; label = 'recovery';
+      }
+
+      let bright = (playhead >= 0 && i <= playhead) ? 1.0 : 0.4;
+      ctx.globalAlpha = bright;
+      ctx.fillStyle = col;
+      ctx.fillRect(marginX + i * frameW, marginY, frameW - 1, barH);
+      ctx.globalAlpha = 1.0;
+
+      // frame number
+      if (frameW > 14) {
+        ctx.fillStyle = '#0a0a0b';
+        ctx.font = 'bold 10px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(String(i + 1), marginX + i * frameW + frameW / 2, marginY + barH / 2 + 4);
+      }
+    }
+
+    // phase labels and brackets
+    let labelY = marginY + barH + 20;
+
+    // startup bracket
+    ctx.strokeStyle = '#eab308';
+    ctx.lineWidth = 2;
+    let sStart = marginX;
+    let sEnd = marginX + startup * frameW;
+    ctx.beginPath();
+    ctx.moveTo(sStart, labelY - 8);
+    ctx.lineTo(sStart, labelY);
+    ctx.lineTo(sEnd, labelY);
+    ctx.lineTo(sEnd, labelY - 8);
+    ctx.stroke();
+    ctx.fillStyle = '#eab308';
+    ctx.font = '12px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('Startup: ' + startup + 'f', (sStart + sEnd) / 2, labelY + 16);
+
+    // active bracket
+    ctx.strokeStyle = '#ef4444';
+    let aStart = sEnd;
+    let aEnd = aStart + active * frameW;
+    ctx.beginPath();
+    ctx.moveTo(aStart, labelY - 8);
+    ctx.lineTo(aStart, labelY);
+    ctx.lineTo(aEnd, labelY);
+    ctx.lineTo(aEnd, labelY - 8);
+    ctx.stroke();
+    ctx.fillStyle = '#ef4444';
+    ctx.fillText('Active: ' + active + 'f', (aStart + aEnd) / 2, labelY + 16);
+
+    // recovery bracket
+    ctx.strokeStyle = '#3b82f6';
+    let rStart = aEnd;
+    let rEnd = rStart + recovery * frameW;
+    ctx.beginPath();
+    ctx.moveTo(rStart, labelY - 8);
+    ctx.lineTo(rStart, labelY);
+    ctx.lineTo(rEnd, labelY);
+    ctx.lineTo(rEnd, labelY - 8);
+    ctx.stroke();
+    ctx.fillStyle = '#3b82f6';
+    ctx.fillText('Recovery: ' + recovery + 'f', (rStart + rEnd) / 2, labelY + 16);
+
+    // total
+    ctx.fillStyle = '#71717a';
+    ctx.font = '11px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('Total: ' + total + ' frames', W / 2, labelY + 38);
+
+    // playhead
+    if (playhead >= 0 && playhead < total) {
+      let phx = marginX + playhead * frameW + frameW / 2;
+      ctx.strokeStyle = '#fafafa';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(phx, marginY - 15);
+      ctx.lineTo(phx, marginY + barH + 5);
+      ctx.stroke();
+
+      // triangle
+      ctx.fillStyle = '#fafafa';
+      ctx.beginPath();
+      ctx.moveTo(phx - 5, marginY - 15);
+      ctx.lineTo(phx + 5, marginY - 15);
+      ctx.lineTo(phx, marginY - 6);
+      ctx.fill();
+
+      // current phase label at top
+      let phaseName, phaseColor;
+      if (playhead < startup) {
+        phaseName = 'STARTUP'; phaseColor = '#eab308';
+      } else if (playhead < startup + active) {
+        phaseName = 'ACTIVE'; phaseColor = '#ef4444';
+      } else {
+        phaseName = 'RECOVERY'; phaseColor = '#3b82f6';
+      }
+      ctx.fillStyle = phaseColor;
+      ctx.font = 'bold 14px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(phaseName + '  (frame ' + (playhead + 1) + '/' + total + ')', W / 2, 28);
+    } else {
+      ctx.fillStyle = '#71717a';
+      ctx.font = '13px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('Click "Play" to animate the timeline', W / 2, 28);
+    }
+
+    // frame advantage info
+    ctx.fillStyle = '#a1a1aa';
+    ctx.font = '11px "Inter", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('Attacker recovers at frame ' + total + '.  If hitstun > recovery, attacker has frame advantage.', marginX, H - 12);
+  }
+
+  let playTimer = 0;
+  let lastPlayTime = 0;
+  const PLAY_SPEED = 1000 / 10; // 10 fps for visibility
+
+  function playLoop(time) {
+    if (!playing) return;
+    playTimer += time - lastPlayTime;
+    lastPlayTime = time;
+    if (playTimer >= PLAY_SPEED) {
+      playTimer -= PLAY_SPEED;
+      playhead++;
+      let total = startup + active + recovery;
+      if (playhead >= total) {
+        playing = false;
+        playhead = total - 1;
+        draw();
+        return;
+      }
+      draw();
+    }
+    animId = requestAnimationFrame(playLoop);
+  }
+
+  document.getElementById('fd-play-btn').addEventListener('click', function() {
+    playing = true;
+    playhead = -1;
+    playTimer = 0;
+    lastPlayTime = performance.now();
+    draw();
+    animId = requestAnimationFrame(playLoop);
+  });
+
+  draw();
+})();
+
+// ============================================================
+// DEMO 3: INPUT BUFFER
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-inputbuf');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const statusDisplay = document.getElementById('ib-status');
+  const windowSlider = document.getElementById('ib-window');
+  const windowVal = document.getElementById('ib-window-val');
+
+  let bufferWindow = 20;
+  let frameCount = 0;
+  let buffer = []; // { dir, button, frame }
+  let specialFlash = 0;
+  let specialText = '';
+
+  // The special move: DOWN, DOWN_FORWARD, FORWARD, PUNCH
+  const SPECIAL_SEQUENCE = ['down', 'down-forward', 'forward'];
+  const SPECIAL_BUTTON = 'punch';
+
+  // input icons
+  const DIR_SYMBOLS = {
+    'down': { label: 'D', arrow: '\u2193' },
+    'down-forward': { label: 'DF', arrow: '\u2198' },
+    'forward': { label: 'F', arrow: '\u2192' },
+    'up': { label: 'U', arrow: '\u2191' },
+    'up-forward': { label: 'UF', arrow: '\u2197' },
+    'back': { label: 'B', arrow: '\u2190' },
+    'down-back': { label: 'DB', arrow: '\u2199' },
+    'up-back': { label: 'UB', arrow: '\u2196' },
+    'neutral': { label: 'N', arrow: '\u25CB' }
+  };
+
+  windowSlider.addEventListener('input', function() {
+    bufferWindow = parseInt(this.value);
+    windowVal.textContent = this.value;
+  });
+
+  let keysDown = {};
+  document.addEventListener('keydown', function(e) {
+    let rect = canvas.getBoundingClientRect();
+    if (rect.bottom < 0 || rect.top > window.innerHeight) return;
+
+    let handled = true;
+    switch (e.key) {
+      case 'ArrowDown': keysDown['down'] = true; break;
+      case 'ArrowRight': keysDown['right'] = true; break;
+      case 'ArrowLeft': keysDown['left'] = true; break;
+      case 'ArrowUp': keysDown['up'] = true; break;
+      case 'p': case 'P':
+        keysDown['punch'] = true;
+        recordInput(true);
+        break;
+      default: handled = false;
+    }
+    if (handled) {
+      e.preventDefault();
+      if (e.key !== 'p' && e.key !== 'P') recordInput(false);
+    }
+  });
+
+  document.addEventListener('keyup', function(e) {
+    switch (e.key) {
+      case 'ArrowDown': keysDown['down'] = false; break;
+      case 'ArrowRight': keysDown['right'] = false; break;
+      case 'ArrowLeft': keysDown['left'] = false; break;
+      case 'ArrowUp': keysDown['up'] = false; break;
+      case 'p': case 'P': keysDown['punch'] = false; break;
+    }
+  });
+
+  function getDirection() {
+    let d = keysDown['down'];
+    let u = keysDown['up'];
+    let r = keysDown['right'];
+    let l = keysDown['left'];
+    if (d && r) return 'down-forward';
+    if (d && l) return 'down-back';
+    if (u && r) return 'up-forward';
+    if (u && l) return 'up-back';
+    if (d) return 'down';
+    if (u) return 'up';
+    if (r) return 'forward';
+    if (l) return 'back';
+    return 'neutral';
+  }
+
+  function recordInput(isPunch) {
+    frameCount++;
+    let dir = getDirection();
+    let entry = { dir: dir, button: isPunch ? 'punch' : null, frame: frameCount };
+
+    // avoid duplicate neutral entries
+    if (buffer.length > 0) {
+      let last = buffer[buffer.length - 1];
+      if (last.dir === dir && last.button === entry.button && !isPunch) return;
+    }
+
+    buffer.push(entry);
+    if (buffer.length > 30) buffer.shift();
+
+    statusDisplay.textContent = (isPunch ? 'PUNCH + ' : '') + dir.toUpperCase();
+
+    // check for special move
+    if (isPunch) {
+      checkSpecial();
+    }
+  }
+
+  function checkSpecial() {
+    // need to find DOWN, DOWN_FORWARD, FORWARD in that order within window, then PUNCH
+    let seqIdx = SPECIAL_SEQUENCE.length - 1;
+    let latest = buffer[buffer.length - 1];
+    if (!latest || latest.button !== 'punch') return;
+
+    for (let i = buffer.length - 2; i >= 0; i--) {
+      let entry = buffer[i];
+      if (frameCount - entry.frame > bufferWindow) break;
+
+      if (entry.dir === SPECIAL_SEQUENCE[seqIdx]) {
+        seqIdx--;
+        if (seqIdx < 0) {
+          // SPECIAL DETECTED
+          specialFlash = 90;
+          specialText = 'SPECIAL MOVE!';
+          statusDisplay.textContent = 'SPECIAL MOVE DETECTED!';
+          return;
+        }
+      }
+    }
+  }
+
+  function draw() {
+    ctx.fillStyle = '#0d0d0f';
+    ctx.fillRect(0, 0, W, H);
+
+    // Title: required sequence at top
+    ctx.fillStyle = '#71717a';
+    ctx.font = '12px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('Special move command:', 20, 24);
+
+    let seqIcons = ['down', 'down-forward', 'forward', 'punch'];
+    let seqX = 210;
+    seqIcons.forEach(function(s, i) {
+      let isDir = s !== 'punch';
+      ctx.fillStyle = isDir ? '#27272a' : '#3f2020';
+      ctx.strokeStyle = isDir ? '#3f3f46' : '#ef4444';
+      ctx.lineWidth = 2;
+      let bw = 46, bh = 32;
+      ctx.fillRect(seqX, 8, bw, bh);
+      ctx.strokeRect(seqX, 8, bw, bh);
+
+      ctx.fillStyle = isDir ? '#fafafa' : '#ef4444';
+      ctx.font = isDir ? '18px sans-serif' : 'bold 13px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      if (isDir) {
+        ctx.fillText(DIR_SYMBOLS[s].arrow, seqX + bw / 2, 30);
+      } else {
+        ctx.fillText('P', seqX + bw / 2, 30);
+      }
+      ctx.fillStyle = '#71717a';
+      ctx.font = '9px "JetBrains Mono", monospace';
+      ctx.fillText(isDir ? s : 'punch', seqX + bw / 2, 52);
+
+      if (i < seqIcons.length - 1) {
+        ctx.fillStyle = '#3f3f46';
+        ctx.font = '14px sans-serif';
+        ctx.fillText('\u2192', seqX + bw + 8, 28);
+      }
+      seqX += bw + 24;
+    });
+
+    // Buffer display
+    let bufY = 80;
+    ctx.fillStyle = '#a1a1aa';
+    ctx.font = '12px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('Input buffer (most recent on right):', 20, bufY);
+
+    let slotW = 52, slotH = 56;
+    let slotGap = 4;
+    let maxSlots = Math.floor((W - 40) / (slotW + slotGap));
+    let visibleBuf = buffer.slice(-maxSlots);
+
+    let bStartX = 20;
+    bufY += 10;
+
+    visibleBuf.forEach(function(entry, i) {
+      let sx = bStartX + i * (slotW + slotGap);
+      let age = frameCount - entry.frame;
+      let expired = age > bufferWindow;
+      let freshness = expired ? 0.15 : Math.max(0.3, 1 - age / bufferWindow);
+
+      ctx.globalAlpha = freshness;
+
+      // slot background
+      ctx.fillStyle = entry.button === 'punch' ? '#3f1515' : '#1a1a1e';
+      ctx.fillRect(sx, bufY, slotW, slotH);
+      ctx.strokeStyle = expired ? '#27272a' : entry.button === 'punch' ? '#ef4444' : '#3f3f46';
+      ctx.lineWidth = expired ? 1 : 2;
+      ctx.strokeRect(sx, bufY, slotW, slotH);
+
+      // direction arrow
+      let sym = DIR_SYMBOLS[entry.dir] || DIR_SYMBOLS['neutral'];
+      ctx.fillStyle = expired ? '#3f3f46' : '#fafafa';
+      ctx.font = '20px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(sym.arrow, sx + slotW / 2, bufY + 24);
+
+      // punch indicator
+      if (entry.button === 'punch') {
+        ctx.fillStyle = expired ? '#5a2020' : '#ef4444';
+        ctx.font = 'bold 11px "JetBrains Mono", monospace';
+        ctx.fillText('+P', sx + slotW / 2, bufY + 42);
+      }
+
+      // age
+      ctx.fillStyle = '#71717a';
+      ctx.font = '8px "JetBrains Mono", monospace';
+      ctx.fillText(age + 'f', sx + slotW / 2, bufY + slotH + 10);
+
+      ctx.globalAlpha = 1.0;
+    });
+
+    // Buffer window visualizer
+    let winY = bufY + slotH + 24;
+    ctx.fillStyle = '#71717a';
+    ctx.font = '11px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('Buffer window: ' + bufferWindow + ' frames', 20, winY);
+
+    // draw a timer bar
+    let barW = 300, barH = 12;
+    let barX = 200;
+    ctx.fillStyle = '#1a1a1e';
+    ctx.fillRect(barX, winY - 10, barW, barH);
+    ctx.strokeStyle = '#3f3f46';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(barX, winY - 10, barW, barH);
+
+    // show how much window remains since last input
+    if (buffer.length > 0) {
+      let lastAge = frameCount - buffer[buffer.length - 1].frame;
+      let pct = Math.max(0, 1 - lastAge / bufferWindow);
+      let fillColor = pct > 0.5 ? '#22c55e' : pct > 0.2 ? '#eab308' : '#ef4444';
+      ctx.fillStyle = fillColor;
+      ctx.fillRect(barX + 1, winY - 9, (barW - 2) * pct, barH - 2);
+    }
+
+    // SPECIAL MOVE flash
+    if (specialFlash > 0) {
+      let alpha = Math.min(1, specialFlash / 30);
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = '#f59e0b';
+      ctx.font = 'bold 42px "Inter", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(specialText, W / 2, H - 30);
+
+      // explosion lines
+      let cx = W / 2, cy = H - 50;
+      for (let a = 0; a < 8; a++) {
+        let angle = (a / 8) * Math.PI * 2 + specialFlash * 0.05;
+        let r1 = 40 + (90 - specialFlash) * 0.5;
+        let r2 = r1 + 20;
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(angle) * r1, cy + Math.sin(angle) * r1 * 0.5);
+        ctx.lineTo(cx + Math.cos(angle) * r2, cy + Math.sin(angle) * r2 * 0.5);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1.0;
+    }
+
+    // controls hint
+    ctx.fillStyle = '#4a4a54';
+    ctx.font = '11px "Inter", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Arrow keys = direction  |  P = punch  |  Try: Down, Down+Right, Right, P', W / 2, H - 8);
+  }
+
+  let animId = null;
+  function loop() {
+    if (specialFlash > 0) specialFlash--;
+    // increment frame for aging
+    draw();
+    animId = requestAnimationFrame(loop);
+  }
+
+  document.getElementById('ib-clear-btn').addEventListener('click', function() {
+    buffer = [];
+    frameCount = 0;
+    specialFlash = 0;
+    statusDisplay.textContent = 'Buffer cleared';
+  });
+
+  loop();
+})();
+</script>

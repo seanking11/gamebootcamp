@@ -1,0 +1,779 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 16: Third-Person Shooter">
+  <div class="container page-content">
+    <div class="module-header">
+      <div class="module-number">Module 16</div>
+      <h1>Third-Person Shooter</h1>
+      <p class="module-theme">Shooting with spatial awareness of your own body &mdash; you are the action hero you can see.</p>
+    </div>
+
+    <blockquote>"The camera is the most important weapon in a third-person game."</blockquote>
+
+    <hr />
+
+    <h2>Prerequisites</h2>
+    <table>
+      <thead>
+        <tr><th>Module</th><th>What You Used From It</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Module 11 - First-Person Game</td><td>3D rendering, raycasting, and basic FPS controls &mdash; this module extends those concepts with a visible player character and offset camera</td></tr>
+        <tr><td>Module 03 - Top-Down Shooter</td><td>Core shooting mechanics (projectiles, hit detection, enemy behavior) transfer directly, now applied in 3D space</td></tr>
+      </tbody>
+    </table>
+    <p><strong>Note:</strong> This is a 3D module. A game engine (Unity, Unreal, Godot) is strongly recommended. The concepts are engine-agnostic, but implementing a third-person camera, animation blending, and cover system from scratch is prohibitively time-consuming.</p>
+
+    <hr />
+
+    <h2>Week 1: History &amp; Design Theory</h2>
+
+    <h3>The Origin</h3>
+    <p><em>Resident Evil 4</em> (2005), directed by Shinji Mikami at Capcom, redefined third-person action by introducing the over-the-shoulder camera that has since become the genre standard. Previous third-person games used fixed cameras (<em>Resident Evil</em>, 1996), fully top-down views, or a distant chase camera that made precise aiming feel imprecise. Mikami's breakthrough was positioning the camera just behind and to the right of the protagonist Leon Kennedy's shoulder, close enough that the player felt embodied in the character while still seeing Leon's body in the environment. Combined with a laser-sight aiming system that required the player to stop moving to shoot, it created a moment-to-moment tension between spatial awareness and precision that had never existed in 3D shooters. Every major third-person shooter since &mdash; from <em>Gears of War</em> to <em>The Last of Us</em> &mdash; descends from this camera philosophy.</p>
+
+    <h3>How the Genre Evolved</h3>
+    <p><strong>Gears of War (2006):</strong> Epic Games' Cliff Bleszinski and team codified the cover system for third-person shooters. Players could snap to waist-high walls, blind-fire over them, pop out to aim precisely, and vault over cover to advance. The "stop and pop" rhythm it created &mdash; sprint to cover, hunker down, pop out, shoot, advance &mdash; became the dominant template for the genre for a decade. Its "roadie run" camera (low, shaky, close to the ground) also demonstrated that camera behavior itself could convey gameplay state.</p>
+
+    <p><strong>Splatoon (2015):</strong> Nintendo's radical reinterpretation proved the genre could be joyful rather than grim. By replacing bullets with ink that coated the environment, Splatoon made territory control visible and traversal a shooting mechanic &mdash; players could swim through their own ink as a squid. It demonstrated that the third-person perspective's greatest strength is <em>seeing the consequences of your actions on the world around you</em>, something a first-person view inherently obscures.</p>
+
+    <p><strong>Fortnite (2017):</strong> Epic Games combined the third-person shooter with building mechanics, creating a game where the player constantly creates and destroys their own cover. This pushed the genre's spatial awareness to its extreme &mdash; players had to track enemy positions, manage building resources, and shoot accurately, all while maintaining awareness of their character's exposed body in a 3D environment. Its success proved the third-person camera's superiority for games requiring environmental awareness.</p>
+
+    <h3>What Makes Third-Person Shooters "Great"</h3>
+    <p>The core design insight of the third-person shooter is <strong>embodied spatial awareness</strong>. Unlike a first-person game where the player <em>is</em> the camera, a third-person game lets the player see their character <em>in relation to</em> the environment. This seemingly simple difference has profound implications: the player can see if their body is exposed behind cover, can judge the distance of a jump by seeing their character's feet, and can read their own animations for feedback. The visible player character becomes both avatar and information source &mdash; you watch yourself dodge a bullet and feel the near-miss viscerally. This is why third-person shooters excel at making the player feel like the protagonist of an action movie: you are simultaneously the actor and the audience.</p>
+
+    <h3>The Essential Mechanic</h3>
+    <p><strong>Shooting with spatial awareness of your character's body in the environment</strong> &mdash; the offset camera creates a game where positioning, exposure, and spatial relationships matter as much as aiming precision.</p>
+
+    <hr />
+
+    <h2>Week 2: Build the MVP</h2>
+
+    <h3>What You're Building</h3>
+    <p>A small 3D arena or corridor with waist-high cover objects, 3-5 enemy NPCs that take cover and shoot back, and a player character with over-the-shoulder camera, aim-down-sights, and a cover system. The focus is on the camera, cover mechanics, and crosshair alignment &mdash; not on realistic graphics or complex level design.</p>
+
+    <h3>Core Concepts (Must Implement)</h3>
+
+    <h4>1. Over-the-Shoulder Camera</h4>
+    <p>The camera is positioned behind and offset to one side of the player character (typically right), providing a view that includes the character's upper body and the world ahead. The camera must follow the player's movement while allowing the player to rotate the view with mouse/stick input.</p>
+    <pre is:raw><code>class ThirdPersonCamera:
+    def __init__(self):
+        self.distance = 3.0        # Distance behind the character
+        self.height = 1.6          # Height above character's feet
+        self.horizontal_offset = 0.6  # Offset to the right
+        self.pitch = 0.0           # Vertical look angle
+        self.yaw = 0.0             # Horizontal look angle
+
+    def update(self, player_position, mouse_delta, dt):
+        # Mouse input rotates the camera
+        self.yaw += mouse_delta.x * SENSITIVITY
+        self.pitch -= mouse_delta.y * SENSITIVITY
+        self.pitch = clamp(self.pitch, -60, 60)
+
+        # Calculate camera position relative to player
+        yaw_rad = radians(self.yaw)
+        pitch_rad = radians(self.pitch)
+
+        # Camera sits behind the player along the yaw direction
+        offset_back = Vector3(
+            -sin(yaw_rad) * self.distance * cos(pitch_rad),
+            self.height + self.distance * sin(pitch_rad),
+            -cos(yaw_rad) * self.distance * cos(pitch_rad)
+        )
+
+        # Apply horizontal offset (perpendicular to look direction)
+        right = Vector3(cos(yaw_rad), 0, -sin(yaw_rad))
+        offset_side = right * self.horizontal_offset
+
+        self.position = player_position + offset_back + offset_side
+        self.look_target = player_position + Vector3(0, self.height, 0)
+
+    def get_view_matrix(self):
+        return look_at(self.position, self.look_target, UP)</code></pre>
+    <p>A critical detail: the camera must handle collision with walls. If a wall is between the camera and the player, the camera should push forward to avoid clipping through geometry.</p>
+    <p><strong>Why it matters:</strong> The camera is the player's window into the game world. In third-person, the camera defines the entire experience &mdash; how much of the character you see, how much spatial information you have, and how aiming feels. A bad camera makes an otherwise good game unplayable.</p>
+
+    <!-- Demo 1: Over-the-Shoulder Camera -->
+    <div class="demo-container">
+      <div class="demo-label">Demo: Over-the-Shoulder Camera</div>
+      <p class="demo-hint">Drag on the canvas to rotate the camera around the player. The blue circle is the player, the dashed rectangle is the camera frustum, and the green line shows the camera offset vector.</p>
+      <canvas id="demo-camera" width="760" height="420"></canvas>
+    </div>
+
+    <h4>2. Cover System</h4>
+    <p>The player can snap to cover objects (waist-high walls, pillars, crates) and take a protected position. From cover, the player can peek out to aim and shoot, blind-fire without exposing themselves, and leave cover to move freely.</p>
+    <pre is:raw><code>class CoverSystem:
+    def __init__(self):
+        self.in_cover = false
+        self.cover_object = null
+        self.cover_side = "left"   # Which side of cover the player is on
+        self.peeking = false
+
+    def try_enter_cover(self, player, cover_objects):
+        nearest = find_nearest_cover(player.position, cover_objects,
+                                      max_distance=1.5)
+        if nearest:
+            self.in_cover = true
+            self.cover_object = nearest
+            self.cover_side = determine_side(player.position, nearest)
+            # Snap player position to cover surface
+            player.position = get_snap_position(nearest, self.cover_side)
+
+    def update(self, player, input):
+        if not self.in_cover:
+            return
+
+        if input.aim_button:
+            self.peeking = true
+            # Shift camera and player to peek over/around cover
+            player.position = get_peek_position(self.cover_object,
+                                                 self.cover_side)
+        else:
+            self.peeking = false
+            player.position = get_snap_position(self.cover_object,
+                                                 self.cover_side)
+
+        # Leave cover
+        if input.move_away_from_cover or input.roll_button:
+            self.in_cover = false
+            self.cover_object = null
+
+    def is_player_exposed(self):
+        return not self.in_cover or self.peeking
+
+def find_nearest_cover(position, cover_objects, max_distance):
+    best = null
+    best_dist = max_distance
+    for obj in cover_objects:
+        dist = distance_to_surface(position, obj)
+        if dist &lt; best_dist:
+            best = obj
+            best_dist = dist
+    return best</code></pre>
+    <p>Cover objects need metadata: their height (waist-high vs. full), their shape (linear wall vs. pillar), and whether they can be peeked from either end or only over the top.</p>
+    <p><strong>Why it matters:</strong> Cover transforms the pacing of combat from constant shooting to a rhythm of advance-and-engage. It gives the player agency over their exposure and creates meaningful spatial decisions: which cover to move to, when to peek, when to abandon a flanked position.</p>
+
+    <!-- Demo 2: Cover System -->
+    <div class="demo-container">
+      <div class="demo-label">Demo: Cover System with Line-of-Sight</div>
+      <p class="demo-hint">Use arrow keys or WASD to move the player (blue circle). Move near a cover wall (gray rectangles) to snap to cover. Red triangles are enemies with line-of-sight rays. Cover blocks enemy sight lines (green = blocked, red = exposed).</p>
+      <canvas id="demo-cover" width="760" height="420"></canvas>
+    </div>
+
+    <h4>3. Aim-Down-Sights / Zoom</h4>
+    <p>When the player holds the aim button, the camera transitions from the default over-the-shoulder view to a tighter, zoomed-in view that centers the crosshair for precision shooting. Movement speed typically decreases while aiming.</p>
+    <pre is:raw><code>class AimSystem:
+    def __init__(self):
+        self.aim_lerp = 0.0   # 0 = hip, 1 = fully aimed
+        self.AIM_SPEED = 8.0  # Lerp speed for smooth transition
+
+    def update(self, input, camera, dt):
+        target = 1.0 if input.aim_button else 0.0
+        self.aim_lerp = lerp(self.aim_lerp, target, self.AIM_SPEED * dt)
+
+        # Interpolate camera parameters
+        camera.distance = lerp(3.0, 1.5, self.aim_lerp)
+        camera.horizontal_offset = lerp(0.6, 0.4, self.aim_lerp)
+        camera.fov = lerp(75, 50, self.aim_lerp)
+
+        # Movement speed reduction while aiming
+        player.move_speed = lerp(BASE_SPEED, AIM_SPEED, self.aim_lerp)
+
+    def get_crosshair_size(self):
+        # Tighter crosshair when fully aimed
+        return lerp(CROSSHAIR_LARGE, CROSSHAIR_SMALL, self.aim_lerp)</code></pre>
+    <p><strong>Why it matters:</strong> The hip/aim duality creates two distinct modes of play within the same game: exploration mode (fast, wide view, imprecise shooting) and combat mode (slow, zoomed, precise). This modality is what gives third-person shooters their distinctive rhythm.</p>
+
+    <h4>4. Character Animation Blending</h4>
+    <p>The character's upper body and lower body must animate independently. The lower body plays movement animations (idle, walk, run, crouch) while the upper body plays aim and shoot animations oriented toward the crosshair direction. These two animation layers blend together on the character's skeleton.</p>
+    <pre is:raw><code>class AnimationBlender:
+    def __init__(self, skeleton):
+        self.skeleton = skeleton
+        # Define which bones belong to which layer
+        self.lower_body_bones = ["hips", "left_leg", "right_leg", "spine_base"]
+        self.upper_body_bones = ["spine_mid", "spine_top", "left_arm",
+                                  "right_arm", "head", "neck"]
+
+    def update(self, movement_state, aim_direction, is_firing):
+        # Lower body: movement animation
+        if movement_state == "idle":
+            lower_pose = self.sample_animation("idle_lower")
+        elif movement_state == "walk":
+            lower_pose = self.sample_animation("walk")
+        elif movement_state == "run":
+            lower_pose = self.sample_animation("run")
+
+        # Upper body: aim direction
+        aim_pitch = angle_from_horizontal(aim_direction)
+        if aim_pitch > 0:
+            upper_pose = blend(
+                self.sample_animation("aim_forward"),
+                self.sample_animation("aim_up"),
+                aim_pitch / 90.0
+            )
+        else:
+            upper_pose = blend(
+                self.sample_animation("aim_forward"),
+                self.sample_animation("aim_down"),
+                abs(aim_pitch) / 90.0
+            )
+
+        # Layer if firing
+        if is_firing:
+            upper_pose = blend_additive(upper_pose,
+                                         self.sample_animation("fire_recoil"))
+
+        # Combine layers
+        final_pose = {}
+        for bone in self.skeleton.bones:
+            if bone.name in self.upper_body_bones:
+                final_pose[bone.name] = upper_pose[bone.name]
+            else:
+                final_pose[bone.name] = lower_pose[bone.name]
+
+        self.skeleton.apply_pose(final_pose)</code></pre>
+    <p><strong>Why it matters:</strong> In a third-person game, the player is always watching their character. If the character faces forward while shooting to the right, or freezes while aiming, the illusion breaks entirely. Animation blending is what makes the character feel like a living entity rather than a puppet.</p>
+
+    <h4>5. Third-Person Crosshair Alignment</h4>
+    <p>The crosshair is drawn at the center of the screen, but the bullets originate from the character's gun, which is offset from the camera. A raycast from the camera through the crosshair into the world determines the <em>target point</em>, and the bullet is then fired from the gun <em>toward that target point</em>.</p>
+    <pre is:raw><code>def calculate_shot(camera, player_gun_position):
+    # Step 1: Raycast from camera center into the world
+    ray_origin = camera.position
+    ray_direction = camera.forward  # Center of screen
+
+    hit = raycast(ray_origin, ray_direction, max_distance=1000)
+
+    if hit:
+        target_point = hit.position
+    else:
+        target_point = ray_origin + ray_direction * 1000
+
+    # Step 2: Fire bullet from gun toward target point
+    bullet_direction = normalize(target_point - player_gun_position)
+
+    spawn_bullet(
+        origin=player_gun_position,
+        direction=bullet_direction,
+        speed=BULLET_SPEED
+    )
+
+    # Step 3: At very close range, check for obstructions
+    obstruction = raycast(player_gun_position, bullet_direction,
+                           max_distance=distance(player_gun_position,
+                                                  target_point))
+    if obstruction and obstruction.distance &lt; 0.5:
+        apply_damage_at(obstruction.position)</code></pre>
+    <p><strong>Why it matters:</strong> Crosshair alignment is the single most common source of "the game feels broken" bugs in third-person shooters. If the player's crosshair is on an enemy but the bullet hits a wall because it originated from the gun at a different angle, trust is destroyed. This is a solved problem, but only if you implement the two-raycast approach deliberately.</p>
+
+    <h4>6. Environmental Destruction / Interaction</h4>
+    <p>Certain objects in the environment respond to being shot: crates splinter, glass shatters, cover degrades over time. Destructible objects have a health value and change visual state as they take damage.</p>
+    <pre is:raw><code>class DestructibleObject:
+    def __init__(self, max_health, provides_cover=true):
+        self.health = max_health
+        self.max_health = max_health
+        self.provides_cover = provides_cover
+        self.destruction_stage = 0  # 0=intact, 1=damaged, 2=destroyed
+
+    def take_damage(self, amount):
+        self.health -= amount
+        health_ratio = self.health / self.max_health
+        if health_ratio &lt;= 0:
+            self.destruction_stage = 2
+            self.provides_cover = false
+            spawn_debris_particles(self.position)
+            remove_from_cover_objects(self)
+        elif health_ratio &lt;= 0.5:
+            self.destruction_stage = 1
+            swap_mesh(self, "damaged_mesh")
+            spawn_chip_particles(self.position)
+
+class CoverManager:
+    def update_cover_validity(self):
+        for player in players:
+            if player.cover_system.in_cover:
+                cover = player.cover_system.cover_object
+                if hasattr(cover, 'provides_cover') and not cover.provides_cover:
+                    player.cover_system.force_leave_cover()
+                    show_feedback("Cover destroyed!")</code></pre>
+    <p><strong>Why it matters:</strong> Destructible environments turn static arenas into evolving tactical spaces. Cover that degrades forces the player to reposition, preventing the "sit behind wall and peek forever" strategy. It also provides satisfying visual feedback &mdash; seeing bullet impacts chip away at the world makes weapons feel powerful.</p>
+
+    <hr />
+
+    <h3>Stretch Goals</h3>
+    <ul>
+      <li><strong>Blind-fire from cover:</strong> The player can fire without peeking, with significantly reduced accuracy but no exposure to enemy fire.</li>
+      <li><strong>Roll/dodge mechanic:</strong> A quick dodge roll between cover points with brief invincibility frames, enabling aggressive repositioning.</li>
+      <li><strong>Enemy flanking AI:</strong> Enemies attempt to move to positions that negate the player's cover advantage, forcing the player to reposition.</li>
+      <li><strong>Shoulder swap:</strong> Allow the player to toggle the camera offset between left and right shoulder, enabling peeking from both sides of cover.</li>
+    </ul>
+
+    <h3>MVP Spec</h3>
+    <table>
+      <thead>
+        <tr><th>Feature</th><th>Required</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Over-the-shoulder camera with collision</td><td>Yes</td></tr>
+        <tr><td>Player movement in 3D space (walk, run)</td><td>Yes</td></tr>
+        <tr><td>Cover system (snap, peek, leave)</td><td>Yes</td></tr>
+        <tr><td>Aim-down-sights with camera transition</td><td>Yes</td></tr>
+        <tr><td>Animation blending (upper/lower body)</td><td>Yes</td></tr>
+        <tr><td>Crosshair-aligned shooting (two-raycast)</td><td>Yes</td></tr>
+        <tr><td>3-5 enemy NPCs that shoot back</td><td>Yes</td></tr>
+        <tr><td>At least 2 destructible cover objects</td><td>Yes</td></tr>
+        <tr><td>Waist-high cover objects in arena</td><td>Yes</td></tr>
+        <tr><td>Blind-fire from cover</td><td>Stretch</td></tr>
+        <tr><td>Roll/dodge between cover</td><td>Stretch</td></tr>
+        <tr><td>Enemy flanking behavior</td><td>Stretch</td></tr>
+        <tr><td>Shoulder swap toggle</td><td>Stretch</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliverable</h3>
+    <p>Submit your playable third-person shooter arena with source code. Include a short write-up (300-500 words) answering: <em>What was the most difficult part of getting the camera to feel right? Describe how you solved crosshair alignment and what happens when the player shoots at an object that is between the camera and the character.</em></p>
+
+    <hr />
+
+    <h2>Analogies by Background</h2>
+    <blockquote><p>These analogies map game dev concepts to patterns you already know.</p></blockquote>
+
+    <h3>For Backend Developers</h3>
+    <table>
+      <thead><tr><th>Game Dev Concept</th><th>Backend Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Over-the-shoulder camera</td><td>A reverse proxy that sits in front of the actual server (player), adding its own headers (offset, FOV) while forwarding the underlying request (player's aim direction)</td></tr>
+        <tr><td>Cover system</td><td>Connection pooling with keep-alive &mdash; the player "binds" to a cover resource, uses it for multiple operations (peeks), and explicitly releases it when moving on</td></tr>
+        <tr><td>Aim-down-sights / zoom</td><td>Feature toggles with transition &mdash; switching between a fast-response mode (hip-fire) and a thorough-validation mode (ADS), with graceful transition between the two</td></tr>
+        <tr><td>Animation blending</td><td>Request middleware layering &mdash; independent middleware (upper body, lower body) each contribute their transformation to the final response (character pose)</td></tr>
+        <tr><td>Crosshair alignment (two-raycast)</td><td>DNS resolution then direct connection &mdash; first resolve the name (camera ray to find target point), then connect directly (gun ray to target), because the resolution path differs from the data path</td></tr>
+        <tr><td>Environmental destruction</td><td>Database soft-delete with state degradation &mdash; records transition through states (intact, damaged, destroyed) rather than binary existence, and dependent queries update accordingly</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Frontend Developers</h3>
+    <table>
+      <thead><tr><th>Game Dev Concept</th><th>Frontend Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Over-the-shoulder camera</td><td>A CSS transform with <code>perspective</code> and <code>translateZ</code> &mdash; positioning the viewport at an offset from the content while maintaining a specific focal point</td></tr>
+        <tr><td>Cover system</td><td>A modal or drawer component &mdash; the player "opens" cover (snaps in), interacts within it (peeks, shoots), and "closes" it (leaves), with the UI constraining available actions while active</td></tr>
+        <tr><td>Aim-down-sights / zoom</td><td>A CSS transition between two layout states &mdash; smoothly interpolating properties (zoom, offset, speed) when toggling between exploration and combat modes</td></tr>
+        <tr><td>Animation blending</td><td>Independent CSS animations on different DOM elements composited together &mdash; a header animates separately from the body, but both render as one coherent page</td></tr>
+        <tr><td>Crosshair alignment (two-raycast)</td><td>Event coordinate mapping &mdash; translating a click position in viewport space to a position in the document (camera ray), then dispatching the actual event to the element at that position (gun ray)</td></tr>
+        <tr><td>Environmental destruction</td><td>Progressive enhancement degradation &mdash; a component with multiple fallback states that degrades gracefully as features (health) are removed, eventually reaching a minimal (destroyed) state</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Data / ML Engineers</h3>
+    <table>
+      <thead><tr><th>Game Dev Concept</th><th>Data / ML Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Over-the-shoulder camera</td><td>An observation function in reinforcement learning &mdash; the agent (player) does not observe the raw state; instead, a camera function transforms the world state into a partial observation with a specific perspective bias</td></tr>
+        <tr><td>Cover system</td><td>Feature gating in a pipeline &mdash; the player binds to a cover object, which gates (blocks) incoming damage features while allowing outgoing attack features to pass through selectively</td></tr>
+        <tr><td>Aim-down-sights / zoom</td><td>Resolution scaling in image processing &mdash; dynamically switching between a low-resolution, wide-field view and a high-resolution, narrow-field view depending on the task</td></tr>
+        <tr><td>Animation blending</td><td>Ensemble model output &mdash; multiple independent models (animation layers) each produce predictions for their domain, and a blending function combines them into a single output (final pose)</td></tr>
+        <tr><td>Crosshair alignment (two-raycast)</td><td>Two-stage retrieval &mdash; a fast, approximate nearest-neighbor search (camera ray) identifies the target region, then a precise similarity computation (gun ray) finds the exact hit point</td></tr>
+        <tr><td>Environmental destruction</td><td>Feature importance decay &mdash; as a feature (cover object) loses importance (health), it contributes less to the model's decision (tactical value) until it is pruned (destroyed) entirely</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li><strong>Camera as game design:</strong> The shift from first-person to third-person fundamentally changes how a player relates to their character. What information does the third-person camera give the player that first-person cannot? What does it take away? How did these tradeoffs influence your design decisions?</li>
+      <li><strong>The cover paradox:</strong> Cover systems slow down gameplay but add tactical depth. Some modern games (Fortnite, Splatoon) reject traditional cover entirely. What are the design arguments for and against a snap-to-cover system, and when does cover enhance versus hinder a shooter?</li>
+      <li><strong>The crosshair lies:</strong> In your MVP, did you encounter situations where the crosshair pointed at something the bullet could not actually hit? How does the two-raycast approach solve this, and are there edge cases where it still fails?</li>
+      <li><strong>Animation sells the fantasy:</strong> How much did animation quality affect the "feel" of your game? Could you identify moments where a missing or wrong animation broke the sense of controlling a real character? What is the minimum viable animation set for a third-person shooter to feel responsive?</li>
+    </ol>
+
+    <nav class="module-nav">
+      <a href={`${base}modules/15-run-and-gun/`}>&larr; Module 15: Run and Gun</a>
+      <a href={`${base}modules/17-point-and-click/`}>Module 17: Point-and-Click Adventure &rarr;</a>
+    </nav>
+  </div>
+
+  <script>
+    // Demo 1: Over-the-Shoulder Camera
+    (function() {
+      const canvas = document.getElementById('demo-camera');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width, H = canvas.height;
+
+      let angle = 0;
+      let dragging = false;
+      let lastX = 0;
+
+      const player = { x: W / 2, y: H / 2, r: 18 };
+      const camDist = 90;
+      const camOffset = 30;
+
+      function draw() {
+        ctx.clearRect(0, 0, W, H);
+
+        // Grid
+        ctx.strokeStyle = '#1a2a3a';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < W; i += 40) {
+          ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, H); ctx.stroke();
+        }
+        for (let j = 0; j < H; j += 40) {
+          ctx.beginPath(); ctx.moveTo(0, j); ctx.lineTo(W, j); ctx.stroke();
+        }
+
+        // Some obstacles
+        ctx.fillStyle = '#3a3a4a';
+        ctx.fillRect(200, 120, 80, 30);
+        ctx.fillRect(480, 260, 60, 40);
+        ctx.fillRect(320, 340, 100, 25);
+
+        const rad = angle;
+        // Camera direction (where the player looks)
+        const lookDirX = Math.cos(rad);
+        const lookDirY = Math.sin(rad);
+
+        // Camera position: behind and offset
+        const perpX = -lookDirY;
+        const perpY = lookDirX;
+
+        const camX = player.x - lookDirX * camDist + perpX * camOffset;
+        const camY = player.y - lookDirY * camDist + perpY * camOffset;
+
+        // Draw look direction line
+        ctx.strokeStyle = '#ffaa44';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.moveTo(player.x, player.y);
+        ctx.lineTo(player.x + lookDirX * 180, player.y + lookDirY * 180);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Draw camera offset vector
+        ctx.strokeStyle = '#44dd88';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(player.x, player.y);
+        ctx.lineTo(camX, camY);
+        ctx.stroke();
+
+        // Camera frustum
+        const fovHalf = 0.4;
+        const frustLen = 200;
+        const fLeftX = camX + Math.cos(rad - fovHalf) * frustLen;
+        const fLeftY = camY + Math.sin(rad - fovHalf) * frustLen;
+        const fRightX = camX + Math.cos(rad + fovHalf) * frustLen;
+        const fRightY = camY + Math.sin(rad + fovHalf) * frustLen;
+
+        ctx.fillStyle = 'rgba(68, 170, 255, 0.08)';
+        ctx.beginPath();
+        ctx.moveTo(camX, camY);
+        ctx.lineTo(fLeftX, fLeftY);
+        ctx.lineTo(fRightX, fRightY);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(68, 170, 255, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(camX, camY);
+        ctx.lineTo(fLeftX, fLeftY);
+        ctx.lineTo(fRightX, fRightY);
+        ctx.closePath();
+        ctx.stroke();
+
+        // Camera rectangle
+        ctx.save();
+        ctx.translate(camX, camY);
+        ctx.rotate(rad);
+        ctx.strokeStyle = '#44aaff';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 3]);
+        ctx.strokeRect(-12, -8, 24, 16);
+        ctx.setLineDash([]);
+        // Lens
+        ctx.fillStyle = '#44aaff';
+        ctx.beginPath();
+        ctx.arc(12, 0, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // Player
+        ctx.fillStyle = '#4488ff';
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#6699ff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Player direction indicator
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(player.x + lookDirX * 12, player.y + lookDirY * 12, 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Labels
+        ctx.fillStyle = '#aabbcc';
+        ctx.font = '12px monospace';
+        ctx.fillText('Camera', camX - 20, camY - 15);
+        ctx.fillText('Player', player.x - 18, player.y - 25);
+        ctx.fillStyle = '#44dd88';
+        ctx.fillText('offset: ' + camDist + 'px back, ' + camOffset + 'px right', 10, H - 15);
+        ctx.fillStyle = '#ffaa44';
+        ctx.fillText('look direction', player.x + lookDirX * 100 - 40, player.y + lookDirY * 100 - 10);
+      }
+
+      canvas.addEventListener('mousedown', function(e) {
+        dragging = true;
+        lastX = e.offsetX;
+      });
+      canvas.addEventListener('mousemove', function(e) {
+        if (!dragging) return;
+        const dx = e.offsetX - lastX;
+        angle += dx * 0.015;
+        lastX = e.offsetX;
+        draw();
+      });
+      canvas.addEventListener('mouseup', function() { dragging = false; });
+      canvas.addEventListener('mouseleave', function() { dragging = false; });
+
+      draw();
+    })();
+
+    // Demo 2: Cover System with Line-of-Sight
+    (function() {
+      const canvas = document.getElementById('demo-cover');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width, H = canvas.height;
+
+      const player = { x: 380, y: 300, r: 14, speed: 3, inCover: false, coverObj: null };
+      const keys = {};
+      const SNAP_DIST = 30;
+
+      const covers = [
+        { x: 200, y: 150, w: 100, h: 20 },
+        { x: 350, y: 220, w: 20, h: 80 },
+        { x: 500, y: 160, w: 80, h: 20 },
+        { x: 150, y: 300, w: 20, h: 70 },
+        { x: 450, y: 330, w: 90, h: 20 },
+        { x: 600, y: 250, w: 20, h: 80 },
+      ];
+
+      const enemies = [
+        { x: 100, y: 60, r: 12 },
+        { x: 660, y: 80, r: 12 },
+        { x: 400, y: 50, r: 12 },
+      ];
+
+      function lineIntersectsRect(x1, y1, x2, y2, rx, ry, rw, rh) {
+        function lineIntersectsSegment(ax, ay, bx, by, cx, cy, dx, dy) {
+          const denom = (bx - ax) * (dy - cy) - (by - ay) * (dx - cx);
+          if (Math.abs(denom) < 0.0001) return null;
+          const t = ((cx - ax) * (dy - cy) - (cy - ay) * (dx - cx)) / denom;
+          const u = ((cx - ax) * (by - ay) - (cy - ay) * (bx - ax)) / denom;
+          if (t >= 0 && t <= 1 && u >= 0 && u <= 1) return t;
+          return null;
+        }
+        const sides = [
+          [rx, ry, rx + rw, ry],
+          [rx + rw, ry, rx + rw, ry + rh],
+          [rx + rw, ry + rh, rx, ry + rh],
+          [rx, ry + rh, rx, ry],
+        ];
+        for (const s of sides) {
+          if (lineIntersectsSegment(x1, y1, x2, y2, s[0], s[1], s[2], s[3]) !== null) return true;
+        }
+        return false;
+      }
+
+      function distToRect(px, py, rect) {
+        const cx = Math.max(rect.x, Math.min(px, rect.x + rect.w));
+        const cy = Math.max(rect.y, Math.min(py, rect.y + rect.h));
+        return Math.hypot(px - cx, py - cy);
+      }
+
+      function snapToRect(px, py, rect) {
+        const cx = Math.max(rect.x, Math.min(px, rect.x + rect.w));
+        const cy = Math.max(rect.y, Math.min(py, rect.y + rect.h));
+        const dx = px - cx, dy = py - cy;
+        const dist = Math.hypot(dx, dy);
+        if (dist < 1) return { x: px, y: py + player.r + 2 };
+        return { x: cx + (dx / dist) * (player.r + 2), y: cy + (dy / dist) * (player.r + 2) };
+      }
+
+      function collideWithCovers(px, py) {
+        for (const c of covers) {
+          const cx = Math.max(c.x, Math.min(px, c.x + c.w));
+          const cy = Math.max(c.y, Math.min(py, c.y + c.h));
+          const dx = px - cx, dy = py - cy;
+          const dist = Math.hypot(dx, dy);
+          if (dist < player.r) {
+            if (dist < 0.01) { px += 1; continue; }
+            px = cx + (dx / dist) * player.r;
+            py = cy + (dy / dist) * player.r;
+          }
+        }
+        return { x: px, y: py };
+      }
+
+      function update() {
+        let dx = 0, dy = 0;
+        if (keys['ArrowLeft'] || keys['KeyA']) dx -= 1;
+        if (keys['ArrowRight'] || keys['KeyD']) dx += 1;
+        if (keys['ArrowUp'] || keys['KeyW']) dy -= 1;
+        if (keys['ArrowDown'] || keys['KeyS']) dy += 1;
+        if (dx || dy) {
+          const len = Math.hypot(dx, dy);
+          player.x += (dx / len) * player.speed;
+          player.y += (dy / len) * player.speed;
+          player.inCover = false;
+          player.coverObj = null;
+        }
+
+        player.x = Math.max(player.r, Math.min(W - player.r, player.x));
+        player.y = Math.max(player.r, Math.min(H - player.r, player.y));
+
+        const pos = collideWithCovers(player.x, player.y);
+        player.x = pos.x;
+        player.y = pos.y;
+
+        // Snap to cover
+        if (!dx && !dy) {
+          let nearest = null, nearDist = SNAP_DIST;
+          for (const c of covers) {
+            const d = distToRect(player.x, player.y, c);
+            if (d < nearDist) {
+              nearDist = d;
+              nearest = c;
+            }
+          }
+          if (nearest) {
+            const snap = snapToRect(player.x, player.y, nearest);
+            player.x = snap.x;
+            player.y = snap.y;
+            player.inCover = true;
+            player.coverObj = nearest;
+          }
+        }
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, W, H);
+
+        // Background
+        ctx.fillStyle = '#111822';
+        ctx.fillRect(0, 0, W, H);
+
+        // Arena border
+        ctx.strokeStyle = '#2a3a4a';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(2, 2, W - 4, H - 4);
+
+        // Draw sight lines first (behind everything)
+        for (const e of enemies) {
+          let blocked = false;
+          for (const c of covers) {
+            if (lineIntersectsRect(e.x, e.y, player.x, player.y, c.x, c.y, c.w, c.h)) {
+              blocked = true;
+              break;
+            }
+          }
+          ctx.strokeStyle = blocked ? 'rgba(68, 220, 100, 0.4)' : 'rgba(255, 60, 60, 0.5)';
+          ctx.lineWidth = blocked ? 1 : 2;
+          ctx.setLineDash(blocked ? [4, 4] : []);
+          ctx.beginPath();
+          ctx.moveTo(e.x, e.y);
+          ctx.lineTo(player.x, player.y);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+
+        // Covers
+        for (const c of covers) {
+          ctx.fillStyle = '#556677';
+          ctx.fillRect(c.x, c.y, c.w, c.h);
+          ctx.strokeStyle = '#778899';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(c.x, c.y, c.w, c.h);
+        }
+
+        // Enemies (triangles)
+        for (const e of enemies) {
+          let blocked = false;
+          for (const c of covers) {
+            if (lineIntersectsRect(e.x, e.y, player.x, player.y, c.x, c.y, c.w, c.h)) {
+              blocked = true;
+              break;
+            }
+          }
+          ctx.fillStyle = blocked ? '#884444' : '#ff4444';
+          ctx.beginPath();
+          ctx.moveTo(e.x, e.y - e.r);
+          ctx.lineTo(e.x - e.r, e.y + e.r);
+          ctx.lineTo(e.x + e.r, e.y + e.r);
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = '#ff6666';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+
+          // Eye
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.arc(e.x, e.y + 2, 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Player
+        ctx.fillStyle = player.inCover ? '#2266cc' : '#4488ff';
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = player.inCover ? '#88bbff' : '#6699ff';
+        ctx.lineWidth = player.inCover ? 3 : 2;
+        ctx.stroke();
+
+        // Cover indicator
+        if (player.inCover) {
+          ctx.fillStyle = '#88bbff';
+          ctx.font = 'bold 11px monospace';
+          ctx.fillText('IN COVER', player.x - 28, player.y - 20);
+        }
+
+        // Status
+        ctx.fillStyle = '#aabbcc';
+        ctx.font = '12px monospace';
+        let hasLOS = false;
+        for (const e of enemies) {
+          let blocked = false;
+          for (const c of covers) {
+            if (lineIntersectsRect(e.x, e.y, player.x, player.y, c.x, c.y, c.w, c.h)) {
+              blocked = true; break;
+            }
+          }
+          if (!blocked) hasLOS = true;
+        }
+        ctx.fillStyle = hasLOS ? '#ff6644' : '#44dd88';
+        ctx.fillText(hasLOS ? 'EXPOSED - enemies can see you!' : 'SAFE - behind cover', 10, H - 10);
+      }
+
+      function loop() {
+        update();
+        draw();
+        requestAnimationFrame(loop);
+      }
+
+      window.addEventListener('keydown', function(e) {
+        keys[e.code] = true;
+        if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
+      });
+      window.addEventListener('keyup', function(e) { keys[e.code] = false; });
+
+      loop();
+    })();
+  </script>
+</BaseLayout>

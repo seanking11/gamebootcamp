@@ -1,0 +1,761 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 22: Real-Time Strategy (RTS)">
+  <div class="container page-content">
+    <div class="module-header">
+      <div class="module-number">Module 22</div>
+      <h1>Real-Time Strategy (RTS)</h1>
+      <p class="module-theme">Command armies, manage economies, conquer maps &mdash; You need more pylons</p>
+    </div>
+
+    <blockquote>
+      <p>"No plan survives first contact with the enemy." &mdash; Helmuth von Moltke</p>
+    </blockquote>
+
+    <hr />
+
+    <h2>Prerequisites</h2>
+    <table>
+      <thead>
+        <tr><th>Module</th><th>What You Used From It</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Module 6 - Tower Defense</td><td>Pathfinding algorithms (A*), enemy wave management, resource/economy systems</td></tr>
+        <tr><td>Module 3 - Top-Down Shooter</td><td>Entity management for many simultaneous objects, real-time input handling, collision detection</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h2>Week 1: History &amp; Design Theory</h2>
+
+    <h3>The Origin</h3>
+    <p>The real-time strategy genre emerged when designers asked: what if the tabletop war game ran in continuous time instead of turns? Dune II (Westwood, 1992) answered that question and established nearly every convention the genre still uses &mdash; resource harvesting, base building, unit production, and the fog of war. The critical design challenge was translating the deliberate, analytical nature of strategy games into a format where the clock never stops. The solution was giving the player god-like control (select units, right-click to command) while requiring them to manage scarce resources across multiple fronts simultaneously. The RTS became a genre about attention management as much as strategic thinking &mdash; the best player is not just the smartest, but the one who can execute the most actions per minute while making the fewest mistakes.</p>
+
+    <h3>How the Genre Evolved</h3>
+    <p><strong>StarCraft (Blizzard, 1998):</strong> StarCraft perfected asymmetric faction design &mdash; three races (Terran, Zerg, Protoss) with fundamentally different economies, units, and strategies, yet balanced against each other. It proved that an RTS could sustain a professional competitive scene for decades, and that the genre's skill ceiling was essentially infinite. StarCraft's influence established the RTS as the premier "macro and micro" game: macro is building the right things at the right time, micro is controlling individual units with precision during combat.</p>
+    <p><strong>Age of Empires II (Ensemble Studios, 1999):</strong> Where StarCraft emphasized speed and asymmetry, AoE II emphasized long-term planning and civilization development. Its tech tree &mdash; a branching progression from the Dark Age to the Imperial Age &mdash; showed that RTS games could span hours and feel like epic narratives of growth. Age of Empires II's thirteen civilizations (expanded to dozens over time) demonstrated that even symmetric starting conditions could produce diverse gameplay through tech tree variations and unique units.</p>
+    <p><strong>Company of Heroes (Relic Entertainment, 2006):</strong> Relic stripped away base building and resource gathering in favor of territory control &mdash; holding strategic points on the map generated resources automatically. This shifted the genre's focus from economy to tactics: positioning, cover, flanking, and combined arms. Company of Heroes proved that the RTS could be as much about moment-to-moment battlefield decisions as about long-term build orders, and that reducing macro complexity could make the genre more accessible without sacrificing depth.</p>
+
+    <h3>What Makes an RTS "Great"</h3>
+    <p>A great RTS creates meaningful decisions at every timescale. In the moment, the player micro-manages individual units &mdash; dodging projectiles, focusing fire, flanking. Over minutes, they make macro decisions &mdash; what to build next, when to expand, when to attack. Over the full game, they execute a strategy &mdash; rush early, turtle and tech up, or play for the late game. The best entries in the genre ensure that all three timescales matter, that no single strategy dominates, and that information (scouting, fog of war) is as valuable a resource as minerals or gold. An RTS is a game about imperfect information and imperfect execution &mdash; the winner is the player who makes the best decisions with incomplete data while under constant time pressure.</p>
+
+    <h3>The Essential Mechanic</h3>
+    <p>Commanding multiple units while managing an economy in real-time.</p>
+
+    <hr />
+
+    <h2>Week 2: Build the MVP</h2>
+
+    <h3>What You're Building</h3>
+    <p>A stripped-down RTS with one unit type, one resource, one building, and a simple enemy that produces units on a timer. The player gathers resources, builds structures that produce units, selects and commands those units, and attempts to destroy the enemy base &mdash; all while the fog of war hides unexplored territory. The emphasis is on the core interaction patterns (select, command, build) rather than content depth.</p>
+
+    <h3>Core Concepts (Must Implement)</h3>
+
+    <h4>1. Box Selection / Unit Selection System</h4>
+    <p>The fundamental input pattern of the RTS: click to select one unit, click-drag to draw a box and select all units inside it, shift-click to add or remove units from the selection. Every command the player issues applies to the current selection.</p>
+    <pre is:raw><code>selection = []
+drag_start = null
+is_dragging = false
+
+function on_mouse_down(position):
+    drag_start = position
+    is_dragging = false
+
+function on_mouse_move(position):
+    if drag_start and distance(drag_start, position) > 5:
+        is_dragging = true
+        draw_selection_rectangle(drag_start, position)
+
+function on_mouse_up(position):
+    if is_dragging:
+        box = make_rect(drag_start, position)
+        if not input_held("shift"):
+            selection = []
+        for unit in player_units:
+            if point_in_rect(unit.position, box):
+                if unit not in selection:
+                    selection.append(unit)
+    else:
+        clicked_unit = find_unit_at(position)
+        if input_held("shift"):
+            if clicked_unit in selection:
+                selection.remove(clicked_unit)
+            elif clicked_unit and clicked_unit.owner == "player":
+                selection.append(clicked_unit)
+        else:
+            selection = []
+            if clicked_unit and clicked_unit.owner == "player":
+                selection = [clicked_unit]
+    drag_start = null
+    is_dragging = false</code></pre>
+    <p><strong>Why it matters:</strong> Box selection is the most important UX pattern in the RTS. It is how the player expresses intent at scale &mdash; without it, commanding an army of 50 units would require 50 individual clicks. The quality of the selection system directly determines how many actions per minute the player can execute.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Box Selection &amp; Unit Commands</div>
+      <p class="demo-hint">Click and drag to draw a selection box around units (colored circles). Selected units highlight with a ring. Right-click to command selected units to move to that location.</p>
+      <canvas id="demo-box-select" width="760" height="420"></canvas>
+      <div class="demo-controls">
+        <button id="bs-reset-btn">Reset Units</button>
+        <span class="value-display" id="bs-selected-display">Selected: 0</span>
+        <span class="value-display" id="bs-info-display">Left-drag: Select | Right-click: Move</span>
+      </div>
+    </div>
+
+    <h4>2. Right-Click Command System</h4>
+    <p>The context-sensitive command input: right-click on empty ground to move, right-click on an enemy to attack, right-click on a resource to gather. The same input produces different commands based on what is under the cursor.</p>
+    <pre is:raw><code>function on_right_click(position):
+    if len(selection) == 0: return
+    target = get_entity_at(position)
+
+    if target == null:
+        issue_command(selection, { type: "move", destination: position })
+    elif target.owner == "enemy":
+        issue_command(selection, { type: "attack", target: target })
+    elif target.type == "resource":
+        workers = selection.filter(u => u.can_gather)
+        issue_command(workers, { type: "gather", target: target })
+
+function issue_command(units, command):
+    for unit in units:
+        unit.current_command = command
+        unit.command_queue = [command]
+
+function update_unit(unit, dt):
+    if unit.current_command == null: return
+    cmd = unit.current_command
+    if cmd.type == "move":
+        move_toward(unit, cmd.destination, dt)
+        if distance(unit.position, cmd.destination) < 2:
+            unit.current_command = next_in_queue(unit)
+    elif cmd.type == "attack":
+        if distance(unit.position, cmd.target.position) <= unit.attack_range:
+            attack(unit, cmd.target)
+        else:
+            move_toward(unit, cmd.target.position, dt)</code></pre>
+    <p><strong>Why it matters:</strong> The right-click command system makes the RTS feel responsive and intuitive. One input does the "right thing" in every context. This design reduces the cognitive load of controlling many units &mdash; the player focuses on WHERE to click, and the game figures out WHAT to do.</p>
+
+    <h4>3. Fog of War Implementation</h4>
+    <p>The map is divided into three visibility states per tile: unexplored (completely hidden), explored but fogged (visible terrain, no unit info), and currently visible (fully revealed by a nearby unit). Each unit reveals tiles within its vision radius.</p>
+    <pre is:raw><code>FOG_UNEXPLORED = 0    // Black -- never seen
+FOG_EXPLORED = 1      // Dim -- seen before, no live info
+FOG_VISIBLE = 2       // Clear -- currently in unit's vision
+
+fog_map = 2D array [map_width][map_height] initialized to FOG_UNEXPLORED
+
+function update_fog_of_war():
+    for x in 0 to map_width:
+        for y in 0 to map_height:
+            if fog_map[x][y] == FOG_VISIBLE:
+                fog_map[x][y] = FOG_EXPLORED
+    for unit in player_units:
+        tiles_in_range = get_tiles_in_radius(unit.position, unit.vision_radius)
+        for tile in tiles_in_range:
+            if has_line_of_sight(unit.position, tile):
+                fog_map[tile.x][tile.y] = FOG_VISIBLE
+
+function render_tile(x, y):
+    if fog_map[x][y] == FOG_UNEXPLORED:
+        draw_black(x, y)
+    elif fog_map[x][y] == FOG_EXPLORED:
+        draw_terrain(x, y)
+        draw_overlay(x, y, color: black, opacity: 0.5)
+    elif fog_map[x][y] == FOG_VISIBLE:
+        draw_terrain(x, y)
+        draw_entities_at(x, y)</code></pre>
+    <p><strong>Why it matters:</strong> Fog of war transforms a strategy game from a puzzle (perfect information) into a true strategy game (imperfect information). Without fog, both players know everything and the game reduces to execution speed. With fog, scouting becomes essential, surprise attacks become possible, and the player must make decisions under uncertainty &mdash; which is what real strategy is.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Fog of War</div>
+      <p class="demo-hint">A grid world with three fog states. Click a unit (blue circle) and right-click to move it. Units reveal terrain around them. Explored areas go dim when units leave. Unexplored areas are black.</p>
+      <canvas id="demo-fog" width="760" height="420"></canvas>
+      <div class="demo-controls">
+        <button id="fog-reset-btn">Reset Map</button>
+        <span class="value-display" id="fog-info">Click unit, then right-click to move</span>
+      </div>
+    </div>
+
+    <h4>4. Resource Gathering and Tech Trees</h4>
+    <p>Workers collect a resource from the map, deposit it at the base, and the player spends resources to construct buildings that unlock new unit types. This is the economic backbone of the RTS &mdash; the engine that powers everything else.</p>
+    <pre is:raw><code>player_resources = { minerals: 50 }
+
+costs = {
+    "worker":   { minerals: 50,  build_time: 5.0 },
+    "soldier":  { minerals: 100, build_time: 8.0, requires: "barracks" },
+    "barracks": { minerals: 150, build_time: 10.0 }
+}
+
+function gather_resource(worker, resource_node):
+    if worker.carrying >= worker.carry_capacity:
+        worker.current_command = { type: "deposit", target: find_nearest_base() }
+        return
+    worker.gather_timer += dt
+    if worker.gather_timer >= 1.0:
+        amount = min(5, resource_node.remaining)
+        worker.carrying += amount
+        resource_node.remaining -= amount
+        worker.gather_timer = 0
+
+function deposit_resources(worker, base):
+    player_resources.minerals += worker.carrying
+    worker.carrying = 0
+    worker.current_command = { type: "gather", target: worker.last_resource }</code></pre>
+    <p><strong>Why it matters:</strong> The economy is the meta-game of the RTS. Every unit and building has an opportunity cost &mdash; minerals spent on soldiers cannot be spent on workers, and vice versa. The tech tree creates decision points: do you rush soldiers now, or invest in a barracks to unlock better units later?</p>
+
+    <h4>5. Formation Movement</h4>
+    <p>When multiple selected units are given a move command, they form up around the destination in a spread pattern, maintaining relative positions instead of all pathing to the same point.</p>
+    <pre is:raw><code>function calculate_formation_positions(units, destination):
+    count = len(units)
+    if count == 1: return [destination]
+    positions = []
+    columns = ceil(sqrt(count))
+    spacing = 20
+
+    for i in 0 to count:
+        row = floor(i / columns)
+        col = i % columns
+        offset_x = (col - columns / 2) * spacing
+        offset_y = (row - floor(count / columns) / 2) * spacing
+        positions.append({
+            x: destination.x + offset_x,
+            y: destination.y + offset_y
+        })
+    return positions</code></pre>
+    <p><strong>Why it matters:</strong> Formation movement is what makes an army feel like an army instead of a blob. Even a simple formation system dramatically improves the visual and strategic quality of unit movement.</p>
+
+    <h4>6. Build Queue System</h4>
+    <p>Production buildings train units over time. The player can queue multiple units, and they are produced sequentially. Managing build queues across multiple buildings is a core macro skill.</p>
+    <pre is:raw><code>function create_building(type, position):
+    return {
+        type: type, position: position,
+        build_queue: [], current_build: null,
+        build_progress: 0, rally_point: position
+    }
+
+function add_to_queue(building, unit_type):
+    if not can_afford(unit_type): return
+    player_resources.minerals -= costs[unit_type].minerals
+    building.build_queue.append(unit_type)
+    if building.current_build == null:
+        start_next_in_queue(building)
+
+function update_building(building, dt):
+    if building.current_build == null: return
+    building.build_progress += dt
+    total_time = costs[building.current_build].build_time
+    if building.build_progress >= total_time:
+        new_unit = spawn_unit(building.current_build, building.position)
+        new_unit.current_command = { type: "move", destination: building.rally_point }
+        start_next_in_queue(building)</code></pre>
+    <p><strong>Why it matters:</strong> Build queues are how the player converts economic advantage into military strength. Keeping production buildings busy is one of the most important macro skills in the RTS.</p>
+
+    <h4>7. Minimap with Fog</h4>
+    <p>A small overview of the entire map shown in a corner of the screen. It displays terrain, unit positions (color-coded by team), fog state, and allows the player to click on it to jump the camera to that location.</p>
+    <pre is:raw><code>function render_minimap():
+    scale_x = MINIMAP_SIZE / map_width
+    scale_y = MINIMAP_SIZE / map_height
+
+    for x in 0 to map_width:
+        for y in 0 to map_height:
+            mini_x = MINIMAP_POSITION.x + x * scale_x
+            mini_y = MINIMAP_POSITION.y + y * scale_y
+            if fog_map[x][y] == FOG_UNEXPLORED:
+                draw_pixel(mini_x, mini_y, color: black)
+            elif fog_map[x][y] == FOG_EXPLORED:
+                draw_pixel(mini_x, mini_y, color: dark_gray)
+            else:
+                draw_pixel(mini_x, mini_y, color: terrain_color(x, y))
+
+    for unit in all_units:
+        if fog_map[unit.tile_x][unit.tile_y] == FOG_VISIBLE or unit.owner == "player":
+            color = "green" if unit.owner == "player" else "red"
+            draw_dot(mini_x, mini_y, color: color, size: 2)</code></pre>
+    <p><strong>Why it matters:</strong> The minimap is the player's strategic awareness tool. In a game where the camera shows only a fraction of the map, the minimap provides the global context needed to make informed decisions.</p>
+
+    <hr />
+
+    <h3>Stretch Goals</h3>
+    <ul>
+      <li><strong>Attack-move command:</strong> Units move to a destination but automatically engage any enemy encountered along the way.</li>
+      <li><strong>Simple AI opponent:</strong> An enemy AI that gathers resources, builds units on a timer, and sends them to attack the player's base periodically.</li>
+      <li><strong>Multiple unit types:</strong> Add a ranged unit and a melee unit with different strengths, creating combined-arms tactics.</li>
+      <li><strong>Control groups:</strong> Press Ctrl+1 to assign selected units to group 1, press 1 to re-select them instantly.</li>
+    </ul>
+
+    <h3>MVP Spec</h3>
+    <table>
+      <thead>
+        <tr><th>Element</th><th>Minimum Viable Version</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Units</td><td>1 unit type (worker that can also fight) or 1 worker + 1 soldier</td></tr>
+        <tr><td>Resource</td><td>1 resource type, harvestable from nodes on the map</td></tr>
+        <tr><td>Buildings</td><td>Base (deposits resources, trains workers) + 1 production building</td></tr>
+        <tr><td>Selection</td><td>Click to select, drag-box to multi-select</td></tr>
+        <tr><td>Commands</td><td>Right-click to move, right-click enemy to attack, right-click resource to gather</td></tr>
+        <tr><td>Fog of War</td><td>3-state fog (unexplored, explored, visible) updated per unit</td></tr>
+        <tr><td>Build Queue</td><td>Buildings produce units over time with a queue</td></tr>
+        <tr><td>Minimap</td><td>Overview with fog state, unit dots, and click-to-move-camera</td></tr>
+        <tr><td>Enemy</td><td>A pre-placed enemy base that produces units on a timer</td></tr>
+        <tr><td>Win/Lose</td><td>Destroy enemy base to win, lose if your base is destroyed</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliverable</h3>
+    <p>A playable RTS where the player gathers resources with workers, constructs a building, produces combat units, and commands them to destroy an enemy base &mdash; all while fog of war hides unexplored territory and a minimap provides strategic overview. The enemy should produce units on a timer and attack periodically, creating time pressure. The game is won by destroying the enemy base before it overwhelms the player.</p>
+
+    <hr />
+
+    <h2>Analogies by Background</h2>
+
+    <h3>For Backend Developers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Box Selection</td><td>Like bulk operations in a database &mdash; SELECT * WHERE position WITHIN bounding_box. You query for entities matching spatial criteria and operate on the result set.</td></tr>
+        <tr><td>Right-Click Commands</td><td>Like RESTful API design &mdash; the same endpoint (right-click) performs different operations based on context (what the cursor is over).</td></tr>
+        <tr><td>Fog of War</td><td>Like access control with visibility scopes &mdash; each unit is a principal with a vision radius, and only entities within that radius are authorized for display.</td></tr>
+        <tr><td>Resource Gathering</td><td>Like capacity planning &mdash; you invest compute (workers) to generate throughput (resources) that funds infrastructure (buildings).</td></tr>
+        <tr><td>Formation Movement</td><td>Like load-balanced request distribution &mdash; incoming traffic is distributed across servers so no single server receives all the load.</td></tr>
+        <tr><td>Build Queue</td><td>Like a message queue with consumers &mdash; build orders are enqueued, and the building processes them sequentially at a fixed rate.</td></tr>
+        <tr><td>Minimap</td><td>Like a monitoring dashboard &mdash; an aggregated, real-time view of the entire system's health with the ability to drill into specifics.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Frontend Developers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Box Selection</td><td>Like <code>document.querySelectorAll</code> with a spatial query &mdash; you define a bounding box and receive all matching elements within it.</td></tr>
+        <tr><td>Right-Click Commands</td><td>Like context menus in a UI &mdash; right-clicking produces different options depending on what element the cursor is over.</td></tr>
+        <tr><td>Fog of War</td><td>Like lazy loading with placeholder content &mdash; unexplored areas show a placeholder, explored areas show a low-res preview, visible areas are fully loaded.</td></tr>
+        <tr><td>Formation Movement</td><td>Like CSS Flexbox layout &mdash; units are distributed along an axis with configurable spacing and alignment.</td></tr>
+        <tr><td>Build Queue</td><td>Like a render queue or animation frame queue &mdash; tasks are processed in order, one at a time, with a progress indicator.</td></tr>
+        <tr><td>Minimap</td><td>Like a site map or thumbnail preview &mdash; a zoomed-out view of the full page showing the user's current viewport location.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Data / ML Engineers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Box Selection</td><td>Like spatial indexing with a bounding box query &mdash; a k-d tree returns all data points within the query rectangle.</td></tr>
+        <tr><td>Fog of War</td><td>Like masking in attention mechanisms &mdash; each unit's vision defines an attention mask, and only unmasked tokens contribute to the player's information.</td></tr>
+        <tr><td>Resource Gathering</td><td>Like a DAG of data transformations &mdash; raw data flows through processing stages, and later stages depend on outputs of earlier ones.</td></tr>
+        <tr><td>Build Queue</td><td>Like a FIFO job queue in a training pipeline &mdash; jobs are processed sequentially, each taking a known duration.</td></tr>
+        <tr><td>Minimap</td><td>Like a dimensionality reduction visualization &mdash; the full game map is projected into a small, navigable overview that preserves key relationships.</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li>StarCraft professionals execute 300+ actions per minute (APM). To what extent should an RTS reward mechanical speed versus strategic thinking? Can you design an RTS where the slower player wins if they make better decisions?</li>
+      <li>Fog of war creates imperfect information, which means the player must make decisions under uncertainty. How does this change the nature of "optimal play" compared to a game with perfect information (like chess)?</li>
+      <li>The RTS genre has declined in mainstream popularity while MOBAs (which evolved from RTS mods) have thrived. What aspects of the RTS are too demanding for casual play, and how might you simplify them without losing strategic depth?</li>
+      <li>In an RTS, the player manages an economy, an army, and information simultaneously. How is this form of multitasking different from the moment-to-moment decision-making in an action game?</li>
+    </ol>
+
+    <nav class="module-nav">
+      <a href={`${base}modules/21-simulation/`}>&larr; Module 21: Simulation</a>
+      <a href={`${base}modules/23-turn-based-strategy/`}>Module 23: Turn-Based Strategy &rarr;</a>
+    </nav>
+  </div>
+</BaseLayout>
+
+<script>
+// ==================== Demo 1: Box Selection & Unit Commands ====================
+(function() {
+  const canvas = document.getElementById('demo-box-select');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const selectedDisplay = document.getElementById('bs-selected-display');
+  const resetBtn = document.getElementById('bs-reset-btn');
+
+  const COLORS = ['#4fc3f7','#81c784','#ffb74d','#e57373','#ba68c8','#4db6ac','#fff176','#f06292'];
+  let units = [];
+  let selection = [];
+  let dragStart = null;
+  let dragCurrent = null;
+  let isDragging = false;
+
+  function createUnits() {
+    units = [];
+    selection = [];
+    for (let i = 0; i < 15; i++) {
+      units.push({
+        x: 60 + Math.random() * 640,
+        y: 60 + Math.random() * 300,
+        radius: 12,
+        color: COLORS[i % COLORS.length],
+        targetX: null,
+        targetY: null,
+        speed: 80 + Math.random() * 40,
+        id: i
+      });
+    }
+  }
+  createUnits();
+
+  resetBtn.addEventListener('click', () => {
+    createUnits();
+  });
+
+  canvas.addEventListener('mousedown', (e) => {
+    if (e.button === 0) {
+      const rect = canvas.getBoundingClientRect();
+      dragStart = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      dragCurrent = { ...dragStart };
+      isDragging = false;
+    }
+  });
+
+  canvas.addEventListener('mousemove', (e) => {
+    if (dragStart) {
+      const rect = canvas.getBoundingClientRect();
+      dragCurrent = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      const dx = dragCurrent.x - dragStart.x;
+      const dy = dragCurrent.y - dragStart.y;
+      if (Math.sqrt(dx*dx + dy*dy) > 5) {
+        isDragging = true;
+      }
+    }
+  });
+
+  canvas.addEventListener('mouseup', (e) => {
+    if (e.button === 0 && dragStart) {
+      if (isDragging) {
+        const box = {
+          x: Math.min(dragStart.x, dragCurrent.x),
+          y: Math.min(dragStart.y, dragCurrent.y),
+          w: Math.abs(dragCurrent.x - dragStart.x),
+          h: Math.abs(dragCurrent.y - dragStart.y)
+        };
+        if (!e.shiftKey) selection = [];
+        for (const u of units) {
+          if (u.x >= box.x && u.x <= box.x + box.w && u.y >= box.y && u.y <= box.y + box.h) {
+            if (!selection.includes(u)) selection.push(u);
+          }
+        }
+      } else {
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        let clicked = null;
+        for (const u of units) {
+          const dx = u.x - mx, dy = u.y - my;
+          if (Math.sqrt(dx*dx + dy*dy) <= u.radius) { clicked = u; break; }
+        }
+        if (!e.shiftKey) selection = [];
+        if (clicked && !selection.includes(clicked)) selection.push(clicked);
+      }
+      dragStart = null;
+      dragCurrent = null;
+      isDragging = false;
+      selectedDisplay.textContent = 'Selected: ' + selection.length;
+    }
+  });
+
+  canvas.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    if (selection.length === 0) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const count = selection.length;
+    const cols = Math.ceil(Math.sqrt(count));
+    const spacing = 28;
+    selection.forEach((u, i) => {
+      const row = Math.floor(i / cols);
+      const col = i % cols;
+      u.targetX = mx + (col - cols / 2) * spacing;
+      u.targetY = my + (row - Math.floor(count / cols) / 2) * spacing;
+    });
+  });
+
+  let lastTime = performance.now();
+  function update() {
+    const now = performance.now();
+    const dt = (now - lastTime) / 1000;
+    lastTime = now;
+
+    for (const u of units) {
+      if (u.targetX !== null) {
+        const dx = u.targetX - u.x;
+        const dy = u.targetY - u.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist < 2) {
+          u.targetX = null;
+          u.targetY = null;
+        } else {
+          u.x += (dx / dist) * u.speed * dt;
+          u.y += (dy / dist) * u.speed * dt;
+        }
+      }
+    }
+
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Grid lines
+    ctx.strokeStyle = '#2a2a4a';
+    ctx.lineWidth = 0.5;
+    for (let x = 0; x < canvas.width; x += 40) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+    }
+    for (let y = 0; y < canvas.height; y += 40) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+    }
+
+    // Movement lines
+    for (const u of selection) {
+      if (u.targetX !== null) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath(); ctx.moveTo(u.x, u.y); ctx.lineTo(u.targetX, u.targetY); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    // Units
+    for (const u of units) {
+      const isSelected = selection.includes(u);
+      ctx.beginPath();
+      ctx.arc(u.x, u.y, u.radius, 0, Math.PI * 2);
+      ctx.fillStyle = u.color;
+      ctx.fill();
+      if (isSelected) {
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(u.x, u.y, u.radius + 4, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+
+    // Drag box
+    if (isDragging && dragStart && dragCurrent) {
+      const bx = Math.min(dragStart.x, dragCurrent.x);
+      const by = Math.min(dragStart.y, dragCurrent.y);
+      const bw = Math.abs(dragCurrent.x - dragStart.x);
+      const bh = Math.abs(dragCurrent.y - dragStart.y);
+      ctx.strokeStyle = '#4fc3f7';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(bx, by, bw, bh);
+      ctx.fillStyle = 'rgba(79, 195, 247, 0.1)';
+      ctx.fillRect(bx, by, bw, bh);
+    }
+
+    requestAnimationFrame(update);
+  }
+  update();
+})();
+
+// ==================== Demo 2: Fog of War ====================
+(function() {
+  const canvas = document.getElementById('demo-fog');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const resetBtn = document.getElementById('fog-reset-btn');
+  const fogInfo = document.getElementById('fog-info');
+
+  const TILE = 28;
+  const COLS = Math.floor(canvas.width / TILE);
+  const ROWS = Math.floor(canvas.height / TILE);
+  const VISION_RADIUS = 3;
+
+  const UNEXPLORED = 0, EXPLORED = 1, VISIBLE = 2;
+
+  let terrain = [];
+  let fog = [];
+  let playerUnits = [];
+  let selectedUnit = null;
+
+  const TERRAIN_COLORS = {
+    grass: '#4a7c3f',
+    water: '#2a6496',
+    forest: '#2d5a27',
+    sand: '#c2a64e',
+    stone: '#7a7a7a'
+  };
+
+  function init() {
+    terrain = [];
+    fog = [];
+    for (let r = 0; r < ROWS; r++) {
+      terrain[r] = [];
+      fog[r] = [];
+      for (let c = 0; c < COLS; c++) {
+        const rng = Math.random();
+        if (rng < 0.6) terrain[r][c] = 'grass';
+        else if (rng < 0.72) terrain[r][c] = 'water';
+        else if (rng < 0.84) terrain[r][c] = 'forest';
+        else if (rng < 0.93) terrain[r][c] = 'sand';
+        else terrain[r][c] = 'stone';
+        fog[r][c] = UNEXPLORED;
+      }
+    }
+    playerUnits = [
+      { col: 3, row: 3, color: '#4fc3f7', targetCol: null, targetRow: null },
+      { col: 5, row: 8, color: '#81c784', targetCol: null, targetRow: null },
+      { col: 10, row: 5, color: '#ffb74d', targetCol: null, targetRow: null }
+    ];
+    selectedUnit = null;
+    updateFog();
+  }
+
+  function updateFog() {
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        if (fog[r][c] === VISIBLE) fog[r][c] = EXPLORED;
+      }
+    }
+    for (const u of playerUnits) {
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const dist = Math.abs(u.row - r) + Math.abs(u.col - c);
+          if (dist <= VISION_RADIUS) {
+            fog[r][c] = VISIBLE;
+          }
+        }
+      }
+    }
+  }
+
+  init();
+  resetBtn.addEventListener('click', init);
+
+  canvas.addEventListener('mousedown', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const col = Math.floor(mx / TILE);
+    const row = Math.floor(my / TILE);
+
+    if (e.button === 0) {
+      selectedUnit = null;
+      for (const u of playerUnits) {
+        if (u.col === col && u.row === row) {
+          selectedUnit = u;
+          fogInfo.textContent = 'Unit selected. Right-click to move.';
+          break;
+        }
+      }
+      if (!selectedUnit) fogInfo.textContent = 'Click a blue/green/orange unit first.';
+    }
+  });
+
+  canvas.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    if (!selectedUnit) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const col = Math.floor(mx / TILE);
+    const row = Math.floor(my / TILE);
+    if (col >= 0 && col < COLS && row >= 0 && row < ROWS && terrain[row][col] !== 'water') {
+      selectedUnit.targetCol = col;
+      selectedUnit.targetRow = row;
+      fogInfo.textContent = 'Moving unit to (' + col + ',' + row + ')';
+    }
+  });
+
+  let moveTimer = 0;
+  let lastTime = performance.now();
+
+  function update() {
+    const now = performance.now();
+    const dt = (now - lastTime) / 1000;
+    lastTime = now;
+    moveTimer += dt;
+
+    if (moveTimer > 0.15) {
+      moveTimer = 0;
+      for (const u of playerUnits) {
+        if (u.targetCol !== null && u.targetRow !== null) {
+          const dc = Math.sign(u.targetCol - u.col);
+          const dr = Math.sign(u.targetRow - u.row);
+          const nextCol = u.col + dc;
+          const nextRow = u.row + dr;
+          if (nextCol >= 0 && nextCol < COLS && nextRow >= 0 && nextRow < ROWS && terrain[nextRow][nextCol] !== 'water') {
+            u.col = nextCol;
+            u.row = nextRow;
+          }
+          if (u.col === u.targetCol && u.row === u.targetRow) {
+            u.targetCol = null;
+            u.targetRow = null;
+          }
+        }
+      }
+      updateFog();
+    }
+
+    // Draw
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const x = c * TILE;
+        const y = r * TILE;
+        if (fog[r][c] === UNEXPLORED) {
+          ctx.fillStyle = '#0a0a0a';
+          ctx.fillRect(x, y, TILE, TILE);
+        } else if (fog[r][c] === EXPLORED) {
+          ctx.fillStyle = TERRAIN_COLORS[terrain[r][c]];
+          ctx.fillRect(x, y, TILE, TILE);
+          ctx.fillStyle = 'rgba(0,0,0,0.55)';
+          ctx.fillRect(x, y, TILE, TILE);
+        } else {
+          ctx.fillStyle = TERRAIN_COLORS[terrain[r][c]];
+          ctx.fillRect(x, y, TILE, TILE);
+        }
+        ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+        ctx.strokeRect(x, y, TILE, TILE);
+      }
+    }
+
+    // Units
+    for (const u of playerUnits) {
+      const cx = u.col * TILE + TILE / 2;
+      const cy = u.row * TILE + TILE / 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, TILE / 2 - 3, 0, Math.PI * 2);
+      ctx.fillStyle = u.color;
+      ctx.fill();
+      if (u === selectedUnit) {
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, TILE / 2, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      // target marker
+      if (u.targetCol !== null && u === selectedUnit) {
+        const tx = u.targetCol * TILE + TILE / 2;
+        const ty = u.targetRow * TILE + TILE / 2;
+        ctx.strokeStyle = u.color;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(tx, ty); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.beginPath(); ctx.arc(tx, ty, 4, 0, Math.PI * 2);
+        ctx.fillStyle = u.color; ctx.fill();
+      }
+    }
+
+    // Legend
+    ctx.fillStyle = '#fff';
+    ctx.font = '11px monospace';
+    ctx.fillText('Black = Unexplored | Dim = Explored (no vision) | Bright = Visible', 8, canvas.height - 6);
+
+    requestAnimationFrame(update);
+  }
+  update();
+})();
+</script>

@@ -1,0 +1,813 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 34: Idle / Incremental">
+  <div class="container page-content">
+    <div class="module-header">
+      <div class="module-number">Module 34</div>
+      <h1>Idle / Incremental</h1>
+      <p class="module-theme">Build a game that plays itself &mdash; and keeps players coming back | The Joy of Watching Numbers Go Up</p>
+    </div>
+
+    <blockquote>
+      "The perfect idle game makes you feel clever for doing nothing."
+    </blockquote>
+
+    <hr />
+
+    <h2>Prerequisites</h2>
+    <table>
+      <thead>
+        <tr><th>Module</th><th>What You Used From It</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Module 01 - Pong</td><td>A working game loop (update/render cycle) and basic input handling. The idle game pushes your loop to handle exponential state changes every tick.</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h2>Week 1: History &amp; Design Theory</h2>
+
+    <h3>The Origin</h3>
+    <p>The idle genre emerged from a satirical experiment. In 2013, French programmer Orteil released <strong>Cookie Clicker</strong> as a browser game built in a single weekend. The premise was absurdly simple: click a cookie to get cookies, then spend cookies on grandmas and factories that produce cookies for you. It was designed partly as a commentary on the dopamine loops in social and mobile games. Instead of being dismissed, Cookie Clicker went viral. Players found genuine satisfaction in watching their cookie count climb from dozens to millions to undecillions. The joke became a genre. What Orteil accidentally proved was that the core loop of resource accumulation &mdash; stripped of story, art, and complex mechanics &mdash; was inherently compelling. The numbers themselves were the game.</p>
+
+    <h3>How the Genre Evolved</h3>
+    <p><strong>Cookie Clicker (Orteil, 2013)</strong> &mdash; The spark. A browser game where clicking produces cookies, and cookies buy buildings that produce more cookies automatically. Cookie Clicker introduced the prestige system ("ascension") where players could reset all progress in exchange for permanent heavenly chips that multiplied future production. This reset mechanic became the defining structural innovation of the genre, giving players a reason to start over and a sense of meta-progression beyond the raw numbers.</p>
+
+    <p><strong>Adventure Capitalist (Hyper Hippo, 2015)</strong> &mdash; Took the idle formula to mobile and introduced streamlined prestige ("angel investors") and a clear visual hierarchy of businesses. Adventure Capitalist proved the genre worked on phones &mdash; a platform where players naturally check in for short sessions. Its clean UI and intuitive tap-to-upgrade flow became a template for commercial idle games. It also demonstrated that idle games could sustain monetization through time-skip purchases without destroying balance.</p>
+
+    <p><strong>Melvor Idle (Brendan Malcolm, 2021)</strong> &mdash; Combined idle mechanics with deep RPG systems inspired by RuneScape. Players train skills, fight monsters, and collect gear &mdash; all while the game runs in the background. Melvor proved that idle mechanics could serve as the engine beneath complex, content-rich game systems. It showed the genre maturing beyond simple clickers into something with genuine strategic depth and hundreds of hours of progression.</p>
+
+    <h3>What Makes It "Great"</h3>
+    <p>A great idle game respects the player's time while making them feel like a genius optimizer. The initial click-to-earn phase gives way to an automated economy where the player becomes a strategist, choosing which upgrades to buy, when to prestige, and how to allocate scarce multipliers. The tension between patience and action &mdash; do you reset now for a small boost or grind longer for a bigger one &mdash; creates real decision-making. The best idle games layer systems so that each prestige reveals new mechanics, keeping discovery alive long after the first cookie. And the numbers must feel good: watching "1.23e15" tick up to "1.24e15" should feel like progress, which means growth curves, formatting, and pacing all have to be carefully tuned.</p>
+
+    <h3>The Essential Mechanic</h3>
+    <p>Purchasing upgrades that increase the rate of resource generation &mdash; numbers go up.</p>
+
+    <hr />
+
+    <h2>Week 2: Build the MVP</h2>
+
+    <h3>What You're Building</h3>
+    <p>A single-screen idle game where the player clicks to earn a primary currency, purchases generators that produce currency automatically, buys upgrades that multiply production rates, and can prestige to reset progress in exchange for a permanent multiplier. The game calculates offline progress when the player returns after being away.</p>
+
+    <h3>Core Concepts</h3>
+
+    <h4>1. Exponential Growth Modeling</h4>
+    <p>Numbers in an idle game grow exponentially. A generator producing 1 unit per second seems slow, but with multiplicative upgrades it quickly reaches millions, billions, and beyond. You need to model this growth, format large numbers for display, and ensure your math stays stable at extreme scales.</p>
+    <pre is:raw><code>// Growth per tick
+function calculateProduction(generators, upgrades):
+    total = 0
+    for each generator in generators:
+        base_rate = generator.base_production * generator.count
+        multiplier = getMultiplierFromUpgrades(upgrades, generator.type)
+        total += base_rate * multiplier
+    return total
+
+// Large number formatting
+function formatNumber(n):
+    if n < 1000:
+        return toString(n, 1 decimal)
+    if n < 1_000_000:
+        return toString(n / 1000, 2 decimals) + "K"
+    if n < 1_000_000_000:
+        return toString(n / 1_000_000, 2 decimals) + "M"
+    // ...continue for B, T, Qa, Qi...
+    // Or use scientific notation:
+    exponent = floor(log10(n))
+    mantissa = n / (10 ^ exponent)
+    return toString(mantissa, 2 decimals) + "e" + exponent</code></pre>
+    <p><strong>Why it matters:</strong> The entire feel of the game depends on growth pacing. Too slow and the player leaves. Too fast and there is no tension. Formatting matters because "1.23 Trillion" communicates progress better than "1234567890123."</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Exponential Growth Visualizer</div>
+      <p class="demo-hint">Click the resource button to earn manually. Buy generators that produce resources per second. Watch the numbers grow exponentially. The log-scale graph shows the growth curve, and big number formatting kicks in at 1K, 1M, 1B, and beyond.</p>
+      <canvas id="demo-growth" width="760" height="500"></canvas>
+      <div class="demo-controls">
+        <button id="growth-click-btn">Click for Resources (+1)</button>
+        <button id="growth-buy-cursor">Buy Cursor (Cost: 10)</button>
+        <button id="growth-buy-farm">Buy Farm (Cost: 100)</button>
+        <button id="growth-buy-factory">Buy Factory (Cost: 1000)</button>
+        <button id="growth-reset">Reset</button>
+      </div>
+    </div>
+
+    <h4>2. Prestige / Reset Loop</h4>
+    <p>The prestige system lets the player voluntarily reset most progress in exchange for a permanent multiplier. This creates a meta-progression layer: each run is faster than the last, and the player must decide the optimal moment to reset.</p>
+    <pre is:raw><code>// Calculate prestige currency earned on reset
+function calculatePrestigeReward(lifetimeEarnings, currentPrestigeCurrency):
+    raw = floor(sqrt(lifetimeEarnings / PRESTIGE_THRESHOLD))
+    reward = raw - currentPrestigeCurrency
+    return max(0, reward)
+
+// Apply prestige multiplier to all production
+function getPrestigeMultiplier(prestigeCurrency):
+    return 1 + (prestigeCurrency * PRESTIGE_BONUS_PER_POINT)
+
+// Execute prestige reset
+function prestige(gameState):
+    reward = calculatePrestigeReward(gameState.lifetimeEarnings, gameState.prestigeCurrency)
+    if reward <= 0:
+        return  // not worth it yet
+    gameState.prestigeCurrency += reward
+    gameState.currency = 0
+    gameState.generators = resetAllToZero()
+    gameState.upgrades = resetNonPermanent()
+    // prestigeCurrency persists across resets</code></pre>
+    <p><strong>Why it matters:</strong> Without prestige, the game is a straight line that eventually plateaus. The reset loop turns it into a spiral: each cycle is a fresh start with a permanent advantage, creating "just one more run" compulsion and making early-game content replayable.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Prestige Calculator</div>
+      <p class="demo-hint">Earn resources and watch the prestige meter fill. Click "Prestige" to reset everything but gain a permanent multiplier. The chart below shows total lifetime earnings over time with different prestige timings &mdash; when is it optimal to prestige?</p>
+      <canvas id="demo-prestige" width="760" height="500"></canvas>
+      <div class="demo-controls">
+        <button id="prestige-click-btn">Click (+1)</button>
+        <button id="prestige-buy-gen">Buy Generator (Cost: 15)</button>
+        <button id="prestige-btn">Prestige!</button>
+        <button id="prestige-reset">Reset All</button>
+        <span class="value-display" id="prestige-info">Prestige Points: 0 | Multiplier: 1.0x</span>
+      </div>
+    </div>
+
+    <h4>3. Offline Progress Calculation</h4>
+    <p>When the player closes the game and returns later, you calculate what would have happened in their absence. This is what makes an idle game idle &mdash; progress does not require the player to be present.</p>
+    <pre is:raw><code>function calculateOfflineProgress(gameState, lastSaveTimestamp):
+    now = getCurrentTime()
+    elapsedSeconds = (now - lastSaveTimestamp) / 1000
+    elapsedSeconds = min(elapsedSeconds, MAX_OFFLINE_SECONDS)
+
+    productionPerSecond = calculateProduction(gameState.generators, gameState.upgrades)
+    offlineEarnings = productionPerSecond * elapsedSeconds
+    offlineEarnings = offlineEarnings * OFFLINE_EFFICIENCY
+
+    gameState.currency += offlineEarnings
+    gameState.lastSaveTimestamp = now
+    return offlineEarnings</code></pre>
+    <p><strong>Why it matters:</strong> Offline progress is the hook that brings players back. The "welcome back" screen showing accumulated earnings is one of the most satisfying moments in an idle game. It also means your game is always running in the player's mind even when it is not on screen.</p>
+
+    <h4>4. Upgrade Economy</h4>
+    <p>Upgrades are the player's primary decisions. Some increase production rates, some reduce costs, and all use cost-scaling formulas so each successive purchase is more expensive, creating natural pacing.</p>
+    <pre is:raw><code>// Cost scaling: each purchase costs more
+function getGeneratorCost(baseCost, owned, growthRate):
+    return floor(baseCost * (growthRate ^ owned))
+    // e.g., baseCost=10, growthRate=1.15
+    // 0 owned: 10, 1 owned: 11, 5 owned: 20, 20 owned: 163
+
+// Upgrade types
+UPGRADE_TYPES:
+    PRODUCTION_MULTIPLIER:  // "Grandmas are 2x more efficient"
+    COST_REDUCTION:         // "Factories cost 25% less"
+    GLOBAL_MULTIPLIER:      // "All production x3"
+    CLICK_POWER:            // "Each click produces 10x more"</code></pre>
+    <p><strong>Why it matters:</strong> The upgrade tree is where strategy lives. Players must choose between spending currency on more generators (linear scaling) or saving for an upgrade that multiplies existing output (multiplicative scaling). This decision space is what separates a thoughtful idle game from a mindless clicker.</p>
+
+    <h4>5. Multiple Currency / Generator Tiers</h4>
+    <p>Layered generators create depth: Tier 1 generates currency, Tier 2 generates Tier 1 generators, Tier 3 generates Tier 2 generators. Each tier adds an exponential layer to growth.</p>
+    <pre is:raw><code>// Generator tiers
+GENERATORS:
+    tier1_cursor:   { produces: "currency",  base_rate: 0.1 }
+    tier2_grandma:  { produces: "currency",  base_rate: 1 }
+    tier3_factory:  { produces: "currency",  base_rate: 8 }
+    tier4_bank:     { produces: "currency",  base_rate: 47 }
+
+// Tick update with tiered production
+function updateGenerators(generators, deltaTime):
+    for tier from highest to lowest:
+        production = generators[tier].count * generators[tier].base_rate * deltaTime
+        production *= getAllMultipliers(tier)
+        if generators[tier].produces == "currency":
+            gameState.currency += production
+        else:
+            targetTier = generators[tier].produces
+            generators[targetTier].count += production</code></pre>
+    <p><strong>Why it matters:</strong> Tiers give the player something new to work toward. When the current tier plateaus, unlocking the next tier resets the feeling of rapid growth. This is how idle games sustain engagement over days and weeks &mdash; there is always a new layer to discover.</p>
+
+    <h4>6. Big Number Library</h4>
+    <p>Standard floating-point numbers lose precision around 2^53. Idle games routinely exceed this. You need a strategy for handling numbers that go to 1e308 and beyond.</p>
+    <pre is:raw><code>// Custom large number as {mantissa, exponent}
+class BigNumber:
+    mantissa: float   // 1.0 to 9.999...
+    exponent: integer // power of 10
+
+    function add(other):
+        if this.exponent > other.exponent + 15:
+            return this  // other is negligible
+        diff = this.exponent - other.exponent
+        newMantissa = this.mantissa + other.mantissa / (10 ^ diff)
+        return normalize(newMantissa, this.exponent)
+
+    function multiply(other):
+        newMantissa = this.mantissa * other.mantissa
+        newExponent = this.exponent + other.exponent
+        return normalize(newMantissa, newExponent)</code></pre>
+    <p><strong>Why it matters:</strong> When your player reaches 1e100 cookies and buys something that costs 9.7e99, the subtraction must be correct. Floating-point errors at these scales will break the game. A big number system is invisible infrastructure &mdash; players never think about it, but everything collapses without it.</p>
+
+    <h4>7. Engagement Without Active Gameplay</h4>
+    <p>An idle game must reward players for returning without punishing them for leaving. Milestones, unlocks, and notifications create a rhythm of check-ins that feels rewarding rather than demanding.</p>
+    <pre is:raw><code>// Milestone system
+MILESTONES:
+    { threshold: 1e6,   reward: "Unlock Factories",  message: "Millionaire!" }
+    { threshold: 1e9,   reward: "Unlock Banks",       message: "Billionaire!" }
+    { threshold: 1e12,  reward: "Unlock Prestige",    message: "Transcendent!" }
+
+function checkMilestones(gameState):
+    for each milestone in MILESTONES:
+        if gameState.lifetimeEarnings >= milestone.threshold AND NOT milestone.claimed:
+            milestone.claimed = true
+            applyReward(gameState, milestone.reward)
+            showNotification(milestone.message)</code></pre>
+    <p><strong>Why it matters:</strong> The idle game's primary competitor is every other app on the player's device. If there is no reason to come back, the player forgets the game exists. Milestones, unlocks, and well-timed notifications create a positive habit loop without making the game feel like a chore.</p>
+
+    <hr />
+
+    <h3>Stretch Goals</h3>
+    <ol>
+      <li>Add multiple prestige layers (prestige currency that can itself be prestiged).</li>
+      <li>Implement an achievement system with hidden achievements that grant bonuses.</li>
+      <li>Add a simple visual representation of generators (animated sprites or progress bars).</li>
+      <li>Create an "ascension tree" where prestige currency is spent on permanent perks.</li>
+      <li>Implement a statistics page tracking lifetime earnings, time played, total clicks, and prestiges.</li>
+      <li>Add a "buy max" button that calculates how many generators the player can afford at once.</li>
+    </ol>
+
+    <h3>MVP Spec</h3>
+    <table>
+      <thead>
+        <tr><th>Element</th><th>Scope</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Screen</td><td>Single screen: currency display at top, click button, generator list, upgrade panel, prestige button</td></tr>
+        <tr><td>Currency</td><td>One primary currency (e.g., "coins"), one prestige currency (e.g., "gems")</td></tr>
+        <tr><td>Generators</td><td>3-4 tiers, each with base production rate and scaling cost</td></tr>
+        <tr><td>Upgrades</td><td>4-6 purchasable upgrades that multiply generator output</td></tr>
+        <tr><td>Prestige</td><td>One prestige loop: reset generators and upgrades, keep prestige currency, gain permanent multiplier</td></tr>
+        <tr><td>Offline progress</td><td>On load, calculate elapsed time and award earnings at current rate</td></tr>
+        <tr><td>Big numbers</td><td>Implement mantissa/exponent notation or use BigInt for currency values</td></tr>
+        <tr><td>Display</td><td>Format numbers with suffixes (K, M, B, T) or scientific notation above 1e15</td></tr>
+        <tr><td>Save system</td><td>Auto-save to local storage every 30 seconds; load on startup</td></tr>
+        <tr><td>Click action</td><td>Manual click awards a base amount modified by click upgrades</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliverable</h3>
+    <p>A playable idle game where the player can click to earn currency, purchase at least three tiers of generators, buy upgrades that multiply production, prestige to reset with a permanent bonus, and return after closing the game to find offline earnings waiting. Numbers must scale cleanly into the billions and beyond. The game should be engaging enough that a playtester wants to check back after 10 minutes away.</p>
+
+    <hr />
+
+    <h2>Analogies by Background</h2>
+
+    <blockquote>
+      <p>These analogies map game dev concepts to patterns you already know. Find your background below.</p>
+    </blockquote>
+
+    <h3>For Backend Developers</h3>
+    <table>
+      <thead>
+        <tr><th>Concept</th><th>Analogy</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Exponential growth modeling</td><td>Like modeling compound interest in a financial API &mdash; small rates create enormous values over time, and you must handle precision at scale</td></tr>
+        <tr><td>Prestige / reset loop</td><td>Like database migration rollbacks with schema versioning &mdash; you start fresh but carry forward structural improvements</td></tr>
+        <tr><td>Offline progress calculation</td><td>Like a batch job that runs overnight &mdash; calculate the result of N seconds of processing without actually ticking N times</td></tr>
+        <tr><td>Upgrade economy</td><td>Like capacity planning for servers &mdash; invest in horizontal scaling (more instances) or vertical scaling (bigger instances), each with different cost curves</td></tr>
+        <tr><td>Multiple currency / generator tiers</td><td>Like microservice dependencies &mdash; Service A feeds Service B feeds Service C, and throughput at each tier compounds</td></tr>
+        <tr><td>Big number library</td><td>Like arbitrary-precision arithmetic in financial systems &mdash; when double is not enough, you build or import a decimal library</td></tr>
+        <tr><td>Engagement without active gameplay</td><td>Like webhook notifications and scheduled cron jobs &mdash; events fire on meaningful state changes rather than constant polling</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Frontend Developers</h3>
+    <table>
+      <thead>
+        <tr><th>Concept</th><th>Analogy</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Exponential growth modeling</td><td>Like DOM node counts in a poorly optimized recursive component &mdash; small inputs create enormous outputs, and you must format them for human readability</td></tr>
+        <tr><td>Prestige / reset loop</td><td>Like clearing local storage and refreshing the app but keeping your user preferences &mdash; a clean start with accumulated wisdom</td></tr>
+        <tr><td>Offline progress calculation</td><td>Like service worker background sync &mdash; computing what happened while the tab was closed and reconciling state on return</td></tr>
+        <tr><td>Upgrade economy</td><td>Like choosing npm packages for a build pipeline &mdash; each dependency has a cost (bundle size) and a benefit (productivity), and you weigh tradeoffs</td></tr>
+        <tr><td>Multiple currency / generator tiers</td><td>Like component composition &mdash; a Page contains Sections, Sections contain Cards, Cards contain Buttons, and changes cascade through the hierarchy</td></tr>
+        <tr><td>Big number library</td><td>Like handling internationalization of numbers &mdash; different locales, different formats, and the need for a library when native support falls short</td></tr>
+        <tr><td>Engagement without active gameplay</td><td>Like push notifications and badge counts &mdash; drawing the user back to the app with meaningful, non-spammy signals</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Data / ML Engineers</h3>
+    <table>
+      <thead>
+        <tr><th>Concept</th><th>Analogy</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Exponential growth modeling</td><td>Like tracking model training loss on a log scale &mdash; exponential curves are natural, and visualization requires careful axis scaling</td></tr>
+        <tr><td>Prestige / reset loop</td><td>Like hyperparameter tuning across training runs &mdash; each run resets weights but carries forward knowledge about what configuration works</td></tr>
+        <tr><td>Offline progress calculation</td><td>Like computing batch inference results &mdash; given inputs and a model, calculate the output for a time window without step-by-step simulation</td></tr>
+        <tr><td>Upgrade economy</td><td>Like feature engineering investment &mdash; spending compute on a new feature (upgrade) that multiplicatively improves model performance versus just adding more training data (generators)</td></tr>
+        <tr><td>Multiple currency / generator tiers</td><td>Like data pipeline DAGs &mdash; raw data feeds feature extraction, which feeds model training, which feeds prediction serving, each tier amplifying the one below</td></tr>
+        <tr><td>Big number library</td><td>Like numerical stability in deep learning &mdash; overflow, underflow, and precision loss are constant threats, handled with log-space computation or mixed precision</td></tr>
+        <tr><td>Engagement without active gameplay</td><td>Like automated model monitoring dashboards and alerts &mdash; the pipeline runs unattended, but meaningful anomalies trigger human review</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li><strong>Balancing patience and impatience:</strong> Idle games must be satisfying when the player is actively watching AND when they return after hours away. How do you tune production rates so that active play feels rewarding but offline progress does not make active play feel pointless?</li>
+      <li><strong>The ethics of engagement loops:</strong> Idle games use the same psychological hooks as slot machines and social media feeds (variable reward schedules, loss aversion via reset decisions, notification-driven re-engagement). Where is the line between a well-designed game and a manipulative one? How would you design an idle game that respects the player's time?</li>
+      <li><strong>Numbers as content:</strong> Most games have art, story, or level design as their primary content. In an idle game, the numbers themselves &mdash; their growth rate, their formatting, the moment a new suffix appears &mdash; ARE the content. What does this teach us about what makes any game feel like it has "progression"?</li>
+      <li><strong>Computational shortcuts:</strong> Your offline calculation assumes a constant production rate, but in reality the player might have hit milestones or unlocked upgrades during that time. How would you model offline progress more accurately without simulating every tick? What tradeoffs exist between accuracy and performance?</li>
+    </ol>
+
+    <nav class="module-nav">
+      <a href={`${base}modules/33-mmo/`}>&larr; Module 33: MMO</a>
+      <a href={`${base}modules/35-party-game/`}>Module 35: Party Game &rarr;</a>
+    </nav>
+  </div>
+</BaseLayout>
+
+<script>
+// ============================================================
+// DEMO 1: Exponential Growth Visualizer
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-growth');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const GRAPH_X = 420, GRAPH_Y = 40, GRAPH_W = 320, GRAPH_H = 200;
+  const PANEL_X = 20, PANEL_Y = 40;
+
+  let state = {
+    currency: 0,
+    lifetimeEarnings: 0,
+    generators: [
+      { name: 'Cursor', baseCost: 10, baseRate: 0.2, count: 0, growthRate: 1.15 },
+      { name: 'Farm', baseCost: 100, baseRate: 2, count: 0, growthRate: 1.15 },
+      { name: 'Factory', baseCost: 1000, baseRate: 20, count: 0, growthRate: 1.15 }
+    ],
+    history: [],
+    historyTimer: 0,
+    clickPower: 1
+  };
+
+  function getCost(gen) {
+    return Math.floor(gen.baseCost * Math.pow(gen.growthRate, gen.count));
+  }
+
+  function getProduction() {
+    let total = 0;
+    for (const g of state.generators) {
+      total += g.baseRate * g.count;
+    }
+    return total;
+  }
+
+  function formatNum(n) {
+    if (n < 0) return '0';
+    if (n < 1000) return n.toFixed(1);
+    if (n < 1e6) return (n / 1e3).toFixed(2) + 'K';
+    if (n < 1e9) return (n / 1e6).toFixed(2) + 'M';
+    if (n < 1e12) return (n / 1e9).toFixed(2) + 'B';
+    if (n < 1e15) return (n / 1e12).toFixed(2) + 'T';
+    const exp = Math.floor(Math.log10(n));
+    const man = n / Math.pow(10, exp);
+    return man.toFixed(2) + 'e' + exp;
+  }
+
+  function buyGen(idx) {
+    const g = state.generators[idx];
+    const cost = getCost(g);
+    if (state.currency >= cost) {
+      state.currency -= cost;
+      g.count++;
+    }
+  }
+
+  document.getElementById('growth-click-btn').addEventListener('click', () => {
+    state.currency += state.clickPower;
+    state.lifetimeEarnings += state.clickPower;
+  });
+  document.getElementById('growth-buy-cursor').addEventListener('click', () => buyGen(0));
+  document.getElementById('growth-buy-farm').addEventListener('click', () => buyGen(1));
+  document.getElementById('growth-buy-factory').addEventListener('click', () => buyGen(2));
+  document.getElementById('growth-reset').addEventListener('click', () => {
+    state.currency = 0;
+    state.lifetimeEarnings = 0;
+    state.history = [];
+    for (const g of state.generators) g.count = 0;
+  });
+
+  let lastTime = performance.now();
+  function update(now) {
+    const dt = (now - lastTime) / 1000;
+    lastTime = now;
+
+    const prod = getProduction();
+    const earned = prod * dt;
+    state.currency += earned;
+    state.lifetimeEarnings += earned;
+
+    state.historyTimer += dt;
+    if (state.historyTimer >= 0.5) {
+      state.historyTimer = 0;
+      state.history.push(Math.max(1, state.lifetimeEarnings));
+      if (state.history.length > 160) state.history.shift();
+    }
+
+    // Update button labels
+    document.getElementById('growth-buy-cursor').textContent = 'Buy Cursor (Cost: ' + formatNum(getCost(state.generators[0])) + ')';
+    document.getElementById('growth-buy-farm').textContent = 'Buy Farm (Cost: ' + formatNum(getCost(state.generators[1])) + ')';
+    document.getElementById('growth-buy-factory').textContent = 'Buy Factory (Cost: ' + formatNum(getCost(state.generators[2])) + ')';
+    document.getElementById('growth-click-btn').textContent = 'Click for Resources (+' + formatNum(state.clickPower) + ')';
+
+    draw(prod);
+    requestAnimationFrame(update);
+  }
+
+  function draw(prod) {
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, W, H);
+
+    // Panel
+    ctx.fillStyle = '#e0e0e0';
+    ctx.font = 'bold 22px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('Resources: ' + formatNum(state.currency), PANEL_X, PANEL_Y);
+    ctx.font = '14px Inter, sans-serif';
+    ctx.fillStyle = '#88ccaa';
+    ctx.fillText('Per second: ' + formatNum(prod) + '/s', PANEL_X, PANEL_Y + 25);
+    ctx.fillStyle = '#aaaacc';
+    ctx.fillText('Lifetime: ' + formatNum(state.lifetimeEarnings), PANEL_X, PANEL_Y + 45);
+
+    // Generator list
+    ctx.fillStyle = '#cccccc';
+    ctx.font = '14px Inter, sans-serif';
+    const colors = ['#ff6b6b', '#ffd93d', '#6bcb77'];
+    for (let i = 0; i < state.generators.length; i++) {
+      const g = state.generators[i];
+      const y = PANEL_Y + 80 + i * 50;
+      ctx.fillStyle = colors[i];
+      ctx.fillRect(PANEL_X, y, 12, 12);
+      ctx.fillStyle = '#cccccc';
+      ctx.fillText(g.name + ': ' + g.count + ' (produces ' + formatNum(g.baseRate * g.count) + '/s)', PANEL_X + 20, y + 11);
+      ctx.fillStyle = '#888888';
+      ctx.fillText('Next cost: ' + formatNum(getCost(g)), PANEL_X + 20, y + 28);
+    }
+
+    // Milestones
+    ctx.fillStyle = '#555577';
+    ctx.font = '12px Inter, sans-serif';
+    const milestones = [
+      { t: 1e3, l: '1K' }, { t: 1e6, l: '1M' }, { t: 1e9, l: '1B' },
+      { t: 1e12, l: '1T' }, { t: 1e15, l: '1Qa' }
+    ];
+    let my = PANEL_Y + 240;
+    ctx.fillStyle = '#888888';
+    ctx.fillText('Milestones:', PANEL_X, my);
+    for (const m of milestones) {
+      my += 18;
+      const reached = state.lifetimeEarnings >= m.t;
+      ctx.fillStyle = reached ? '#6bcb77' : '#555555';
+      ctx.fillText((reached ? '[X] ' : '[ ] ') + m.l + ' earnings', PANEL_X + 10, my);
+    }
+
+    // Graph - log scale
+    ctx.strokeStyle = '#333355';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(GRAPH_X, GRAPH_Y, GRAPH_W, GRAPH_H);
+
+    ctx.fillStyle = '#888888';
+    ctx.font = '11px JetBrains Mono, monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText('Log Scale', GRAPH_X + GRAPH_W, GRAPH_Y - 5);
+
+    if (state.history.length > 1) {
+      const vals = state.history;
+      const maxLog = Math.log10(Math.max(...vals));
+      const minLog = 0;
+      const range = Math.max(maxLog - minLog, 1);
+
+      // Grid lines
+      ctx.strokeStyle = '#222244';
+      ctx.lineWidth = 0.5;
+      for (let e = 0; e <= Math.ceil(maxLog); e += 3) {
+        const gy = GRAPH_Y + GRAPH_H - ((e - minLog) / range) * GRAPH_H;
+        if (gy >= GRAPH_Y && gy <= GRAPH_Y + GRAPH_H) {
+          ctx.beginPath();
+          ctx.moveTo(GRAPH_X, gy);
+          ctx.lineTo(GRAPH_X + GRAPH_W, gy);
+          ctx.stroke();
+          ctx.fillStyle = '#666688';
+          ctx.textAlign = 'right';
+          ctx.fillText('1e' + e, GRAPH_X - 5, gy + 4);
+        }
+      }
+
+      // Data line
+      ctx.beginPath();
+      ctx.strokeStyle = '#ff6b6b';
+      ctx.lineWidth = 2;
+      for (let i = 0; i < vals.length; i++) {
+        const x = GRAPH_X + (i / (vals.length - 1)) * GRAPH_W;
+        const logVal = Math.log10(Math.max(1, vals[i]));
+        const y = GRAPH_Y + GRAPH_H - ((logVal - minLog) / range) * GRAPH_H;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+
+    // Labels
+    ctx.fillStyle = '#666688';
+    ctx.font = '11px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Lifetime Earnings Over Time (Log Scale)', GRAPH_X + GRAPH_W / 2, GRAPH_Y + GRAPH_H + 20);
+
+    // Number format examples
+    ctx.fillStyle = '#555577';
+    ctx.font = '12px JetBrains Mono, monospace';
+    ctx.textAlign = 'left';
+    let ey = GRAPH_Y + GRAPH_H + 50;
+    ctx.fillText('Number Formatting Examples:', GRAPH_X, ey);
+    const examples = [999, 1500, 45000, 1234567, 9876543210, 1.5e12, 2.3e18];
+    for (const ex of examples) {
+      ey += 16;
+      ctx.fillStyle = '#888888';
+      ctx.fillText(ex.toExponential(1) + '  =>  ' + formatNum(ex), GRAPH_X + 10, ey);
+    }
+  }
+
+  requestAnimationFrame(update);
+})();
+
+// ============================================================
+// DEMO 2: Prestige Calculator
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-prestige');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const CHART_X = 20, CHART_Y = 260, CHART_W = 720, CHART_H = 220;
+  const PRESTIGE_THRESHOLD = 1000;
+
+  let state = {
+    currency: 0,
+    lifetimeEarnings: 0,
+    totalLifetimeAcrossRuns: 0,
+    generators: 0,
+    genCost: 15,
+    genRate: 1,
+    prestigePoints: 0,
+    runNumber: 1,
+    runTime: 0,
+    runs: [],
+    currentRunEarnings: []
+  };
+
+  function getMultiplier() {
+    return 1 + state.prestigePoints * 0.5;
+  }
+
+  function getProduction() {
+    return state.generators * state.genRate * getMultiplier();
+  }
+
+  function getPrestigeReward() {
+    return Math.max(0, Math.floor(Math.sqrt(state.lifetimeEarnings / PRESTIGE_THRESHOLD)) - state.prestigePoints);
+  }
+
+  function formatNum(n) {
+    if (n < 1000) return n.toFixed(1);
+    if (n < 1e6) return (n / 1e3).toFixed(2) + 'K';
+    if (n < 1e9) return (n / 1e6).toFixed(2) + 'M';
+    if (n < 1e12) return (n / 1e9).toFixed(2) + 'B';
+    return (n / 1e12).toFixed(2) + 'T';
+  }
+
+  document.getElementById('prestige-click-btn').addEventListener('click', () => {
+    const amount = getMultiplier();
+    state.currency += amount;
+    state.lifetimeEarnings += amount;
+    state.totalLifetimeAcrossRuns += amount;
+  });
+
+  document.getElementById('prestige-buy-gen').addEventListener('click', () => {
+    if (state.currency >= state.genCost) {
+      state.currency -= state.genCost;
+      state.generators++;
+      state.genCost = Math.floor(15 * Math.pow(1.2, state.generators));
+    }
+  });
+
+  document.getElementById('prestige-btn').addEventListener('click', () => {
+    const reward = getPrestigeReward();
+    if (reward > 0) {
+      state.runs.push({
+        runNumber: state.runNumber,
+        duration: state.runTime,
+        earnings: state.lifetimeEarnings,
+        prestigeGained: reward
+      });
+      state.prestigePoints += reward;
+      state.currency = 0;
+      state.lifetimeEarnings = 0;
+      state.generators = 0;
+      state.genCost = 15;
+      state.runNumber++;
+      state.runTime = 0;
+      state.currentRunEarnings = [];
+    }
+  });
+
+  document.getElementById('prestige-reset').addEventListener('click', () => {
+    state.currency = 0;
+    state.lifetimeEarnings = 0;
+    state.totalLifetimeAcrossRuns = 0;
+    state.generators = 0;
+    state.genCost = 15;
+    state.prestigePoints = 0;
+    state.runNumber = 1;
+    state.runTime = 0;
+    state.runs = [];
+    state.currentRunEarnings = [];
+  });
+
+  let lastTime = performance.now();
+  function update(now) {
+    const dt = (now - lastTime) / 1000;
+    lastTime = now;
+
+    const prod = getProduction();
+    const earned = prod * dt;
+    state.currency += earned;
+    state.lifetimeEarnings += earned;
+    state.totalLifetimeAcrossRuns += earned;
+    state.runTime += dt;
+
+    // Track earnings over time for chart
+    if (Math.floor(state.runTime * 2) > state.currentRunEarnings.length) {
+      state.currentRunEarnings.push(state.lifetimeEarnings);
+      if (state.currentRunEarnings.length > 200) state.currentRunEarnings.shift();
+    }
+
+    document.getElementById('prestige-buy-gen').textContent = 'Buy Generator (Cost: ' + formatNum(state.genCost) + ')';
+    document.getElementById('prestige-info').textContent = 'Prestige Points: ' + state.prestigePoints + ' | Multiplier: ' + getMultiplier().toFixed(1) + 'x | Run #' + state.runNumber;
+
+    draw(prod);
+    requestAnimationFrame(update);
+  }
+
+  function draw(prod) {
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, W, H);
+
+    const mx = 20, my = 30;
+
+    // Status Panel
+    ctx.fillStyle = '#e0e0e0';
+    ctx.font = 'bold 20px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('Resources: ' + formatNum(state.currency), mx, my);
+
+    ctx.font = '14px Inter, sans-serif';
+    ctx.fillStyle = '#88ccaa';
+    ctx.fillText('Per second: ' + formatNum(prod) + '/s', mx, my + 22);
+    ctx.fillStyle = '#aaaacc';
+    ctx.fillText('This run earnings: ' + formatNum(state.lifetimeEarnings), mx, my + 42);
+    ctx.fillText('Total across all runs: ' + formatNum(state.totalLifetimeAcrossRuns), mx, my + 60);
+    ctx.fillText('Generators: ' + state.generators + ' | Run time: ' + state.runTime.toFixed(0) + 's', mx, my + 78);
+
+    // Prestige Panel
+    const px = 400, py = 30;
+    ctx.fillStyle = '#2a2a4e';
+    ctx.fillRect(px - 10, py - 18, 360, 100);
+    ctx.strokeStyle = '#ffd93d';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(px - 10, py - 18, 360, 100);
+
+    ctx.fillStyle = '#ffd93d';
+    ctx.font = 'bold 16px Inter, sans-serif';
+    ctx.fillText('Prestige System', px, py);
+    ctx.font = '13px Inter, sans-serif';
+    ctx.fillStyle = '#ccccaa';
+    ctx.fillText('Points: ' + state.prestigePoints + '  |  Multiplier: ' + getMultiplier().toFixed(1) + 'x', px, py + 22);
+    ctx.fillText('Prestige reward if reset now: +' + getPrestigeReward() + ' points', px, py + 42);
+    ctx.fillStyle = '#888888';
+    ctx.fillText('(Need ' + formatNum(PRESTIGE_THRESHOLD) + ' earnings for first point)', px, py + 60);
+
+    // Run History
+    if (state.runs.length > 0) {
+      ctx.fillStyle = '#888888';
+      ctx.font = '12px Inter, sans-serif';
+      let ry = 155;
+      ctx.fillText('Previous Runs:', mx, ry);
+      const showRuns = state.runs.slice(-4);
+      for (const run of showRuns) {
+        ry += 18;
+        ctx.fillStyle = '#6bcb77';
+        ctx.fillText('Run #' + run.runNumber + ': ' + formatNum(run.earnings) + ' earned in ' + run.duration.toFixed(0) + 's  (+' + run.prestigeGained + ' prestige)', mx + 10, ry);
+      }
+    }
+
+    // Chart: Prestige timing comparison
+    ctx.strokeStyle = '#333355';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(CHART_X, CHART_Y, CHART_W, CHART_H);
+
+    ctx.fillStyle = '#888888';
+    ctx.font = '12px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Prestige Timing Analysis: Total Lifetime Earnings Over Time', CHART_X + CHART_W / 2, CHART_Y - 8);
+
+    // Simulate different prestige strategies
+    const simDuration = 120;
+    const strategies = [
+      { name: 'Never Prestige', color: '#ff6b6b', prestigeAt: Infinity },
+      { name: 'Prestige at 5K', color: '#ffd93d', prestigeAt: 5000 },
+      { name: 'Prestige at 2K', color: '#6bcb77', prestigeAt: 2000 },
+      { name: 'Prestige at 500', color: '#4ecdc4', prestigeAt: 500 }
+    ];
+
+    let maxVal = 1;
+    const simData = strategies.map(s => {
+      const data = [];
+      let cur = 0, life = 0, gens = 0, pp = 0, gc = 15;
+      for (let t = 0; t < simDuration; t++) {
+        const mul = 1 + pp * 0.5;
+        const prod2 = gens * 1 * mul;
+        cur += prod2 + mul;
+        life += prod2 + mul;
+        // Auto-buy generators
+        while (cur >= gc) {
+          cur -= gc;
+          gens++;
+          gc = Math.floor(15 * Math.pow(1.2, gens));
+        }
+        // Check prestige
+        if (life >= s.prestigeAt) {
+          const reward = Math.max(0, Math.floor(Math.sqrt(life / PRESTIGE_THRESHOLD)) - pp);
+          if (reward > 0) {
+            pp += reward;
+            cur = 0; life = 0; gens = 0; gc = 15;
+          }
+        }
+        data.push(life + (pp > 0 ? pp * PRESTIGE_THRESHOLD : 0));
+        maxVal = Math.max(maxVal, data[data.length - 1]);
+      }
+      return { data, ...s };
+    });
+
+    const logMax = Math.log10(Math.max(maxVal, 10));
+    // Draw grid
+    ctx.strokeStyle = '#222244';
+    ctx.lineWidth = 0.5;
+    for (let e = 0; e <= Math.ceil(logMax); e += 1) {
+      const gy = CHART_Y + CHART_H - (e / logMax) * CHART_H;
+      if (gy >= CHART_Y && gy <= CHART_Y + CHART_H) {
+        ctx.beginPath();
+        ctx.moveTo(CHART_X, gy);
+        ctx.lineTo(CHART_X + CHART_W, gy);
+        ctx.stroke();
+        ctx.fillStyle = '#555577';
+        ctx.font = '10px JetBrains Mono, monospace';
+        ctx.textAlign = 'right';
+        ctx.fillText('1e' + e, CHART_X - 4, gy + 3);
+      }
+    }
+
+    // Draw lines
+    for (const s of simData) {
+      ctx.beginPath();
+      ctx.strokeStyle = s.color;
+      ctx.lineWidth = 2;
+      for (let i = 0; i < s.data.length; i++) {
+        const x = CHART_X + (i / (simDuration - 1)) * CHART_W;
+        const logV = Math.log10(Math.max(1, s.data[i]));
+        const y = CHART_Y + CHART_H - (logV / logMax) * CHART_H;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+
+    // Legend
+    ctx.font = '11px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    for (let i = 0; i < strategies.length; i++) {
+      const lx = CHART_X + 10 + i * 180;
+      const ly = CHART_Y + CHART_H + 18;
+      ctx.fillStyle = strategies[i].color;
+      ctx.fillRect(lx, ly - 8, 10, 10);
+      ctx.fillText(strategies[i].name, lx + 14, ly);
+    }
+  }
+
+  requestAnimationFrame(update);
+})();
+</script>

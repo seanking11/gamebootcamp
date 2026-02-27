@@ -1,0 +1,883 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 09: Racing Game">
+  <div class="container page-content">
+    <div class="module-header">
+      <div class="module-number">Module 09</div>
+      <h1>Racing Game</h1>
+      <p class="module-theme">Weeks 17-18 | Controlling momentum through curves &mdash; the tension between speed and precision.</p>
+    </div>
+
+    <hr />
+
+    <h2>Prerequisites</h2>
+    <table>
+      <thead>
+        <tr><th>Module</th><th>What You Used From It</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Module 01 - Pong</td><td>Game loop, real-time input handling, and basic collision detection</td></tr>
+        <tr><td>Module 02 - Platformer</td><td>Velocity, acceleration, gravity, and friction as forces applied per frame</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h2>Week 1: History &amp; Design Theory</h2>
+
+    <h3>The Origin</h3>
+    <p><strong>Pole Position</strong> (Namco, 1982) was the first racing game to feel like driving. Earlier games like <em>Night Driver</em> (1976) and <em>Sprint</em> (1977) had cars on tracks, but Pole Position introduced the rear-view perspective that would define the genre for decades: the player's car at the bottom of the screen, the track stretching out ahead with roadside objects scaling up as they approached. It was the first racing game based on a real circuit (Fuji Speedway), the first to feature a qualifying lap that determined your starting position, and the first to make speed itself feel dangerous. The game earned more revenue than any other arcade game in 1983. Its core insight was that racing games are not about steering a sprite &mdash; they are about the illusion of velocity.</p>
+
+    <h3>How the Genre Evolved</h3>
+    <p><strong>Super Mario Kart</strong> (Nintendo, 1992) shattered the assumption that racing games had to simulate real driving. Built on the SNES's Mode 7 hardware &mdash; a texture-mapping trick that rotated and scaled a flat image to create the illusion of a 3D plane &mdash; it introduced item pickups, weapons, and character-specific stats. You could be in first place and lose it to a well-timed red shell. This was a deliberate design choice: Mario Kart prioritized fun and social tension over pure skill. It invented the "kart racer" subgenre and established the template that items, catch-up mechanics, and accessible controls could make racing games appeal to everyone.</p>
+
+    <p><strong>Gran Turismo</strong> (Polyphony Digital, 1997) swung the pendulum in the opposite direction. With over 140 real-world cars, each with unique handling characteristics derived from actual vehicle data, it created the "simulation racing" category on consoles. Gran Turismo introduced car tuning &mdash; adjusting suspension, gear ratios, tire compounds &mdash; turning the garage into a second game. The game sold over 10 million copies and proved there was a massive audience for racing-as-engineering.</p>
+
+    <p><strong>Futuristic racers</strong> like <strong>F-Zero</strong> (Nintendo, 1990) and <strong>Wipeout</strong> (Psygnosis, 1995) explored what racing becomes when you remove the constraints of real vehicles &mdash; anti-gravity ships, track designs impossible in physical space, speeds that demanded twitch-level precision. Modern games like <strong>Forza Horizon</strong> (Playground Games, 2012-present) blend the best of both worlds: simulation-grade physics underneath, but tuned for fun, set in open worlds where the track is wherever you point the car.</p>
+
+    <h3>What Makes Racing Great</h3>
+    <p>A great racing game creates a constant negotiation between aggression and precision. Every curve is a decision: brake early and lose time, or carry speed and risk losing control. This is what separates racing from other movement-based games &mdash; in a platformer, you want maximum speed almost always. In a racing game, speed is a resource you spend and manage. The best racing games make the track itself feel like an opponent, and every lap feels different because your relationship with the car's momentum changes as you learn the course.</p>
+
+    <h3>The Essential Mechanic</h3>
+    <p>Controlling momentum through curves &mdash; the tension between speed and precision.</p>
+
+    <hr />
+
+    <h2>Week 2: Build the MVP</h2>
+
+    <h3>What You're Building</h3>
+    <p>A top-down racing game where the player drives a car around a closed track, completing laps against AI opponents. The car uses a physics-based steering model (not grid movement), drifts on curves, and races against AI that follows waypoints with rubber-banding to keep races competitive.</p>
+
+    <h3>Core Concepts (Must Implement)</h3>
+
+    <h4>1. Steering Model (Forward Thrust + Turning Angle)</h4>
+    <p>Racing movement is fundamentally different from grid-based or WASD movement. A car cannot strafe. It moves forward (or backward) along its heading, and turning changes that heading. This is often modeled as a simplified "bicycle model" &mdash; the car has a position, a heading angle, and a speed. Acceleration pushes along the heading vector; steering rotates the heading.</p>
+
+    <pre is:raw><code>// Simplified bicycle steering model
+function updateCar(car, input, deltaTime):
+    // Steering only works when moving
+    if input.left:
+        car.steerAngle = -MAX_STEER_ANGLE
+    else if input.right:
+        car.steerAngle = MAX_STEER_ANGLE
+    else:
+        car.steerAngle = 0
+
+    if input.accelerate:
+        car.speed = min(car.speed + ACCELERATION * deltaTime, MAX_SPEED)
+    else if input.brake:
+        car.speed = max(car.speed - BRAKING_FORCE * deltaTime, -MAX_REVERSE_SPEED)
+    else:
+        car.speed = car.speed * (1 - DRAG * deltaTime)
+
+    // Turning radius depends on speed
+    turnRadius = WHEELBASE / sin(car.steerAngle)
+    angularVelocity = car.speed / turnRadius
+    car.heading += angularVelocity * deltaTime
+
+    // Move along heading
+    car.x += cos(car.heading) * car.speed * deltaTime
+    car.y += sin(car.heading) * car.speed * deltaTime</code></pre>
+
+    <p><strong>Why it matters:</strong> This is a constrained physics simulation. The car's heading is state that persists between frames and constrains future movement. Unlike grid movement where any direction is available, the steering model means your current state (heading, speed) determines what states you can reach next.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Steering Model</div>
+      <p class="demo-hint">Use arrow keys to drive: Up = accelerate, Down = brake/reverse, Left/Right = steer. The car turns based on its heading, not grid directions. Watch the steering angle and velocity vector update in real-time.</p>
+      <canvas id="demo-steering" width="760" height="420"></canvas>
+    </div>
+
+    <h4>2. Friction and Drift</h4>
+    <p>Different surfaces (road, grass, dirt) apply different friction coefficients. When the car's lateral velocity exceeds its grip threshold, it enters a drift state &mdash; sliding sideways while the player can steer into the skid. This is the core skill expression of racing games.</p>
+
+    <pre is:raw><code>// Surface friction model
+function applyFriction(car, surface):
+    gripFactor = surface.grip  // 1.0 for road, 0.4 for grass, 0.6 for dirt
+
+    // Decompose velocity into forward and lateral components
+    forwardVelocity = dotProduct(car.velocity, car.forwardVector)
+    lateralVelocity = dotProduct(car.velocity, car.rightVector)
+
+    // Lateral friction (what keeps you on the road)
+    maxLateralGrip = gripFactor * LATERAL_GRIP_BASE
+    if abs(lateralVelocity) > maxLateralGrip:
+        car.isDrifting = true
+        lateralVelocity = lateralVelocity * DRIFT_FRICTION
+    else:
+        car.isDrifting = false
+        lateralVelocity = lateralVelocity * gripFactor
+
+    // Reconstruct velocity
+    car.velocity = forwardVelocity * car.forwardVector
+                  + lateralVelocity * car.rightVector</code></pre>
+
+    <p><strong>Why it matters:</strong> This is a pipeline of transformations applied to a velocity vector. Each layer (surface type, drift state, braking) transforms the data flowing through. The threshold-based state transition &mdash; grip vs. drift triggered by lateral velocity exceeding a limit &mdash; is a pattern that appears throughout physics simulation.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Friction Surfaces</div>
+      <p class="demo-hint">Use arrow keys to drive across three surfaces: gray = road (high grip), green = grass (low grip), light blue = ice (very low grip). Watch how speed, drift, and handling change on each surface.</p>
+      <canvas id="demo-friction" width="760" height="420"></canvas>
+    </div>
+
+    <h4>3. Track and Checkpoint System</h4>
+    <p>The track is defined as a closed loop. Checkpoints are invisible gates placed around the track in order. Each racer must pass through checkpoints sequentially to complete a valid lap. This prevents shortcutting.</p>
+
+    <pre is:raw><code>// Checkpoint system
+class CheckpointTracker:
+    checkpoints = [gate0, gate1, gate2, ..., gateN]
+    nextCheckpointIndex = 0
+    lapCount = 0
+
+    function onRacerCrossesGate(racer, gateIndex):
+        if gateIndex == this.nextCheckpointIndex:
+            this.nextCheckpointIndex += 1
+            if this.nextCheckpointIndex >= checkpoints.length:
+                this.nextCheckpointIndex = 0
+                this.lapCount += 1
+                if this.lapCount >= TOTAL_LAPS:
+                    triggerFinish(racer)</code></pre>
+
+    <p><strong>Why it matters:</strong> This is a sequence validation problem. The checkpoint system is a finite state machine where each gate is a state and only forward transitions are legal. It also cleanly separates the visual track from the logical track &mdash; an important architectural distinction.</p>
+
+    <h4>4. Lap Management and Race State</h4>
+    <p>The race itself is a state machine: countdown, racing, finished. During the race, you track each racer's progress &mdash; current lap, last checkpoint, total elapsed time, and split times. Position (1st, 2nd, 3rd) is computed by comparing racers on a combined metric of lap count and checkpoint progress.</p>
+
+    <pre is:raw><code>// Race position calculation
+function calculatePositions(racers):
+    for racer in racers:
+        racer.progress = racer.lapCount
+                       + (racer.lastCheckpoint / TOTAL_CHECKPOINTS)
+
+    racers.sortBy(r => (-r.progress, r.elapsedTime))
+
+    for i, racer in enumerate(racers):
+        racer.position = i + 1</code></pre>
+
+    <p><strong>Why it matters:</strong> This is a leaderboard system &mdash; a ranking derived from composite sort keys. The race state machine defines which operations are valid in each phase.</p>
+
+    <h4>5. AI Racing with Waypoints</h4>
+    <p>AI racers follow a predefined path of waypoints placed along the ideal racing line. Each AI car steers toward its next waypoint, adjusting speed based on the angle to the upcoming waypoint.</p>
+
+    <pre is:raw><code>// AI waypoint following
+function updateAIRacer(ai, waypoints, deltaTime):
+    target = waypoints[ai.currentWaypointIndex]
+    directionToTarget = normalize(target.position - ai.position)
+    angleToTarget = angleBetween(ai.forwardVector, directionToTarget)
+
+    if angleToTarget > STEER_THRESHOLD:
+        ai.steerAngle = MAX_STEER_ANGLE * sign(angleToTarget)
+    else:
+        ai.steerAngle = angleToTarget / STEER_THRESHOLD * MAX_STEER_ANGLE
+
+    nextTarget = waypoints[(ai.currentWaypointIndex + 1) % waypoints.length]
+    turnSharpness = angleBetween(directionToTarget,
+                    normalize(nextTarget.position - target.position))
+    targetSpeed = lerp(MAX_SPEED, CORNER_SPEED, turnSharpness / PI)
+    ai.speed = moveToward(ai.speed, targetSpeed, ACCELERATION * deltaTime)
+
+    if distance(ai.position, target.position) < WAYPOINT_RADIUS:
+        ai.currentWaypointIndex = (ai.currentWaypointIndex + 1) % waypoints.length</code></pre>
+
+    <p><strong>Why it matters:</strong> This is a goal-seeking agent &mdash; the simplest form of autonomous behavior. The look-ahead pattern for speed adjustment is a general technique: inspecting upcoming conditions to optimize current behavior.</p>
+
+    <h4>6. Rubber-Banding / Catch-Up AI</h4>
+    <p>Racers who fall behind get a speed boost; racers who pull far ahead get slightly slowed. This keeps races competitive regardless of player skill.</p>
+
+    <pre is:raw><code>// Rubber-banding system
+function applyRubberBanding(racer, allRacers):
+    leader = allRacers.maxBy(r => r.progress)
+    trailer = allRacers.minBy(r => r.progress)
+    totalSpread = leader.progress - trailer.progress
+
+    if totalSpread == 0:
+        return 1.0
+
+    normalizedPosition = (racer.progress - trailer.progress) / totalSpread
+    speedMultiplier = lerp(BOOST_MAX, PENALTY_MIN, normalizedPosition)
+    return speedMultiplier</code></pre>
+
+    <p><strong>Why it matters:</strong> This is dynamic difficulty adjustment &mdash; an algorithm that modifies system parameters based on observed performance. Understanding that this is a <em>design decision</em> rather than a <em>technical necessity</em> is the lesson.</p>
+
+    <h4>7. Camera Modes (Chase Cam)</h4>
+    <p>The camera follows behind the player's car, smoothly interpolating its position and rotation to match the car's heading.</p>
+
+    <pre is:raw><code>// Chase camera with smooth follow
+function updateChaseCamera(camera, car, deltaTime):
+    offset = -car.forwardVector * FOLLOW_DISTANCE
+    desiredPosition = car.position + offset
+
+    smoothFactor = 1.0 - pow(CAMERA_LAG, deltaTime)
+    camera.position = lerp(camera.position, desiredPosition, smoothFactor)
+
+    lookTarget = car.position + car.forwardVector * LOOK_AHEAD_DISTANCE
+    camera.rotation = smoothLookAt(camera.rotation, lookTarget, smoothFactor)</code></pre>
+
+    <p><strong>Why it matters:</strong> This is an exponential moving average applied to position and rotation. The chase camera is a clean example of the observer pattern &mdash; the camera does not control the car; it reacts to the car's state.</p>
+
+    <h4>8. Minimap</h4>
+    <p>The minimap renders a simplified top-down view of the track with dots for each racer's position. It is a second viewport &mdash; a different projection of the same game state.</p>
+
+    <pre is:raw><code>// Minimap rendering
+function renderMinimap(track, racers, minimapRect):
+    function worldToMinimap(worldPos):
+        normalizedX = (worldPos.x - track.bounds.left) / track.bounds.width
+        normalizedY = (worldPos.y - track.bounds.top) / track.bounds.height
+        return (
+            minimapRect.x + normalizedX * minimapRect.width,
+            minimapRect.y + normalizedY * minimapRect.height
+        )
+
+    for i in range(track.checkpoints.length):
+        p1 = worldToMinimap(track.checkpoints[i].position)
+        p2 = worldToMinimap(track.checkpoints[(i+1) % track.checkpoints.length].position)
+        drawLine(p1, p2, COLOR_TRACK)
+
+    for racer in racers:
+        minimapPos = worldToMinimap(racer.position)
+        color = COLOR_PLAYER if racer.isPlayer else COLOR_AI
+        drawCircle(minimapPos, DOT_RADIUS, color)</code></pre>
+
+    <p><strong>Why it matters:</strong> The minimap is a coordinate transformation &mdash; mapping one coordinate space to another. It is also a practical example of the "second view" pattern: the same underlying data rendered in two completely different ways without duplicating the data.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Mini Top-Down Racer</div>
+      <p class="demo-hint">Use arrow keys to race around the oval track. Pass through checkpoints (dashed lines) in order to complete laps. Lap counter and checkpoint progress are shown in the HUD.</p>
+      <canvas id="demo-racer" width="760" height="480"></canvas>
+    </div>
+
+    <hr />
+
+    <h3>Stretch Goals</h3>
+    <ol>
+      <li><strong>Drift boost:</strong> Reward successful drifts with a speed burst when the player straightens out, adding a risk/reward skill mechanic on top of the physics system.</li>
+      <li><strong>Item pickups (kart-racer style):</strong> Add item boxes on the track that grant random powerups (speed boost, oil slick, missile).</li>
+      <li><strong>Multiple track surfaces:</strong> Visually distinct road, dirt, and grass zones with different friction values.</li>
+      <li><strong>Ghost replay:</strong> Record the player's inputs each frame and replay them as a ghost car on subsequent runs.</li>
+    </ol>
+
+    <h3>MVP Spec</h3>
+    <table>
+      <thead>
+        <tr><th>Element</th><th>Requirement</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Track</td><td>One closed-loop track with at least 4 curves of varying sharpness</td></tr>
+        <tr><td>Player car</td><td>Steering model with acceleration, braking, and turning (not grid movement)</td></tr>
+        <tr><td>Friction</td><td>At least 2 surface types (road and grass/dirt) with different grip values</td></tr>
+        <tr><td>Drift</td><td>Car visibly slides when lateral velocity exceeds grip</td></tr>
+        <tr><td>Checkpoints</td><td>At least 6 checkpoint gates enforcing sequential lap completion</td></tr>
+        <tr><td>Laps</td><td>3-lap race with lap counter and total time display</td></tr>
+        <tr><td>AI opponents</td><td>At least 2 AI racers following waypoints with speed adjustment at curves</td></tr>
+        <tr><td>Rubber-banding</td><td>Trailing racers receive a speed boost; leading racers are slightly slowed</td></tr>
+        <tr><td>Position display</td><td>HUD shows current position, current lap, and elapsed time</td></tr>
+        <tr><td>Camera</td><td>Chase camera that follows behind the player car with smooth interpolation</td></tr>
+        <tr><td>Minimap</td><td>Top-down minimap showing track outline and all racer positions</td></tr>
+        <tr><td>Win/Lose</td><td>Race ends when player completes 3 laps; final standings displayed</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliverable</h3>
+    <p>A playable top-down (or pseudo-3D) racing game with physics-based steering, at least two AI opponents, a checkpoint-validated lap system, and a minimap. The player must feel the difference between road and off-road surfaces, and AI racers must provide a competitive experience through waypoint following and rubber-banding. Submit the project along with a brief writeup (3-5 sentences) describing how you tuned the steering feel and what tradeoffs you made between simulation accuracy and fun.</p>
+
+    <hr />
+
+    <h2>Analogies by Background</h2>
+    <blockquote><p>These analogies map game dev concepts to patterns you already know. Find your background below.</p></blockquote>
+
+    <h3>For Backend Developers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Steering Model</td><td>State machine where current state constrains future transitions &mdash; like a saga pattern where each step limits what can happen next</td></tr>
+        <tr><td>Friction and Drift</td><td>Middleware pipeline transforming a request; threshold-based drift is a circuit breaker tripping when a continuous metric exceeds a limit</td></tr>
+        <tr><td>Track and Checkpoint System</td><td>Saga orchestration &mdash; a workflow that must complete steps in order; skipping steps invalidates the process</td></tr>
+        <tr><td>Lap Management and Race State</td><td>Leaderboard ranking with composite sort keys; race lifecycle mirrors a long-running process (pending -> running -> complete)</td></tr>
+        <tr><td>AI Racing with Waypoints</td><td>Queue consumer with peek-ahead &mdash; process the current message, inspect the next to plan resource allocation</td></tr>
+        <tr><td>Rubber-Banding / Catch-Up AI</td><td>Autoscaling &mdash; allocate more resources to services falling behind, throttle overprovisioned ones</td></tr>
+        <tr><td>Camera Modes (Chase Cam)</td><td>Exponential moving average used in monitoring dashboards and EMA-based alerting thresholds</td></tr>
+        <tr><td>Minimap</td><td>CQRS &mdash; one write model (racer positions), multiple read projections (main view, minimap)</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Frontend Developers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Steering Model</td><td>Like a CSS <code>transform: rotate()</code> that persists &mdash; each frame applies a delta rotation rather than setting an absolute direction</td></tr>
+        <tr><td>Friction and Drift</td><td>CSS transition easing functions &mdash; friction is like <code>ease-out</code> decelerating movement; drift is when inertia overrides the easing curve</td></tr>
+        <tr><td>Track and Checkpoint System</td><td>Multi-step form validation &mdash; the user must complete steps in order, and the progress bar only advances for valid completions</td></tr>
+        <tr><td>Lap Management and Race State</td><td>Page lifecycle states (loading -> interactive -> complete) with a progress indicator</td></tr>
+        <tr><td>AI Racing with Waypoints</td><td>requestAnimationFrame-driven animation along a predefined path of SVG waypoints</td></tr>
+        <tr><td>Rubber-Banding / Catch-Up AI</td><td>Responsive design breakpoints that adapt the experience based on viewport size</td></tr>
+        <tr><td>Camera Modes (Chase Cam)</td><td>Smooth scroll-to with <code>scroll-behavior: smooth</code></td></tr>
+        <tr><td>Minimap</td><td>A <code>position: fixed</code> overview widget showing the full page structure</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Data / ML Engineers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Steering Model</td><td>Differential equations integrated over time steps &mdash; the car's state vector evolves via numerical integration</td></tr>
+        <tr><td>Friction and Drift</td><td>Damping coefficients in a physics simulation; drift threshold is a decision boundary in feature space</td></tr>
+        <tr><td>Track and Checkpoint System</td><td>Validation gates in a data pipeline DAG &mdash; each stage must complete before the next begins</td></tr>
+        <tr><td>Lap Management and Race State</td><td>Composite ranking metrics like sorting by multiple columns in a DataFrame</td></tr>
+        <tr><td>AI Racing with Waypoints</td><td>Greedy optimization &mdash; the agent pursues the locally optimal waypoint while using one-step lookahead</td></tr>
+        <tr><td>Rubber-Banding / Catch-Up AI</td><td>Normalization or rebalancing of a skewed distribution</td></tr>
+        <tr><td>Camera Modes (Chase Cam)</td><td>Exponential moving average (EMA) for time-series smoothing</td></tr>
+        <tr><td>Minimap</td><td>Dimensionality reduction for visualization &mdash; projecting the full game state into a simplified 2D representation</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li><strong>Rubber-banding is controversial.</strong> Mario Kart uses aggressive catch-up mechanics; Gran Turismo uses none. What are the arguments for and against? How does this map to "fairness" in backend systems &mdash; should rate limiting treat all users equally, or should struggling users get more resources?</li>
+      <li><strong>The bicycle steering model is a simplification of real car physics.</strong> Where would you draw the line between simulation accuracy and player feel? Have you made similar simplification tradeoffs in backend systems?</li>
+      <li><strong>Your checkpoint system is a sequence validator.</strong> What happens if a racer legitimately drives backward? How would you handle edge cases without false-flagging valid play?</li>
+      <li><strong>The minimap and the main view render the same data differently.</strong> When is it better to maintain two projections of the same data versus one canonical view?</li>
+    </ol>
+
+    <nav class="module-nav">
+      <a href={`${base}modules/08-fighting-game/`}>&larr; Module 08: Fighting Game</a>
+      <a href={`${base}modules/10-deckbuilder/`}>Module 10: Deckbuilder &rarr;</a>
+    </nav>
+  </div>
+</BaseLayout>
+
+<script>
+// ============================================================
+// DEMO 1: STEERING MODEL
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-steering');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const keys = {};
+  window.addEventListener('keydown', function(e) {
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
+    keys[e.key] = true;
+  });
+  window.addEventListener('keyup', function(e) { keys[e.key] = false; });
+
+  const car = { x: W / 2, y: H / 2, heading: -Math.PI / 2, speed: 0, steerAngle: 0 };
+  const MAX_SPEED = 3.5;
+  const ACCEL = 0.06;
+  const BRAKE = 0.08;
+  const DRAG = 0.015;
+  const MAX_STEER = 0.045;
+  const WHEELBASE = 30;
+  const trail = [];
+
+  function draw() {
+    // Input
+    if (keys['ArrowLeft']) car.steerAngle = -MAX_STEER;
+    else if (keys['ArrowRight']) car.steerAngle = MAX_STEER;
+    else car.steerAngle = 0;
+
+    if (keys['ArrowUp']) car.speed = Math.min(car.speed + ACCEL, MAX_SPEED);
+    else if (keys['ArrowDown']) car.speed = Math.max(car.speed - BRAKE, -MAX_SPEED * 0.4);
+    else car.speed *= (1 - DRAG);
+
+    if (Math.abs(car.speed) > 0.01 && Math.abs(car.steerAngle) > 0.001) {
+      const turnRadius = WHEELBASE / Math.sin(car.steerAngle);
+      const angVel = car.speed / turnRadius;
+      car.heading += angVel;
+    }
+
+    car.x += Math.cos(car.heading) * car.speed;
+    car.y += Math.sin(car.heading) * car.speed;
+
+    // Wrap around
+    if (car.x < -20) car.x = W + 20;
+    if (car.x > W + 20) car.x = -20;
+    if (car.y < -20) car.y = H + 20;
+    if (car.y > H + 20) car.y = -20;
+
+    trail.push({ x: car.x, y: car.y });
+    if (trail.length > 120) trail.shift();
+
+    // Render
+    ctx.clearRect(0, 0, W, H);
+
+    // Grid
+    ctx.strokeStyle = '#1a1a1e';
+    ctx.lineWidth = 1;
+    for (let gx = 0; gx < W; gx += 40) {
+      ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke();
+    }
+    for (let gy = 0; gy < H; gy += 40) {
+      ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke();
+    }
+
+    // Trail
+    for (let i = 1; i < trail.length; i++) {
+      const alpha = i / trail.length * 0.4;
+      ctx.beginPath();
+      ctx.moveTo(trail[i - 1].x, trail[i - 1].y);
+      ctx.lineTo(trail[i].x, trail[i].y);
+      ctx.strokeStyle = 'rgba(59, 130, 246, ' + alpha + ')';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // Car body
+    ctx.save();
+    ctx.translate(car.x, car.y);
+    ctx.rotate(car.heading);
+
+    ctx.fillStyle = '#f59e0b';
+    ctx.beginPath();
+    ctx.roundRect(-18, -10, 36, 20, 4);
+    ctx.fill();
+
+    // Direction indicator
+    ctx.fillStyle = '#fbbf24';
+    ctx.beginPath();
+    ctx.moveTo(18, 0);
+    ctx.lineTo(12, -6);
+    ctx.lineTo(12, 6);
+    ctx.closePath();
+    ctx.fill();
+
+    // Steering wheel indicator
+    if (Math.abs(car.steerAngle) > 0.001) {
+      ctx.strokeStyle = '#22c55e';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(12, 0, 8, -0.5, 0.5);
+      ctx.stroke();
+      const steerNorm = car.steerAngle / MAX_STEER;
+      ctx.beginPath();
+      ctx.arc(12, 0, 8, -0.1 + steerNorm * 0.5, 0.1 + steerNorm * 0.5);
+      ctx.strokeStyle = '#ef4444';
+      ctx.stroke();
+    }
+
+    ctx.restore();
+
+    // Velocity vector
+    const velLen = Math.abs(car.speed) * 20;
+    const velX = car.x + Math.cos(car.heading) * velLen;
+    const velY = car.y + Math.sin(car.heading) * velLen;
+    ctx.beginPath();
+    ctx.moveTo(car.x, car.y);
+    ctx.lineTo(velX, velY);
+    ctx.strokeStyle = '#22c55e';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(velX, velY, 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#22c55e';
+    ctx.fill();
+
+    // HUD
+    ctx.fillStyle = '#a1a1aa';
+    ctx.font = '12px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('Speed: ' + Math.abs(car.speed).toFixed(2), 16, 24);
+    ctx.fillText('Heading: ' + (car.heading * 180 / Math.PI).toFixed(1) + '\u00B0', 16, 42);
+    ctx.fillText('Steer: ' + (car.steerAngle / MAX_STEER * 100).toFixed(0) + '%', 16, 60);
+
+    ctx.fillStyle = '#71717a';
+    ctx.font = '11px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Arrow keys: Up=accel, Down=brake, Left/Right=steer', W / 2, H - 12);
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+// ============================================================
+// DEMO 2: FRICTION SURFACES
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-friction');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const keys = {};
+  window.addEventListener('keydown', function(e) { keys[e.key] = true; });
+  window.addEventListener('keyup', function(e) { keys[e.key] = false; });
+
+  // Surfaces: 3 vertical strips
+  const surfaces = [
+    { x: 0, w: W * 0.33, color: '#2a2a2e', label: 'Road', grip: 1.0, labelColor: '#a1a1aa' },
+    { x: W * 0.33, w: W * 0.34, color: '#1a3a1a', label: 'Grass', grip: 0.4, labelColor: '#4ade80' },
+    { x: W * 0.67, w: W * 0.33, color: '#1a2a3a', label: 'Ice', grip: 0.15, labelColor: '#7dd3fc' }
+  ];
+
+  const car = { x: W * 0.16, y: H / 2, heading: -Math.PI / 2, speed: 0, steerAngle: 0, drift: 0 };
+  const MAX_SPEED = 3.5;
+  const ACCEL = 0.06;
+  const BRAKE = 0.08;
+  const MAX_STEER = 0.045;
+  const WHEELBASE = 30;
+  const trail = [];
+
+  function getSurface(x) {
+    for (const s of surfaces) {
+      if (x >= s.x && x < s.x + s.w) return s;
+    }
+    return surfaces[0];
+  }
+
+  function draw() {
+    const surface = getSurface(car.x);
+    const grip = surface.grip;
+
+    if (keys['ArrowLeft']) car.steerAngle = -MAX_STEER;
+    else if (keys['ArrowRight']) car.steerAngle = MAX_STEER;
+    else car.steerAngle = 0;
+
+    if (keys['ArrowUp']) car.speed = Math.min(car.speed + ACCEL * grip, MAX_SPEED);
+    else if (keys['ArrowDown']) car.speed = Math.max(car.speed - BRAKE * grip, -MAX_SPEED * 0.4);
+    else car.speed *= (1 - 0.015 / Math.max(grip, 0.1));
+
+    if (Math.abs(car.speed) > 0.01 && Math.abs(car.steerAngle) > 0.001) {
+      const turnRadius = WHEELBASE / Math.sin(car.steerAngle);
+      const angVel = car.speed / turnRadius * grip;
+      car.heading += angVel;
+    }
+
+    // Simulate drift on low grip
+    const lateralForce = Math.abs(car.steerAngle) * Math.abs(car.speed);
+    car.drift = lateralForce > grip * 0.08 ? Math.min(car.drift + 0.05, 1) : Math.max(car.drift - 0.05, 0);
+
+    const driftAngle = car.steerAngle * (1 - grip) * car.speed * 0.3;
+    car.x += Math.cos(car.heading + driftAngle) * car.speed;
+    car.y += Math.sin(car.heading + driftAngle) * car.speed;
+
+    if (car.x < 0) car.x = 0;
+    if (car.x > W) car.x = W;
+    if (car.y < 0) car.y = 0;
+    if (car.y > H) car.y = H;
+
+    trail.push({ x: car.x, y: car.y, drift: car.drift });
+    if (trail.length > 100) trail.shift();
+
+    // Render
+    ctx.clearRect(0, 0, W, H);
+
+    // Draw surfaces
+    for (const s of surfaces) {
+      ctx.fillStyle = s.color;
+      ctx.fillRect(s.x, 0, s.w, H);
+
+      ctx.fillStyle = s.labelColor;
+      ctx.font = '600 14px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(s.label + ' (grip: ' + s.grip + ')', s.x + s.w / 2, 24);
+    }
+
+    // Surface dividers
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = '#3f3f46';
+    ctx.lineWidth = 1;
+    for (const s of surfaces) {
+      ctx.beginPath(); ctx.moveTo(s.x, 0); ctx.lineTo(s.x, H); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+
+    // Trail
+    for (let i = 1; i < trail.length; i++) {
+      const alpha = i / trail.length * 0.5;
+      const t = trail[i];
+      const driftColor = t.drift > 0.3 ? 'rgba(239, 68, 68, ' + alpha + ')' : 'rgba(59, 130, 246, ' + alpha + ')';
+      ctx.beginPath();
+      ctx.moveTo(trail[i - 1].x, trail[i - 1].y);
+      ctx.lineTo(t.x, t.y);
+      ctx.strokeStyle = driftColor;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // Car
+    ctx.save();
+    ctx.translate(car.x, car.y);
+    ctx.rotate(car.heading + driftAngle * 0.5);
+
+    ctx.fillStyle = car.drift > 0.3 ? '#ef4444' : '#f59e0b';
+    ctx.beginPath();
+    ctx.roundRect(-18, -10, 36, 20, 4);
+    ctx.fill();
+
+    ctx.fillStyle = '#fbbf24';
+    ctx.beginPath();
+    ctx.moveTo(18, 0);
+    ctx.lineTo(12, -6);
+    ctx.lineTo(12, 6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    // HUD
+    ctx.fillStyle = '#e4e4e7';
+    ctx.font = '12px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('Speed: ' + Math.abs(car.speed).toFixed(2), 16, H - 60);
+    ctx.fillText('Surface: ' + surface.label, 16, H - 42);
+    ctx.fillText('Grip: ' + grip.toFixed(2), 16, H - 24);
+
+    if (car.drift > 0.3) {
+      ctx.fillStyle = '#ef4444';
+      ctx.font = '600 14px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('DRIFTING', W / 2, H - 12);
+    }
+
+    ctx.fillStyle = '#71717a';
+    ctx.font = '11px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Arrow keys to drive across different surfaces', W / 2, H - 12 - (car.drift > 0.3 ? 18 : 0));
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+// ============================================================
+// DEMO 3: MINI TOP-DOWN RACER
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-racer');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const keys = {};
+  window.addEventListener('keydown', function(e) {
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
+    keys[e.key] = true;
+  });
+  window.addEventListener('keyup', function(e) { keys[e.key] = false; });
+
+  // Oval track defined by center, radii
+  const cx = W / 2, cy = H / 2;
+  const outerRx = 340, outerRy = 200;
+  const innerRx = 200, innerRy = 100;
+  const trackWidth = 70;
+
+  // Checkpoints (8 gates around the oval)
+  const numCheckpoints = 8;
+  const checkpoints = [];
+  for (let i = 0; i < numCheckpoints; i++) {
+    const angle = (i / numCheckpoints) * Math.PI * 2 - Math.PI / 2;
+    const midRx = (outerRx + innerRx) / 2;
+    const midRy = (outerRy + innerRy) / 2;
+    checkpoints.push({
+      x: cx + Math.cos(angle) * midRx,
+      y: cy + Math.sin(angle) * midRy,
+      angle: angle
+    });
+  }
+
+  const car = { x: cx, y: cy + outerRy - trackWidth / 2 - 10, heading: Math.PI, speed: 0, steerAngle: 0 };
+  const MAX_SPEED = 3.0;
+  const ACCEL = 0.05;
+  const BRAKE = 0.07;
+  const MAX_STEER = 0.04;
+  const WHEELBASE = 28;
+
+  let nextCheckpoint = 0;
+  let lapCount = 0;
+  let totalLaps = 3;
+  let raceTime = 0;
+  let raceOver = false;
+  let lastTime = performance.now();
+
+  function isOnTrack(x, y) {
+    const dx = (x - cx) / ((outerRx + innerRx) / 2);
+    const dy = (y - cy) / ((outerRy + innerRy) / 2);
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    return dist > 0.55 && dist < 1.45;
+  }
+
+  function pointNearLine(px, py, lx, ly, radius) {
+    const dx = px - lx;
+    const dy = py - ly;
+    return Math.sqrt(dx * dx + dy * dy) < radius;
+  }
+
+  function draw(now) {
+    const dt = Math.min(now - lastTime, 50);
+    lastTime = now;
+
+    if (!raceOver) {
+      raceTime += dt / 1000;
+
+      if (keys['ArrowLeft']) car.steerAngle = -MAX_STEER;
+      else if (keys['ArrowRight']) car.steerAngle = MAX_STEER;
+      else car.steerAngle = 0;
+
+      const onTrack = isOnTrack(car.x, car.y);
+      const grip = onTrack ? 1.0 : 0.45;
+
+      if (keys['ArrowUp']) car.speed = Math.min(car.speed + ACCEL * grip, MAX_SPEED * (onTrack ? 1 : 0.6));
+      else if (keys['ArrowDown']) car.speed = Math.max(car.speed - BRAKE, -MAX_SPEED * 0.3);
+      else car.speed *= 0.985;
+
+      if (Math.abs(car.speed) > 0.01 && Math.abs(car.steerAngle) > 0.001) {
+        const turnRadius = WHEELBASE / Math.sin(car.steerAngle);
+        const angVel = car.speed / turnRadius * grip;
+        car.heading += angVel;
+      }
+
+      car.x += Math.cos(car.heading) * car.speed;
+      car.y += Math.sin(car.heading) * car.speed;
+
+      // Clamp to canvas
+      car.x = Math.max(10, Math.min(W - 10, car.x));
+      car.y = Math.max(10, Math.min(H - 10, car.y));
+
+      // Check checkpoint
+      const cp = checkpoints[nextCheckpoint];
+      if (pointNearLine(car.x, car.y, cp.x, cp.y, 35)) {
+        nextCheckpoint++;
+        if (nextCheckpoint >= numCheckpoints) {
+          nextCheckpoint = 0;
+          lapCount++;
+          if (lapCount >= totalLaps) {
+            raceOver = true;
+          }
+        }
+      }
+    }
+
+    // Render
+    ctx.clearRect(0, 0, W, H);
+
+    // Draw grass
+    ctx.fillStyle = '#1a2a1a';
+    ctx.fillRect(0, 0, W, H);
+
+    // Draw track (oval ring)
+    ctx.fillStyle = '#2a2a2e';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, outerRx, outerRy, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#1a2a1a';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, innerRx, innerRy, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Track border lines
+    ctx.strokeStyle = '#4a4a4e';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, outerRx, outerRy, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, innerRx, innerRy, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Draw checkpoints
+    for (let i = 0; i < checkpoints.length; i++) {
+      const cp = checkpoints[i];
+      const isNext = (i === nextCheckpoint);
+      const midRx = (outerRx + innerRx) / 2;
+      const midRy = (outerRy + innerRy) / 2;
+      const perpAngle = cp.angle;
+      const halfW = (outerRx - innerRx) / 2;
+
+      const dx = Math.cos(perpAngle);
+      const dy = Math.sin(perpAngle);
+      const nx = -dy;
+      const ny = dx;
+
+      const x1 = cp.x + nx * halfW * 0.8;
+      const y1 = cp.y + ny * halfW * 0.8;
+      const x2 = cp.x - nx * halfW * 0.8;
+      const y2 = cp.y - ny * halfW * 0.8;
+
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.strokeStyle = isNext ? '#f59e0b' : '#3f3f4688';
+      ctx.lineWidth = isNext ? 3 : 1;
+      ctx.setLineDash(isNext ? [] : [4, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      if (isNext) {
+        ctx.fillStyle = '#f59e0b';
+        ctx.font = '600 10px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('CP ' + i, cp.x, cp.y - halfW * 0.8 - 6);
+      }
+    }
+
+    // Start/finish line
+    const sf = checkpoints[0];
+    ctx.fillStyle = '#f59e0b44';
+    ctx.font = '10px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('START/FINISH', sf.x, sf.y + 50);
+
+    // Draw car
+    ctx.save();
+    ctx.translate(car.x, car.y);
+    ctx.rotate(car.heading);
+
+    ctx.fillStyle = '#3b82f6';
+    ctx.beginPath();
+    ctx.roundRect(-14, -8, 28, 16, 3);
+    ctx.fill();
+
+    ctx.fillStyle = '#60a5fa';
+    ctx.beginPath();
+    ctx.moveTo(14, 0);
+    ctx.lineTo(10, -5);
+    ctx.lineTo(10, 5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    // HUD
+    ctx.fillStyle = 'rgba(10, 10, 12, 0.8)';
+    ctx.beginPath();
+    ctx.roundRect(12, 12, 180, 80, 6);
+    ctx.fill();
+
+    ctx.fillStyle = '#e4e4e7';
+    ctx.font = '600 13px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('Lap: ' + Math.min(lapCount + 1, totalLaps) + ' / ' + totalLaps, 22, 34);
+    ctx.fillText('Checkpoint: ' + nextCheckpoint + ' / ' + numCheckpoints, 22, 54);
+    ctx.fillText('Time: ' + raceTime.toFixed(1) + 's', 22, 74);
+
+    const onTrack = isOnTrack(car.x, car.y);
+    if (!onTrack) {
+      ctx.fillStyle = '#4ade80';
+      ctx.font = '600 11px "JetBrains Mono", monospace';
+      ctx.fillText('OFF-ROAD', 22, 88);
+    }
+
+    // Race complete overlay
+    if (raceOver) {
+      ctx.fillStyle = 'rgba(10, 10, 11, 0.75)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#f59e0b';
+      ctx.font = '700 32px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Race Complete!', W / 2, H / 2 - 20);
+      ctx.fillStyle = '#a1a1aa';
+      ctx.font = '16px "JetBrains Mono", monospace';
+      ctx.fillText('Time: ' + raceTime.toFixed(2) + 's', W / 2, H / 2 + 20);
+    }
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+</script>

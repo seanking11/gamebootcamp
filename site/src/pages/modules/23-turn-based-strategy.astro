@@ -1,0 +1,717 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 23: Turn-Based Strategy">
+  <div class="container page-content">
+    <div class="module-header">
+      <div class="module-number">Module 23</div>
+      <h1>Turn-Based Strategy</h1>
+      <p class="module-theme">Grids, probability, and agonizing decisions &mdash; 95% to hit. Missed.</p>
+    </div>
+
+    <blockquote>
+      <p>"In preparing for battle I have always found that plans are useless, but planning is indispensable." &mdash; Dwight D. Eisenhower</p>
+    </blockquote>
+
+    <hr />
+
+    <h2>Prerequisites</h2>
+    <table>
+      <thead>
+        <tr><th>Module</th><th>What You Used From It</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Module 7 - Roguelike</td><td>Grid-based world representation, turn-based input loops, entity-on-grid movement</td></tr>
+        <tr><td>Module 6 - Tower Defense</td><td>Pathfinding (A* or BFS), tile cost considerations, spatial reasoning</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h2>Week 1: History &amp; Design Theory</h2>
+
+    <h3>The Origin</h3>
+    <p>Turn-based tactics games descended directly from tabletop war games &mdash; hex grids, cardboard counters, and probability tables. The digital translation began with early titles like Nobunaga's Ambition (1983) and the original Fire Emblem (1990), which moved the war game to a console screen and replaced dice rolls with hidden random number generators. The genre's core promise is giving the player time to think. Unlike an RTS where the clock never stops, a turn-based strategy game says: "Here is a complex situation. Take as long as you need to find the best move." This deliberate pacing attracted players who valued planning over reflexes, and the genre became the home of some of the deepest tactical systems in all of gaming.</p>
+
+    <h3>How the Genre Evolved</h3>
+    <p><strong>Fire Emblem (Intelligent Systems, 1990):</strong> The original Fire Emblem established the tactical RPG template: grid-based maps, character permadeath, weapon triangle (swords beat axes beat lances), and movement ranges defined by unit class. Its genius was making each unit a named character with personality and relationships &mdash; losing a unit was not just a tactical setback but an emotional loss.</p>
+    <p><strong>XCOM: Enemy Unknown (Firaxis, 2012):</strong> Firaxis reinvented the tactical game for a modern audience. Its cover system &mdash; half cover and full cover modifying hit probability &mdash; made positioning the central tactical decision. Its visible percentage displays ("72% to hit") created agonizing risk-reward calculations that the player could see and reason about.</p>
+    <p><strong>Into the Breach (Subset Games, 2018):</strong> Into the Breach stripped the genre to its absolute essence: small grids, few units, and complete information. Every enemy telegraphs its next attack, and the player's job is to figure out how to prevent the most damage with limited actions. It proved that turn-based tactics could be a puzzle game &mdash; deterministic, transparent, and brutally elegant.</p>
+
+    <h3>What Makes Turn-Based Strategy "Great"</h3>
+    <p>A great turn-based strategy game makes every decision feel like it matters. The best entries create situations where the player can see multiple viable options, each with clear tradeoffs: advance this sniper to high ground for a better angle but expose her to flanking fire, or keep her in cover with a worse shot? The probability system must be transparent enough that the player can make informed bets but uncertain enough that no plan is guaranteed. And the consequences must be real. When a plan comes together despite uncertainty, the satisfaction is profound. When it falls apart because of a 5% miss, the agony is equally memorable.</p>
+
+    <h3>The Essential Mechanic</h3>
+    <p>Positioning units on a grid where cover, range, and probability determine outcomes.</p>
+
+    <hr />
+
+    <h2>Week 2: Build the MVP</h2>
+
+    <h3>What You're Building</h3>
+    <p>A tactical combat game on a grid where the player controls 3-4 units against a group of enemies. Each unit has action points, a movement range, and an attack with a hit probability modified by cover and range. The map has cover objects that units can hide behind. Turns alternate between the player and the enemy. Win by eliminating all enemies; lose if all player units fall.</p>
+
+    <h3>Core Concepts (Must Implement)</h3>
+
+    <h4>1. Movement Range Calculation on a Grid</h4>
+    <p>From a unit's current position, calculate which tiles it can reach given its movement budget. This is a breadth-first search (BFS) where each tile has a movement cost, and the search stops when the budget is exhausted.</p>
+    <pre is:raw><code>function calculate_movement_range(unit):
+    start = unit.grid_position
+    budget = unit.move_range    // e.g., 5 tiles
+
+    reachable = {}    // tile -> remaining_budget
+    queue = [(start, budget)]
+    reachable[start] = budget
+
+    while queue is not empty:
+        current, remaining = queue.pop_front()
+        for neighbor in get_adjacent_tiles(current):
+            if not is_walkable(neighbor): continue
+            if is_occupied_by_enemy(neighbor): continue
+            cost = get_tile_move_cost(neighbor)
+            new_remaining = remaining - cost
+            if new_remaining >= 0 and new_remaining > reachable.get(neighbor, -1):
+                reachable[neighbor] = new_remaining
+                queue.append((neighbor, new_remaining))
+    return reachable
+
+function get_tile_move_cost(tile):
+    if tile.terrain == "normal": return 1
+    if tile.terrain == "rough": return 2
+    if tile.terrain == "water": return 3
+    return 1</code></pre>
+    <p><strong>Why it matters:</strong> Movement range visualization is how the player plans. Seeing the blue-highlighted tiles tells them exactly what is possible this turn. The BFS with variable tile costs adds tactical depth &mdash; rough terrain becomes a natural choke point, and high-cost tiles create interesting tradeoffs between the short path and the safe path.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Movement Range BFS</div>
+      <p class="demo-hint">Click on the unit (blue circle) to select it and see reachable tiles highlighted. Different terrain costs more movement: grass=1, forest=2, mountain=3, water=impassable. Click a highlighted tile to move the unit. Press "Next Turn" to reset movement.</p>
+      <canvas id="demo-movement" width="760" height="440"></canvas>
+      <div class="demo-controls">
+        <button id="mv-reset-btn">Next Turn</button>
+        <span class="value-display" id="mv-budget-display">Movement: 5</span>
+        <span class="value-display" id="mv-terrain-display">Hover for terrain info</span>
+      </div>
+    </div>
+
+    <h4>2. Action Point System</h4>
+    <p>Each unit gets a fixed number of action points (AP) per turn. Moving costs AP. Attacking costs AP. The player must decide how to spend them &mdash; a unit that moves far cannot attack, and a unit that attacks twice cannot move.</p>
+    <pre is:raw><code>ACTIONS = {
+    "move":     { ap_cost: 1 },
+    "attack":   { ap_cost: 1 },
+    "overwatch": { ap_cost: 2 },
+    "heal":     { ap_cost: 1 }
+}
+
+function start_player_turn():
+    for unit in player_units:
+        unit.ap = unit.max_ap    // Typically 2
+        unit.has_moved = false
+        unit.has_attacked = false
+
+function try_action(unit, action_type):
+    cost = ACTIONS[action_type].ap_cost
+    if unit.ap < cost:
+        show_message("Not enough action points")
+        return false
+    unit.ap -= cost
+    return true</code></pre>
+    <p><strong>Why it matters:</strong> Action points create the fundamental tension in turn-based tactics: economy of action. With only 2 AP, every point matters. Do you move into cover or stay exposed and attack twice? AP turns each unit's turn into a small optimization problem with real consequences.</p>
+
+    <h4>3. Hit Probability / Accuracy System</h4>
+    <p>When a unit attacks, the hit chance is calculated from base accuracy modified by distance, cover, flanking, and elevation. The percentage is displayed to the player before they commit, creating an informed gamble.</p>
+    <pre is:raw><code>BASE_HIT_CHANCE = 75
+
+COVER_MODIFIERS = {
+    "none": 0,
+    "half": -25,
+    "full": -40
+}
+
+RANGE_PENALTY = -5      // Per tile beyond optimal range
+FLANK_BONUS = 25
+
+function calculate_hit_chance(attacker, defender):
+    chance = BASE_HIT_CHANCE
+    cover = get_cover_between(attacker.position, defender.position)
+    chance += COVER_MODIFIERS[cover]
+    dist = grid_distance(attacker.position, defender.position)
+    if dist > attacker.optimal_range:
+        chance += RANGE_PENALTY * (dist - attacker.optimal_range)
+    if is_flanking(attacker.position, defender):
+        chance += FLANK_BONUS
+    chance = clamp(chance, 5, 95)
+    return chance
+
+function attempt_attack(attacker, defender):
+    hit_chance = calculate_hit_chance(attacker, defender)
+    display_shot_preview(hit_chance, attacker.damage)
+    if player_confirms_attack():
+        roll = random(0, 100)
+        if roll < hit_chance:
+            apply_damage(defender, attacker.damage)
+            show_result("HIT!")
+        else:
+            show_result("MISSED")</code></pre>
+    <p><strong>Why it matters:</strong> The hit probability system is the emotional core of the genre. Showing the player "72% to hit" before they shoot creates a moment of genuine tension &mdash; they chose to take this shot knowing it might miss. This transforms RNG from something that happens TO the player into a risk the player consciously accepts.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Hit Probability Calculator</div>
+      <p class="demo-hint">Adjust range, cover type, and flanking to see how hit probability changes. Click "Fire!" to roll the dice and see the result.</p>
+      <canvas id="demo-hit-prob" width="760" height="380"></canvas>
+      <div class="demo-controls">
+        <label>Range: <input type="range" id="hp-range" min="1" max="10" value="3" /></label>
+        <span class="value-display" id="hp-range-val">3</span>
+        <label>Cover: <select id="hp-cover">
+          <option value="none">None</option>
+          <option value="half">Half Cover</option>
+          <option value="full">Full Cover</option>
+        </select></label>
+        <label><input type="checkbox" id="hp-flank" /> Flanking</label>
+        <button id="hp-fire-btn">Fire!</button>
+      </div>
+    </div>
+
+    <h4>4. Cover System on a Grid</h4>
+    <p>Certain tiles or tile edges provide cover. A unit standing behind cover receives a defensive bonus against attacks from the covered direction. Cover is directional &mdash; it protects from one side but not from flanking.</p>
+    <pre is:raw><code>cover_objects = [
+    { position: [3, 4], type: "half", blocks_movement: false },
+    { position: [5, 2], type: "full", blocks_movement: true },
+    { position: [7, 6], type: "half", blocks_movement: false }
+]
+
+function get_cover_for_unit(unit_pos, attacker_pos):
+    dx = sign(attacker_pos.x - unit_pos.x)
+    dy = sign(attacker_pos.y - unit_pos.y)
+    check_positions = []
+    if dx != 0: check_positions.append({ x: unit_pos.x + dx, y: unit_pos.y })
+    if dy != 0: check_positions.append({ x: unit_pos.x, y: unit_pos.y + dy })
+
+    best_cover = "none"
+    for pos in check_positions:
+        for cover in cover_objects:
+            if cover.position == [pos.x, pos.y]:
+                if cover.type == "full": best_cover = "full"
+                elif cover.type == "half" and best_cover == "none":
+                    best_cover = "half"
+    return best_cover</code></pre>
+    <p><strong>Why it matters:</strong> Cover makes positioning the most important decision in the game. The same unit in the open dies in one hit; behind full cover, it can hold a position for turns. Cover creates a tactical vocabulary: "advance to the next cover," "flank the enemy's cover," "destroy their cover."</p>
+
+    <h4>5. Fog of War with Unit Vision</h4>
+    <p>Each unit reveals a radius of tiles around it. Tiles outside all units' vision are hidden. Enemy units in hidden tiles are invisible. This makes scouting and vision control a tactical resource.</p>
+    <pre is:raw><code>function update_tactical_fog(player_units):
+    for x in 0 to grid_width:
+        for y in 0 to grid_height:
+            visible_map[x][y] = false
+    for unit in player_units:
+        if unit.is_dead: continue
+        for x in 0 to grid_width:
+            for y in 0 to grid_height:
+                dist = grid_distance(unit.position, [x, y])
+                if dist <= unit.vision_range:
+                    if has_line_of_sight_grid(unit.position, [x, y]):
+                        visible_map[x][y] = true</code></pre>
+    <p><strong>Why it matters:</strong> Fog of war in a tactics game transforms information into a resource. Moving a unit forward is not just about positioning &mdash; it is about gaining vision. An enemy you cannot see is an enemy you cannot plan for.</p>
+
+    <h4>6. Initiative / Turn Order</h4>
+    <p>The system that determines when each side acts. Common approaches include "I-go-you-go" (player moves all units, then enemy moves all), alternating activation, or speed-based initiative.</p>
+    <pre is:raw><code>// I-Go-You-Go (XCOM style)
+current_phase = "player"
+
+function start_player_phase():
+    current_phase = "player"
+    for unit in player_units:
+        unit.ap = unit.max_ap
+
+function start_enemy_phase():
+    current_phase = "enemy"
+    for enemy in enemy_units:
+        enemy.ap = enemy.max_ap
+        execute_enemy_ai(enemy)
+    start_player_phase()</code></pre>
+    <p><strong>Why it matters:</strong> Turn order profoundly affects strategy. In I-go-you-go, momentum swings are dramatic. In alternating systems, the opponent cannot chain multiple kills without the player getting a response.</p>
+
+    <h4>7. Undo / Preview System</h4>
+    <p>Showing the player what will happen before they commit. Movement preview shows the path and destination. Attack preview shows hit chance and damage. Undo for movement reduces frustration and focuses the game on decision-making.</p>
+    <pre is:raw><code>move_history = []
+
+function execute_move(unit, destination):
+    move_history.append({ unit: unit, from: unit.position, ap_spent: 1 })
+    unit.position = destination
+    unit.ap -= 1
+
+function undo_last_move():
+    if len(move_history) == 0: return
+    last = move_history.pop()
+    if last.unit.has_attacked:
+        show_message("Cannot undo -- unit has already attacked")
+        move_history.append(last)
+        return
+    last.unit.position = last.from
+    last.unit.ap += last.ap_spent</code></pre>
+    <p><strong>Why it matters:</strong> The preview system is what separates a tactics game from a guessing game. By showing the player exactly what will happen (or the probability of what will happen), the designer ensures that mistakes feel like the player's fault, not the game's.</p>
+
+    <hr />
+
+    <h3>Stretch Goals</h3>
+    <ul>
+      <li><strong>Overwatch / reaction fire:</strong> A unit spends AP to enter "overwatch" &mdash; it will automatically shoot the first enemy that moves within its line of sight during the enemy turn.</li>
+      <li><strong>Destructible cover:</strong> Explosives or heavy attacks can destroy cover objects, opening new sight lines.</li>
+      <li><strong>Unit classes:</strong> Sniper (long range, low movement), assault (short range, high movement), support (healer, buffer).</li>
+      <li><strong>Enemy intent display:</strong> Into the Breach style &mdash; show exactly what each enemy will do next turn.</li>
+    </ul>
+
+    <h3>MVP Spec</h3>
+    <table>
+      <thead><tr><th>Element</th><th>Minimum Viable Version</th></tr></thead>
+      <tbody>
+        <tr><td>Grid</td><td>8x8 to 12x12 tile grid with terrain and cover objects</td></tr>
+        <tr><td>Player Units</td><td>3-4 units with HP, movement range, attack range, and damage</td></tr>
+        <tr><td>Enemy Units</td><td>3-5 enemies with simple AI (move toward player, attack if in range)</td></tr>
+        <tr><td>Movement</td><td>BFS-based range display, click-to-move, path preview</td></tr>
+        <tr><td>Combat</td><td>Hit probability based on cover and range, displayed before confirming</td></tr>
+        <tr><td>Cover</td><td>At least 2 cover types (half and full) affecting hit chance</td></tr>
+        <tr><td>Action Points</td><td>2 AP per unit per turn: move + attack, or double move, or double attack</td></tr>
+        <tr><td>Turn Structure</td><td>I-go-you-go: player moves all units, then all enemies act</td></tr>
+        <tr><td>Preview</td><td>Movement path preview, attack hit % preview, cover indicators</td></tr>
+        <tr><td>Win/Lose</td><td>Eliminate all enemies to win; all player units killed = lose</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliverable</h3>
+    <p>A playable turn-based tactics game where the player positions 3-4 units on a grid with cover objects, moves them within calculated ranges, attacks enemies with probability-based hits modified by cover and range, and attempts to eliminate all enemies before being eliminated. The player should always see hit percentages before attacking and movement ranges before moving.</p>
+
+    <hr />
+
+    <h2>Analogies by Background</h2>
+
+    <h3>For Backend Developers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Movement Range (BFS)</td><td>Like a network hop-count query &mdash; BFS from a source node with a TTL (movement budget), where each edge has a weight, returning all reachable nodes.</td></tr>
+        <tr><td>Action Point System</td><td>Like API rate limits per request window &mdash; each unit gets N actions per turn, and the caller must decide how to spend them.</td></tr>
+        <tr><td>Hit Probability</td><td>Like probabilistic data structures (Bloom filters, HyperLogLog) &mdash; the system gives you a confidence percentage, not a guarantee.</td></tr>
+        <tr><td>Cover System</td><td>Like defense-in-depth in security &mdash; half cover is a firewall, full cover is a firewall plus WAF. Flanking bypasses both.</td></tr>
+        <tr><td>Initiative / Turn Order</td><td>Like round-robin vs. priority scheduling &mdash; different scheduling determines response latency.</td></tr>
+        <tr><td>Undo / Preview</td><td>Like dry-run mode in a deployment pipeline &mdash; preview changes before committing, rollback for non-destructive operations.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Frontend Developers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Movement Range (BFS)</td><td>Like calculating reachable routes in a navigation menu &mdash; determine which pages are reachable within N clicks.</td></tr>
+        <tr><td>Hit Probability</td><td>Like conversion rate predictions in A/B testing &mdash; "72% chance this variant wins" is the same kind of informed uncertainty.</td></tr>
+        <tr><td>Cover System</td><td>Like CSS <code>overflow: hidden</code> with directional clipping &mdash; cover blocks from one direction but not others.</td></tr>
+        <tr><td>Fog of War</td><td>Like virtualized rendering &mdash; only elements within the viewport are rendered; everything outside exists but is not displayed.</td></tr>
+        <tr><td>Undo / Preview</td><td>Like optimistic UI updates with rollback &mdash; show the expected result, let the user confirm, and revert if they change their mind.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Data / ML Engineers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Movement Range (BFS)</td><td>Like breadth-first graph traversal with edge weights &mdash; friends-of-friends within N hops applied to a spatial grid.</td></tr>
+        <tr><td>Hit Probability</td><td>Like model confidence scores &mdash; the system outputs a probability, and the decision-maker must choose whether to act on it.</td></tr>
+        <tr><td>Cover System</td><td>Like regularization &mdash; cover penalizes attacker accuracy, preventing guaranteed hits and forcing creative solutions.</td></tr>
+        <tr><td>Fog of War</td><td>Like partial observability in reinforcement learning &mdash; the agent does not see the full state, only a local observation.</td></tr>
+        <tr><td>Initiative / Turn Order</td><td>Like batch processing vs. online learning &mdash; I-go-you-go processes all samples in one batch before updating.</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li>XCOM is famous for the "95% miss" &mdash; a nearly guaranteed shot that fails. Is this a design flaw or a feature? How does the 5-95% clamp on hit chance affect the player's relationship with probability?</li>
+      <li>Into the Breach shows you exactly what every enemy will do on their next turn. XCOM hides enemy intentions behind fog of war. How does the amount of information available change the type of thinking the game rewards?</li>
+      <li>Fire Emblem's permadeath means a fallen unit is gone forever. XCOM allows wounded soldiers to recover. How do different failure consequences change player behavior?</li>
+      <li>Turn-based strategy games give the player unlimited time to think per turn. Does this make them "easier" than real-time games, or does it make them harder by removing the excuse of "I didn't have time to think"?</li>
+    </ol>
+
+    <nav class="module-nav">
+      <a href={`${base}modules/22-rts/`}>&larr; Module 22: RTS</a>
+      <a href={`${base}modules/24-auto-battler/`}>Module 24: Auto-Battler &rarr;</a>
+    </nav>
+  </div>
+</BaseLayout>
+
+<script>
+// ==================== Demo 1: Movement Range BFS ====================
+(function() {
+  const canvas = document.getElementById('demo-movement');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const resetBtn = document.getElementById('mv-reset-btn');
+  const budgetDisplay = document.getElementById('mv-budget-display');
+  const terrainDisplay = document.getElementById('mv-terrain-display');
+
+  const TILE = 44;
+  const COLS = Math.floor(canvas.width / TILE);
+  const ROWS = Math.floor(canvas.height / TILE);
+  const MAX_MOVE = 5;
+
+  const TERRAIN = { grass: { cost: 1, color: '#5a8c4a' }, forest: { cost: 2, color: '#3a6630' }, mountain: { cost: 3, color: '#8a7a5a' }, water: { cost: Infinity, color: '#2a5a8a' } };
+  const TERRAIN_KEYS = Object.keys(TERRAIN);
+
+  let grid = [];
+  let unit = { col: 2, row: 4, moveLeft: MAX_MOVE };
+  let reachable = {};
+  let selected = false;
+  let hoverCol = -1, hoverRow = -1;
+
+  function initGrid() {
+    grid = [];
+    for (let r = 0; r < ROWS; r++) {
+      grid[r] = [];
+      for (let c = 0; c < COLS; c++) {
+        const rng = Math.random();
+        if (rng < 0.55) grid[r][c] = 'grass';
+        else if (rng < 0.75) grid[r][c] = 'forest';
+        else if (rng < 0.88) grid[r][c] = 'mountain';
+        else grid[r][c] = 'water';
+      }
+    }
+    grid[unit.row][unit.col] = 'grass';
+    unit.moveLeft = MAX_MOVE;
+    selected = false;
+    reachable = {};
+  }
+
+  function bfs() {
+    reachable = {};
+    const queue = [{ col: unit.col, row: unit.row, budget: unit.moveLeft }];
+    const key = (c, r) => c + ',' + r;
+    reachable[key(unit.col, unit.row)] = unit.moveLeft;
+
+    while (queue.length > 0) {
+      const { col, row, budget } = queue.shift();
+      const dirs = [[0,-1],[0,1],[-1,0],[1,0]];
+      for (const [dc, dr] of dirs) {
+        const nc = col + dc, nr = row + dr;
+        if (nc < 0 || nc >= COLS || nr < 0 || nr >= ROWS) continue;
+        const t = grid[nr][nc];
+        const cost = TERRAIN[t].cost;
+        if (cost === Infinity) continue;
+        const rem = budget - cost;
+        if (rem >= 0 && rem > (reachable[key(nc, nr)] || -1)) {
+          reachable[key(nc, nr)] = rem;
+          queue.push({ col: nc, row: nr, budget: rem });
+        }
+      }
+    }
+  }
+
+  initGrid();
+
+  resetBtn.addEventListener('click', () => {
+    unit.moveLeft = MAX_MOVE;
+    selected = false;
+    reachable = {};
+    budgetDisplay.textContent = 'Movement: ' + unit.moveLeft;
+  });
+
+  canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    hoverCol = Math.floor((e.clientX - rect.left) / TILE);
+    hoverRow = Math.floor((e.clientY - rect.top) / TILE);
+    if (hoverCol >= 0 && hoverCol < COLS && hoverRow >= 0 && hoverRow < ROWS) {
+      const t = grid[hoverRow][hoverCol];
+      const costStr = TERRAIN[t].cost === Infinity ? 'impassable' : TERRAIN[t].cost;
+      terrainDisplay.textContent = t.charAt(0).toUpperCase() + t.slice(1) + ' (cost: ' + costStr + ')';
+    }
+  });
+
+  canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const col = Math.floor((e.clientX - rect.left) / TILE);
+    const row = Math.floor((e.clientY - rect.top) / TILE);
+    if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return;
+
+    if (!selected && col === unit.col && row === unit.row) {
+      selected = true;
+      bfs();
+    } else if (selected) {
+      const key = col + ',' + row;
+      if (key in reachable && !(col === unit.col && row === unit.row)) {
+        const cost = unit.moveLeft - reachable[key];
+        unit.col = col;
+        unit.row = row;
+        unit.moveLeft = reachable[key];
+        budgetDisplay.textContent = 'Movement: ' + unit.moveLeft;
+        if (unit.moveLeft > 0) {
+          bfs();
+        } else {
+          selected = false;
+          reachable = {};
+        }
+      } else {
+        selected = false;
+        reachable = {};
+      }
+    }
+  });
+
+  function draw() {
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const x = c * TILE, y = r * TILE;
+        const t = grid[r][c];
+        ctx.fillStyle = TERRAIN[t].color;
+        ctx.fillRect(x, y, TILE, TILE);
+
+        const key = c + ',' + r;
+        if (selected && key in reachable && !(c === unit.col && r === unit.row)) {
+          ctx.fillStyle = 'rgba(100, 180, 255, 0.35)';
+          ctx.fillRect(x, y, TILE, TILE);
+        }
+
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(x, y, TILE, TILE);
+
+        // Cost label
+        if (t !== 'water') {
+          ctx.fillStyle = 'rgba(255,255,255,0.3)';
+          ctx.font = '9px monospace';
+          ctx.fillText(String(TERRAIN[t].cost), x + 2, y + 10);
+        }
+      }
+    }
+
+    // Hover highlight
+    if (hoverCol >= 0 && hoverCol < COLS && hoverRow >= 0 && hoverRow < ROWS) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(hoverCol * TILE, hoverRow * TILE, TILE, TILE);
+    }
+
+    // Unit
+    const ux = unit.col * TILE + TILE / 2;
+    const uy = unit.row * TILE + TILE / 2;
+    ctx.beginPath();
+    ctx.arc(ux, uy, TILE / 2 - 4, 0, Math.PI * 2);
+    ctx.fillStyle = '#4fc3f7';
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 11px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(String(unit.moveLeft), ux, uy + 4);
+    ctx.textAlign = 'left';
+
+    // Legend
+    ctx.font = '10px monospace';
+    ctx.fillStyle = '#ccc';
+    const legend = ['Grass(1)', 'Forest(2)', 'Mountain(3)', 'Water(X)'];
+    const colors = ['#5a8c4a', '#3a6630', '#8a7a5a', '#2a5a8a'];
+    let lx = 8;
+    for (let i = 0; i < legend.length; i++) {
+      ctx.fillStyle = colors[i];
+      ctx.fillRect(lx, canvas.height - 16, 10, 10);
+      ctx.fillStyle = '#ccc';
+      ctx.fillText(legend[i], lx + 14, canvas.height - 7);
+      lx += ctx.measureText(legend[i]).width + 26;
+    }
+
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+// ==================== Demo 2: Hit Probability Calculator ====================
+(function() {
+  const canvas = document.getElementById('demo-hit-prob');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const rangeSlider = document.getElementById('hp-range');
+  const rangeVal = document.getElementById('hp-range-val');
+  const coverSelect = document.getElementById('hp-cover');
+  const flankCheck = document.getElementById('hp-flank');
+  const fireBtn = document.getElementById('hp-fire-btn');
+
+  const BASE = 75;
+  const COVER_MOD = { none: 0, half: -25, full: -40 };
+  const RANGE_PENALTY = -5;
+  const FLANK_BONUS = 25;
+  const OPTIMAL_RANGE = 3;
+
+  let result = null;
+  let resultTimer = 0;
+  let hitChance = BASE;
+  let shots = [];
+
+  rangeSlider.addEventListener('input', () => { rangeVal.textContent = rangeSlider.value; result = null; });
+  coverSelect.addEventListener('change', () => { result = null; });
+  flankCheck.addEventListener('change', () => { result = null; });
+
+  function calcChance() {
+    let chance = BASE;
+    chance += COVER_MOD[coverSelect.value] || 0;
+    const range = parseInt(rangeSlider.value);
+    if (range > OPTIMAL_RANGE) {
+      chance += RANGE_PENALTY * (range - OPTIMAL_RANGE);
+    }
+    if (flankCheck.checked) chance += FLANK_BONUS;
+    return Math.max(5, Math.min(95, chance));
+  }
+
+  fireBtn.addEventListener('click', () => {
+    hitChance = calcChance();
+    const roll = Math.random() * 100;
+    result = roll < hitChance ? 'HIT' : 'MISS';
+    resultTimer = 3;
+    shots.push({ chance: hitChance, result: result, roll: Math.floor(roll) });
+    if (shots.length > 8) shots.shift();
+  });
+
+  let lastTime = performance.now();
+
+  function draw() {
+    const now = performance.now();
+    const dt = (now - lastTime) / 1000;
+    lastTime = now;
+    if (resultTimer > 0) resultTimer -= dt;
+
+    hitChance = calcChance();
+
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Scene: attacker on left, target on right with cover
+    const range = parseInt(rangeSlider.value);
+    const cover = coverSelect.value;
+    const attackerX = 100;
+    const targetX = 100 + range * 55;
+    const floorY = 260;
+
+    // Floor
+    ctx.fillStyle = '#2a2a4a';
+    ctx.fillRect(0, floorY, canvas.width, canvas.height - floorY);
+
+    // Attacker
+    ctx.fillStyle = '#4fc3f7';
+    ctx.beginPath();
+    ctx.arc(attackerX, floorY - 25, 18, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('Shooter', attackerX, floorY + 15);
+
+    // Target
+    ctx.fillStyle = '#e57373';
+    ctx.beginPath();
+    ctx.arc(targetX, floorY - 25, 18, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.fillText('Target', targetX, floorY + 15);
+
+    // Cover visual
+    if (cover !== 'none') {
+      const coverX = targetX - 28;
+      const coverH = cover === 'full' ? 50 : 28;
+      ctx.fillStyle = cover === 'full' ? '#7a7a7a' : '#a0845a';
+      ctx.fillRect(coverX, floorY - coverH, 12, coverH);
+      ctx.fillStyle = '#ccc';
+      ctx.font = '9px monospace';
+      ctx.fillText(cover + ' cover', coverX - 10, floorY - coverH - 5);
+    }
+
+    // Flanking indicator
+    if (flankCheck.checked) {
+      ctx.strokeStyle = '#ffb74d';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      ctx.moveTo(attackerX, floorY - 60);
+      ctx.quadraticCurveTo((attackerX + targetX) / 2, floorY - 120, targetX + 30, floorY - 30);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#ffb74d';
+      ctx.font = '10px monospace';
+      ctx.fillText('Flanking!', (attackerX + targetX) / 2, floorY - 100);
+    }
+
+    // Line of fire
+    ctx.strokeStyle = resultTimer > 0 ? (result === 'HIT' ? '#4caf50' : '#f44336') : 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = resultTimer > 0 ? 3 : 1;
+    ctx.setLineDash(resultTimer > 0 ? [] : [6, 4]);
+    ctx.beginPath();
+    ctx.moveTo(attackerX + 20, floorY - 25);
+    ctx.lineTo(targetX - 20, floorY - 25);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Hit probability display
+    const barX = 50, barY = 20, barW = 300, barH = 30;
+    ctx.fillStyle = '#2a2a4a';
+    ctx.fillRect(barX, barY, barW, barH);
+    const fillW = (hitChance / 100) * barW;
+    const barColor = hitChance >= 70 ? '#4caf50' : hitChance >= 40 ? '#ffb74d' : '#f44336';
+    ctx.fillStyle = barColor;
+    ctx.fillRect(barX, barY, fillW, barH);
+    ctx.strokeStyle = '#555';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(barX, barY, barW, barH);
+
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 16px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(hitChance + '% to hit', barX + barW / 2, barY + 22);
+
+    // Breakdown
+    ctx.textAlign = 'left';
+    ctx.font = '11px monospace';
+    let breakY = 65;
+    ctx.fillStyle = '#aaa';
+    ctx.fillText('Base:      ' + BASE + '%', barX, breakY); breakY += 16;
+    if (COVER_MOD[cover] !== 0) {
+      ctx.fillStyle = '#e57373';
+      ctx.fillText('Cover:     ' + COVER_MOD[cover] + '%', barX, breakY); breakY += 16;
+    }
+    if (range > OPTIMAL_RANGE) {
+      ctx.fillStyle = '#e57373';
+      ctx.fillText('Range:     ' + (RANGE_PENALTY * (range - OPTIMAL_RANGE)) + '%', barX, breakY); breakY += 16;
+    }
+    if (flankCheck.checked) {
+      ctx.fillStyle = '#81c784';
+      ctx.fillText('Flank:     +' + FLANK_BONUS + '%', barX, breakY); breakY += 16;
+    }
+
+    // Result flash
+    if (resultTimer > 0 && result) {
+      ctx.font = 'bold 40px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = result === 'HIT' ? '#4caf50' : '#f44336';
+      ctx.globalAlpha = Math.min(1, resultTimer);
+      ctx.fillText(result + '!', canvas.width / 2, floorY - 80);
+      ctx.globalAlpha = 1;
+    }
+
+    // Shot history
+    ctx.textAlign = 'left';
+    ctx.font = '10px monospace';
+    ctx.fillStyle = '#888';
+    ctx.fillText('Shot History:', canvas.width - 200, 25);
+    shots.forEach((s, i) => {
+      ctx.fillStyle = s.result === 'HIT' ? '#4caf50' : '#f44336';
+      ctx.fillText(s.chance + '% -> ' + s.result + ' (roll: ' + s.roll + ')', canvas.width - 200, 42 + i * 15);
+    });
+
+    ctx.textAlign = 'left';
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+</script>

@@ -1,0 +1,804 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 35: Party Game">
+  <div class="container page-content">
+    <div class="module-header">
+      <div class="module-number">Module 35</div>
+      <h1>Party Game</h1>
+      <p class="module-theme">Build a game that turns a room full of people into a room full of rivals | The More the Merrier</p>
+    </div>
+
+    <blockquote>
+      "A great party game makes strangers into friends and friends into enemies &mdash; temporarily."
+    </blockquote>
+
+    <hr />
+
+    <h2>Prerequisites</h2>
+    <table>
+      <thead>
+        <tr><th>Module</th><th>What You Used From It</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Module 01 - Pong</td><td>A working game loop and basic input handling. Party games extend this to multiple simultaneous players and rapid game-switching.</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h2>Week 1: History &amp; Design Theory</h2>
+
+    <h3>The Origin</h3>
+    <p>The party game genre was born from a simple observation: the best moments in gaming happen when people are in the same room laughing at each other. In 1998, Nintendo released <strong>Mario Party</strong> for the N64, packaging dozens of simple mini-games inside a board game wrapper. The individual games were trivial &mdash; mash a button, steer a character, time a jump &mdash; but the social layer transformed them. Winning a mini-game was not about mastery; it was about the look on your friend's face when you stole their star. Mario Party proved that games did not need deep mechanics to create deep experiences. They needed an audience, shared stakes, and low enough barriers that anyone could pick up a controller and compete within seconds.</p>
+
+    <h3>How the Genre Evolved</h3>
+    <p><strong>Mario Party (Nintendo, 1998)</strong> &mdash; Established the template: a meta-game (board game) that hosts a rotating selection of mini-games. Mario Party's genius was the variety. No single mini-game lasted more than 60 seconds, so even losing felt temporary. The board game layer added strategy and drama between rounds. Crucially, it proved that asymmetric skill &mdash; where one player is great at action games but terrible at memory games &mdash; kept the playing field level and the competition social.</p>
+
+    <p><strong>Jackbox Party Pack (Jackbox Games, 2014)</strong> &mdash; Revolutionized input by letting players use their phones as controllers. This removed the hardware barrier entirely: no extra controllers, no split-screen squinting, and support for up to 8 or more players. Jackbox also shifted the genre toward creativity and humor (drawing games, joke games, bluffing games) rather than reflexes, broadening the audience far beyond traditional gamers. The "audience" feature let spectators participate, blurring the line between player and viewer.</p>
+
+    <p><strong>Among Us (InnerSloth, 2018/2020)</strong> &mdash; While technically a social deduction game, Among Us functioned as a party game phenomenon. It demonstrated that party games could work over the internet, not just in living rooms. Its simple art style, minimal mechanics, and emphasis on voice chat conversation showed that the social interaction was the game. Among Us proved the genre could scale to global audiences and that streamers and viewers could share the party game experience remotely.</p>
+
+    <h3>What Makes It "Great"</h3>
+    <p>A great party game is one where the worst player in the room is still having the best time. Rules must be learnable in seconds &mdash; if you need to explain for more than 30 seconds, the game has already failed. The skill ceiling should be low enough that newcomers can win, but high enough that experienced players can show off. Rounds must be short so that losing stings for only a moment before the next chance arrives. And the game must create stories: the time someone won by accident, the impossible comeback, the betrayal in round five. These stories &mdash; not scores &mdash; are what make people want to play again. The framework matters more than any individual mini-game because it provides the structure that turns chaos into memorable moments.</p>
+
+    <h3>The Essential Mechanic</h3>
+    <p>Variety and social interaction &mdash; the framework that hosts many simple games is the game.</p>
+
+    <hr />
+
+    <h2>Week 2: Build the MVP</h2>
+
+    <h3>What You're Building</h3>
+    <p>A party game shell that supports 2-4 players on a shared screen, with a lobby system for joining, a rotation of 3 mini-games, cumulative scoring across rounds, and a results screen. Each mini-game has distinct rules and mechanics, but they share a common input system and scoring interface.</p>
+
+    <h3>Core Concepts</h3>
+
+    <h4>1. Mini-game Framework</h4>
+    <p>The framework is the real product. It manages game state, loads and unloads mini-games, passes player data between them, and handles the lifecycle (intro, play, results) for each round.</p>
+    <pre is:raw><code>// Mini-game interface that all games must implement
+interface MiniGame:
+    function getName() -> string
+    function getRules() -> string
+    function getMaxDuration() -> seconds
+    function initialize(players[]) -> void
+    function update(deltaTime, inputs[]) -> void
+    function render(screen) -> void
+    function isFinished() -> boolean
+    function getResults() -> PlayerResult[]
+    function cleanup() -> void
+
+// Framework game loop
+class PartyGameFramework:
+    miniGames = [ButtonMashGame, DodgeGame, CollectGame]
+    currentRound = 0
+    cumulativeScores = {}
+
+    function startRound():
+        game = selectNextMiniGame()
+        showRulesScreen(game.getName(), game.getRules(), duration: 3 seconds)
+        game.initialize(players)
+        runGameLoop(game)
+        results = game.getResults()
+        updateCumulativeScores(results)
+        game.cleanup()
+        showRoundResults(results, cumulativeScores)</code></pre>
+    <p><strong>Why it matters:</strong> Without a clean framework, adding a new mini-game means duplicating scoring logic, input handling, and transition code every time. The framework is what makes a party game scalable &mdash; you can ship with 3 mini-games and grow to 30 without rewriting the shell.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Mini-game Framework</div>
+      <p class="demo-hint">Three tiny mini-games cycle automatically: a reaction-time test (click when the screen turns green), a collection game (grab falling coins), and an avoidance game (dodge moving obstacles). Each runs for 10 seconds, then scores display before the next game begins.</p>
+      <canvas id="demo-minigames" width="760" height="420"></canvas>
+      <div class="demo-controls">
+        <button id="mg-start-btn">Start Games</button>
+        <button id="mg-restart-btn">Restart</button>
+        <span class="value-display" id="mg-status">Click Start to begin!</span>
+      </div>
+    </div>
+
+    <h4>2. Multi-player Input Handling</h4>
+    <p>Multiple players need distinct inputs on the same device. This means splitting the keyboard into zones, supporting multiple controllers, or using networked devices (phones) as controllers.</p>
+    <pre is:raw><code>// Input mapping for shared keyboard
+INPUT_MAPS:
+    player1: { left: "A", right: "D", up: "W", down: "S", action: "Space" }
+    player2: { left: "ArrowLeft", right: "ArrowRight", up: "ArrowUp",
+               down: "ArrowDown", action: "Enter" }
+    player3: { left: "J", right: "L", up: "I", down: "K", action: "H" }
+    player4: { left: "Numpad4", right: "Numpad6", up: "Numpad8",
+               down: "Numpad2", action: "Numpad0" }
+
+// Abstract input system
+class InputManager:
+    function getPlayerInput(playerId) -> PlayerInput:
+        mapping = INPUT_MAPS[playerId]
+        return PlayerInput(
+            horizontal: isKeyDown(mapping.right) - isKeyDown(mapping.left),
+            vertical:   isKeyDown(mapping.up) - isKeyDown(mapping.down),
+            action:     isKeyPressed(mapping.action)
+        )</code></pre>
+    <p><strong>Why it matters:</strong> If two players press keys at the same time and the game only registers one, the experience breaks. Input handling must be simultaneous, responsive, and clearly mapped so players know which keys are theirs without confusion.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Multiplayer Input</div>
+      <p class="demo-hint">Four "player zones" on screen. P1: WASD, P2: IJKL, P3: Arrow keys, P4: Numpad 8456. Each zone has a colored dot that moves with those keys. Demonstrates handling multiple simultaneous inputs on a single keyboard.</p>
+      <canvas id="demo-multiinput" width="760" height="420"></canvas>
+      <div class="demo-controls">
+        <span class="value-display">P1: WASD (Red) | P2: IJKL (Blue) | P3: Arrows (Green) | P4: Numpad 8456 (Yellow)</span>
+      </div>
+    </div>
+
+    <h4>3. Shared-Screen Multiplayer</h4>
+    <p>All players see the same screen. The camera or view must accommodate everyone, whether they are in the same area or spread across the play field.</p>
+    <pre is:raw><code>// Option A: Single camera that frames all players
+function updateCamera(players[]):
+    minX = min(p.x for p in players) - PADDING
+    maxX = max(p.x for p in players) + PADDING
+    centerX = (minX + maxX) / 2
+    zoom = min(SCREEN_WIDTH / (maxX - minX), MAX_ZOOM)
+    camera.setPosition(centerX, centerY)
+    camera.setZoom(zoom)
+
+// Option B: Fixed arena (no camera movement needed)
+ARENA = Rectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)</code></pre>
+    <p><strong>Why it matters:</strong> Shared-screen is what makes a party game a party. Everyone sees the same thing at the same time, which means reactions are shared, trash talk is immediate, and spectators can follow along.</p>
+
+    <h4>4. Round / Turn Rotation</h4>
+    <p>The game cycles through mini-games, managing transitions between rounds. Each round has phases: rules display, countdown, gameplay, and results.</p>
+    <pre is:raw><code>// Round state machine
+ROUND_PHASES: RULES_DISPLAY -> COUNTDOWN -> PLAYING -> ROUND_OVER -> SCORES
+
+class RoundManager:
+    phase = RULES_DISPLAY
+    timer = 0
+
+    function update(deltaTime):
+        timer -= deltaTime
+        switch phase:
+            case RULES_DISPLAY:
+                showRulesOverlay(currentGame.getRules())
+                if timer <= 0: phase = COUNTDOWN
+            case COUNTDOWN:
+                showCountdown(ceil(timer))
+                if timer <= 0: phase = PLAYING
+            case PLAYING:
+                currentGame.update(deltaTime, inputs)
+                if timer <= 0 OR currentGame.isFinished():
+                    phase = ROUND_OVER
+            case ROUND_OVER:
+                showRoundResults(results)
+                if timer <= 0: phase = SCORES</code></pre>
+    <p><strong>Why it matters:</strong> Pacing is everything in a party game. The countdown builds anticipation. The rules screen prevents confusion. The results screen creates celebration (or groaning). Without managed transitions, the game feels like a janky playlist instead of a curated experience.</p>
+
+    <h4>5. Lobby / Player Join System</h4>
+    <p>Before the game starts, players must be able to join, choose a color or avatar, and signal they are ready.</p>
+    <pre is:raw><code>class Lobby:
+    players = []
+    MAX_PLAYERS = 4
+    MIN_PLAYERS = 2
+
+    function update(inputs):
+        for each mapping in INPUT_MAPS:
+            if isKeyPressed(mapping.action) AND mapping.playerId NOT in players:
+                newPlayer = Player(id: mapping.playerId, color: assignNextColor())
+                players.add(newPlayer)
+        if players.length >= MIN_PLAYERS AND allPlayersReady(players):
+            startCountdown()</code></pre>
+    <p><strong>Why it matters:</strong> The lobby is the first impression. A confusing join process kills the energy before the game even starts. It must be instant, visual, and foolproof &mdash; press a button, see yourself appear on screen, press again to ready up.</p>
+
+    <h4>6. Scoring / Ranking Across Rounds</h4>
+    <p>Cumulative scoring tracks performance across all mini-games and determines the overall winner.</p>
+    <pre is:raw><code>class ScoringSystem:
+    cumulativeScores = { playerId: 0 for each player }
+    PLACEMENT_POINTS = [10, 6, 3, 1]  // 1st, 2nd, 3rd, 4th
+
+    function scoreRound(results):
+        sortedResults = sortByScore(results, descending)
+        for i, result in enumerate(sortedResults):
+            cumulativeScores[result.playerId] += PLACEMENT_POINTS[i]</code></pre>
+    <p><strong>Why it matters:</strong> If the winner is obvious by round 3 of 7, the remaining players check out. Good scoring systems keep everyone in contention. Placement-based points compress the gap.</p>
+
+    <h4>7. Accessibility of Rules</h4>
+    <p>Rules must be learned in seconds, not minutes. Visual tutorials, animated demonstrations, and one-sentence descriptions replace text-heavy instruction screens.</p>
+    <pre is:raw><code>function showMiniGameRules(game):
+    drawCenteredText(game.getRules())
+    // e.g., "Collect the most coins!" or "Last one standing wins!"
+    playRuleAnimation(game.getRuleAnimation())
+    drawInputHint(game.getControls())</code></pre>
+    <p><strong>Why it matters:</strong> The defining constraint of party games is that a new player must understand what to do immediately. Every second spent explaining rules is a second of lost momentum. A great party game teaches through play, not through reading.</p>
+
+    <hr />
+
+    <h3>Stretch Goals</h3>
+    <ol>
+      <li>Add a 4th and 5th mini-game to the rotation.</li>
+      <li>Implement phone-as-controller input using a local web server and WebSockets.</li>
+      <li>Add character/avatar selection in the lobby.</li>
+      <li>Create a "board game" meta-layer between mini-game rounds.</li>
+      <li>Add an audience mode where spectators can vote to influence mini-games.</li>
+      <li>Implement replay/highlight clips after dramatic round endings.</li>
+    </ol>
+
+    <h3>MVP Spec</h3>
+    <table>
+      <thead>
+        <tr><th>Element</th><th>Scope</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Players</td><td>2-4 players on shared keyboard (or controllers)</td></tr>
+        <tr><td>Lobby</td><td>Join screen with press-to-join, color assignment, ready-up</td></tr>
+        <tr><td>Mini-games</td><td>3 distinct mini-games: one reflex-based, one collection-based, one avoidance-based</td></tr>
+        <tr><td>Round structure</td><td>Rules display (3s) -> Countdown (3s) -> Gameplay (15-30s) -> Results (5s)</td></tr>
+        <tr><td>Scoring</td><td>Placement-based points per round, cumulative leaderboard, final results screen</td></tr>
+        <tr><td>Game length</td><td>5-7 rounds total, rotating through the mini-game pool</td></tr>
+        <tr><td>Visual clarity</td><td>Distinct player colors, large text readable from couch distance, animated transitions</td></tr>
+        <tr><td>Input</td><td>Abstract input system supporting keyboard zones</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliverable</h3>
+    <p>A playable party game framework with a lobby where 2-4 players join via shared keyboard, a rotation of 3 mini-games with distinct mechanics, smooth transitions between rounds with rule displays and countdowns, cumulative scoring across all rounds, and a final results screen showing the winner. A playtester who has never seen the game should be able to join and play a mini-game without verbal instruction.</p>
+
+    <hr />
+
+    <h2>Analogies by Background</h2>
+
+    <blockquote>
+      <p>These analogies map game dev concepts to patterns you already know. Find your background below.</p>
+    </blockquote>
+
+    <h3>For Backend Developers</h3>
+    <table>
+      <thead>
+        <tr><th>Concept</th><th>Analogy</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Mini-game framework</td><td>Like a plugin architecture or middleware pipeline &mdash; the shell defines the lifecycle, and each mini-game is a plugin that conforms to a contract</td></tr>
+        <tr><td>Multi-player input handling</td><td>Like handling concurrent requests from multiple clients &mdash; each player is an independent input stream that must be processed simultaneously</td></tr>
+        <tr><td>Shared-screen multiplayer</td><td>Like a shared database dashboard &mdash; all clients see the same real-time state</td></tr>
+        <tr><td>Round / turn rotation</td><td>Like a job scheduler rotating through a task queue &mdash; each round is a job with defined phases</td></tr>
+        <tr><td>Lobby / player join system</td><td>Like service discovery and health checks &mdash; nodes register themselves, signal readiness, and the system waits for quorum</td></tr>
+        <tr><td>Scoring / ranking</td><td>Like aggregation queries across multiple tables &mdash; accumulating metrics from independent events</td></tr>
+        <tr><td>Accessibility of rules</td><td>Like writing API documentation with clear examples &mdash; if the consumer cannot understand the interface in seconds, adoption fails</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Frontend Developers</h3>
+    <table>
+      <thead>
+        <tr><th>Concept</th><th>Analogy</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Mini-game framework</td><td>Like a component library with a consistent API &mdash; each mini-game is a component with props, lifecycle hooks, and render methods</td></tr>
+        <tr><td>Multi-player input handling</td><td>Like handling multiple touch points simultaneously on a multi-touch screen</td></tr>
+        <tr><td>Shared-screen multiplayer</td><td>Like responsive design for a dashboard that must display all widgets at once without scroll</td></tr>
+        <tr><td>Round / turn rotation</td><td>Like a multi-step wizard or onboarding flow with transitions and progress indicators</td></tr>
+        <tr><td>Lobby / player join system</td><td>Like a real-time collaborative editing lobby &mdash; users appear as they connect and signal ready</td></tr>
+        <tr><td>Scoring / ranking</td><td>Like a real-time analytics dashboard with cumulative charts</td></tr>
+        <tr><td>Accessibility of rules</td><td>Like UX writing and microcopy &mdash; the interface must communicate its purpose instantly through visual hierarchy</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Data / ML Engineers</h3>
+    <table>
+      <thead>
+        <tr><th>Concept</th><th>Analogy</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Mini-game framework</td><td>Like an ML experiment framework (MLflow, W&B) &mdash; each experiment follows a protocol but has unique parameters</td></tr>
+        <tr><td>Multi-player input handling</td><td>Like processing multiple data streams in parallel &mdash; each stream has its own schema but feeds into a shared pipeline</td></tr>
+        <tr><td>Shared-screen multiplayer</td><td>Like a shared monitoring dashboard for a cluster &mdash; all nodes are visible</td></tr>
+        <tr><td>Round / turn rotation</td><td>Like cross-validation folds &mdash; each round is an independent evaluation aggregated into an overall score</td></tr>
+        <tr><td>Lobby / player join system</td><td>Like distributed worker registration in a compute cluster</td></tr>
+        <tr><td>Scoring / ranking</td><td>Like model leaderboard scoring across multiple benchmarks</td></tr>
+        <tr><td>Accessibility of rules</td><td>Like writing clear docstrings &mdash; purpose, inputs, and outputs should be obvious from a glance</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li><strong>The "Mario Kart problem":</strong> Party games often include catch-up mechanics (blue shells, rubber-banding) that help trailing players stay competitive. This makes the game more fun for groups but less rewarding for skilled players. How do you balance competitive integrity with social fun? Should the best player always win?</li>
+      <li><strong>Designing for the non-gamer:</strong> Your player base includes people who rarely play games. How does this constraint shape input design, rule communication, and game duration?</li>
+      <li><strong>The framework vs. the content:</strong> Is the value of a party game in the framework (lobby, scoring, transitions) or in the individual mini-games? Could a polished framework with 3 mediocre mini-games be more fun than a rough framework with 10 excellent ones?</li>
+      <li><strong>Remote party games:</strong> Among Us and Jackbox proved party games can work online, but something is lost without the shared physical space. What specific design changes would you make to preserve the "party" feel when players are on a video call instead of a couch?</li>
+    </ol>
+
+    <nav class="module-nav">
+      <a href={`${base}modules/34-idle-incremental/`}>&larr; Module 34: Idle / Incremental</a>
+      <a href={`${base}modules/36-trivia/`}>Module 36: Trivia &rarr;</a>
+    </nav>
+  </div>
+</BaseLayout>
+
+<script>
+// ============================================================
+// DEMO 1: Mini-game Framework
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-minigames');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const GAME_DURATION = 10;
+  const RESULTS_DURATION = 3;
+  const COUNTDOWN_DURATION = 3;
+
+  let phase = 'idle'; // idle, countdown, playing, results, final
+  let currentGameIdx = -1;
+  let timer = 0;
+  let score = 0;
+  let totalScores = [0, 0, 0];
+  let gameNames = ['Reaction Test', 'Coin Collect', 'Dodge!'];
+  let gameDescs = ['Click when GREEN!', 'Click falling coins!', 'Avoid the red balls!'];
+
+  // Game 1: Reaction test
+  let reactionState = 'waiting'; // waiting, ready, go, done
+  let reactionTimer = 0;
+  let reactionResults = [];
+
+  // Game 2: Coin collect
+  let coins = [];
+  let coinScore = 0;
+  let coinSpawnTimer = 0;
+
+  // Game 3: Dodge
+  let dodgePlayer = { x: W / 2, y: H / 2 };
+  let obstacles = [];
+  let dodgeScore = 0;
+  let dodgeAlive = true;
+  let obstacleSpawnTimer = 0;
+
+  function initGame(idx) {
+    score = 0;
+    if (idx === 0) {
+      reactionState = 'waiting';
+      reactionTimer = 1 + Math.random() * 3;
+      reactionResults = [];
+    } else if (idx === 1) {
+      coins = [];
+      coinScore = 0;
+      coinSpawnTimer = 0;
+    } else if (idx === 2) {
+      dodgePlayer = { x: W / 2, y: H - 60 };
+      obstacles = [];
+      dodgeScore = 0;
+      dodgeAlive = true;
+      obstacleSpawnTimer = 0;
+    }
+  }
+
+  canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) * (W / rect.width);
+    const my = (e.clientY - rect.top) * (H / rect.height);
+
+    if (phase === 'playing' && currentGameIdx === 0) {
+      if (reactionState === 'go') {
+        reactionResults.push(reactionTimer * 1000);
+        reactionState = 'waiting';
+        reactionTimer = 1 + Math.random() * 2;
+        score++;
+      } else if (reactionState === 'waiting') {
+        // Too early
+      }
+    } else if (phase === 'playing' && currentGameIdx === 1) {
+      for (let i = coins.length - 1; i >= 0; i--) {
+        const c = coins[i];
+        const dx = mx - c.x, dy = my - c.y;
+        if (dx * dx + dy * dy < 400) {
+          coins.splice(i, 1);
+          coinScore++;
+          score = coinScore;
+          break;
+        }
+      }
+    }
+  });
+
+  // Mouse tracking for dodge game
+  let mouseX = W / 2, mouseY = H - 60;
+  canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    mouseX = (e.clientX - rect.left) * (W / rect.width);
+    mouseY = (e.clientY - rect.top) * (H / rect.height);
+  });
+
+  document.getElementById('mg-start-btn').addEventListener('click', () => {
+    if (phase === 'idle' || phase === 'final') {
+      totalScores = [0, 0, 0];
+      currentGameIdx = 0;
+      phase = 'countdown';
+      timer = COUNTDOWN_DURATION;
+      initGame(0);
+    }
+  });
+
+  document.getElementById('mg-restart-btn').addEventListener('click', () => {
+    phase = 'idle';
+    currentGameIdx = -1;
+    totalScores = [0, 0, 0];
+  });
+
+  let lastTime = performance.now();
+  function update(now) {
+    const dt = (now - lastTime) / 1000;
+    lastTime = now;
+
+    if (phase === 'countdown') {
+      timer -= dt;
+      if (timer <= 0) {
+        phase = 'playing';
+        timer = GAME_DURATION;
+      }
+    } else if (phase === 'playing') {
+      timer -= dt;
+      updateGame(currentGameIdx, dt);
+      if (timer <= 0) {
+        totalScores[currentGameIdx] = score;
+        phase = 'results';
+        timer = RESULTS_DURATION;
+      }
+    } else if (phase === 'results') {
+      timer -= dt;
+      if (timer <= 0) {
+        currentGameIdx++;
+        if (currentGameIdx >= 3) {
+          phase = 'final';
+        } else {
+          phase = 'countdown';
+          timer = COUNTDOWN_DURATION;
+          initGame(currentGameIdx);
+        }
+      }
+    }
+
+    const statusEl = document.getElementById('mg-status');
+    if (phase === 'idle') statusEl.textContent = 'Click Start to begin!';
+    else if (phase === 'countdown') statusEl.textContent = 'Next: ' + gameNames[currentGameIdx] + ' in ' + Math.ceil(timer) + '...';
+    else if (phase === 'playing') statusEl.textContent = gameNames[currentGameIdx] + ' | Score: ' + score + ' | Time: ' + timer.toFixed(1) + 's';
+    else if (phase === 'results') statusEl.textContent = gameNames[currentGameIdx] + ' complete! Score: ' + totalScores[currentGameIdx];
+    else if (phase === 'final') statusEl.textContent = 'All games done! Total: ' + totalScores.reduce((a, b) => a + b, 0);
+
+    draw(dt);
+    requestAnimationFrame(update);
+  }
+
+  function updateGame(idx, dt) {
+    if (idx === 0) {
+      // Reaction test
+      if (reactionState === 'waiting') {
+        reactionTimer -= dt;
+        if (reactionTimer <= 0) {
+          reactionState = 'go';
+          reactionTimer = 0;
+        }
+      } else if (reactionState === 'go') {
+        reactionTimer += dt;
+        if (reactionTimer > 2) {
+          reactionState = 'waiting';
+          reactionTimer = 1 + Math.random() * 2;
+        }
+      }
+    } else if (idx === 1) {
+      // Coin collect
+      coinSpawnTimer -= dt;
+      if (coinSpawnTimer <= 0) {
+        coins.push({ x: 40 + Math.random() * (W - 80), y: -20, vy: 80 + Math.random() * 60 });
+        coinSpawnTimer = 0.4 + Math.random() * 0.3;
+      }
+      for (let i = coins.length - 1; i >= 0; i--) {
+        coins[i].y += coins[i].vy * dt;
+        if (coins[i].y > H + 20) coins.splice(i, 1);
+      }
+    } else if (idx === 2) {
+      // Dodge
+      if (!dodgeAlive) return;
+      dodgePlayer.x += (mouseX - dodgePlayer.x) * 8 * dt;
+      dodgePlayer.y += (mouseY - dodgePlayer.y) * 8 * dt;
+      dodgePlayer.x = Math.max(15, Math.min(W - 15, dodgePlayer.x));
+      dodgePlayer.y = Math.max(15, Math.min(H - 15, dodgePlayer.y));
+
+      dodgeScore += dt * 10;
+      score = Math.floor(dodgeScore);
+
+      obstacleSpawnTimer -= dt;
+      if (obstacleSpawnTimer <= 0) {
+        const side = Math.random();
+        if (side < 0.5) {
+          obstacles.push({ x: -20, y: 50 + Math.random() * (H - 100), vx: 100 + Math.random() * 150, vy: (Math.random() - 0.5) * 100, r: 10 + Math.random() * 8 });
+        } else {
+          obstacles.push({ x: W + 20, y: 50 + Math.random() * (H - 100), vx: -(100 + Math.random() * 150), vy: (Math.random() - 0.5) * 100, r: 10 + Math.random() * 8 });
+        }
+        obstacleSpawnTimer = 0.3 + Math.random() * 0.4;
+      }
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        const o = obstacles[i];
+        o.x += o.vx * dt;
+        o.y += o.vy * dt;
+        if (o.y < 0 || o.y > H) o.vy *= -1;
+        if (o.x < -50 || o.x > W + 50) { obstacles.splice(i, 1); continue; }
+        const dx = dodgePlayer.x - o.x, dy = dodgePlayer.y - o.y;
+        if (Math.sqrt(dx * dx + dy * dy) < o.r + 12) {
+          dodgeAlive = false;
+        }
+      }
+    }
+  }
+
+  function draw() {
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, W, H);
+
+    if (phase === 'idle') {
+      ctx.fillStyle = '#e0e0e0';
+      ctx.font = 'bold 28px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Mini-Game Framework Demo', W / 2, H / 2 - 40);
+      ctx.font = '16px Inter, sans-serif';
+      ctx.fillStyle = '#888888';
+      ctx.fillText('3 mini-games will cycle: Reaction, Collection, Avoidance', W / 2, H / 2);
+      ctx.fillText('Click "Start Games" to begin!', W / 2, H / 2 + 30);
+    } else if (phase === 'countdown') {
+      ctx.fillStyle = '#ffd93d';
+      ctx.font = 'bold 48px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(gameNames[currentGameIdx], W / 2, H / 2 - 50);
+      ctx.font = '20px Inter, sans-serif';
+      ctx.fillStyle = '#cccccc';
+      ctx.fillText(gameDescs[currentGameIdx], W / 2, H / 2);
+      ctx.font = 'bold 72px Inter, sans-serif';
+      ctx.fillStyle = '#ff6b6b';
+      ctx.fillText(Math.ceil(timer).toString(), W / 2, H / 2 + 80);
+    } else if (phase === 'playing') {
+      drawGame(currentGameIdx);
+      // Timer bar
+      ctx.fillStyle = '#333355';
+      ctx.fillRect(0, 0, W, 6);
+      ctx.fillStyle = timer > 3 ? '#6bcb77' : '#ff6b6b';
+      ctx.fillRect(0, 0, (timer / GAME_DURATION) * W, 6);
+    } else if (phase === 'results') {
+      ctx.fillStyle = '#e0e0e0';
+      ctx.font = 'bold 32px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(gameNames[currentGameIdx] + ' - Results', W / 2, H / 2 - 40);
+      ctx.font = 'bold 48px Inter, sans-serif';
+      ctx.fillStyle = '#ffd93d';
+      ctx.fillText('Score: ' + totalScores[currentGameIdx], W / 2, H / 2 + 20);
+    } else if (phase === 'final') {
+      ctx.fillStyle = '#e0e0e0';
+      ctx.font = 'bold 32px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Final Results', W / 2, 80);
+      const colors = ['#ff6b6b', '#ffd93d', '#6bcb77'];
+      for (let i = 0; i < 3; i++) {
+        const y = 140 + i * 60;
+        ctx.fillStyle = colors[i];
+        ctx.font = 'bold 20px Inter, sans-serif';
+        ctx.fillText(gameNames[i] + ': ' + totalScores[i], W / 2, y);
+      }
+      ctx.fillStyle = '#4ecdc4';
+      ctx.font = 'bold 36px Inter, sans-serif';
+      ctx.fillText('Total: ' + totalScores.reduce((a, b) => a + b, 0), W / 2, 340);
+    }
+  }
+
+  function drawGame(idx) {
+    if (idx === 0) {
+      // Reaction test
+      if (reactionState === 'go') {
+        ctx.fillStyle = '#2ecc71';
+        ctx.fillRect(20, 20, W - 40, H - 40);
+        ctx.fillStyle = '#1a1a2e';
+        ctx.font = 'bold 36px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('CLICK NOW!', W / 2, H / 2);
+      } else {
+        ctx.fillStyle = '#c0392b';
+        ctx.fillRect(20, 20, W - 40, H - 40);
+        ctx.fillStyle = '#e0e0e0';
+        ctx.font = 'bold 28px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Wait for GREEN...', W / 2, H / 2);
+      }
+      ctx.fillStyle = '#e0e0e0';
+      ctx.font = '16px Inter, sans-serif';
+      ctx.fillText('Successful clicks: ' + score, W / 2, H - 20);
+      if (reactionResults.length > 0) {
+        ctx.font = '14px Inter, sans-serif';
+        ctx.fillStyle = '#aaaaaa';
+        ctx.fillText('Last reaction: ' + reactionResults[reactionResults.length - 1].toFixed(0) + 'ms', W / 2, H - 40);
+      }
+    } else if (idx === 1) {
+      // Coin collect
+      ctx.fillStyle = '#ffd93d';
+      for (const c of coins) {
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, 15, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#1a1a2e';
+        ctx.font = 'bold 14px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('$', c.x, c.y + 5);
+        ctx.fillStyle = '#ffd93d';
+      }
+      ctx.fillStyle = '#e0e0e0';
+      ctx.font = 'bold 20px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Coins: ' + coinScore, W / 2, 30);
+      ctx.font = '14px Inter, sans-serif';
+      ctx.fillStyle = '#888888';
+      ctx.fillText('Click the falling coins!', W / 2, H - 15);
+    } else if (idx === 2) {
+      // Dodge
+      for (const o of obstacles) {
+        ctx.fillStyle = '#ff4444';
+        ctx.beginPath();
+        ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      if (dodgeAlive) {
+        ctx.fillStyle = '#4ecdc4';
+        ctx.beginPath();
+        ctx.arc(dodgePlayer.x, dodgePlayer.y, 12, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.fillStyle = '#666666';
+        ctx.font = 'bold 32px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Hit! Final score: ' + score, W / 2, H / 2);
+      }
+      ctx.fillStyle = '#e0e0e0';
+      ctx.font = 'bold 18px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Score: ' + score, W / 2, 30);
+      ctx.font = '13px Inter, sans-serif';
+      ctx.fillStyle = '#888888';
+      ctx.fillText('Move mouse to dodge red balls!', W / 2, H - 15);
+    }
+  }
+
+  requestAnimationFrame(update);
+})();
+
+// ============================================================
+// DEMO 2: Multiplayer Input
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-multiinput');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const ZONE_W = W / 2, ZONE_H = H / 2;
+  const SPEED = 200;
+
+  const players = [
+    { x: ZONE_W / 2, y: ZONE_H / 2, color: '#ff6b6b', name: 'P1', keys: { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD' }, trail: [] },
+    { x: ZONE_W + ZONE_W / 2, y: ZONE_H / 2, color: '#4e9af5', name: 'P2', keys: { up: 'KeyI', down: 'KeyK', left: 'KeyJ', right: 'KeyL' }, trail: [] },
+    { x: ZONE_W / 2, y: ZONE_H + ZONE_H / 2, color: '#6bcb77', name: 'P3', keys: { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' }, trail: [] },
+    { x: ZONE_W + ZONE_W / 2, y: ZONE_H + ZONE_H / 2, color: '#ffd93d', name: 'P4', keys: { up: 'Numpad8', down: 'Numpad5', left: 'Numpad4', right: 'Numpad6' }, trail: [] }
+  ];
+
+  const zones = [
+    { x: 0, y: 0, w: ZONE_W, h: ZONE_H },
+    { x: ZONE_W, y: 0, w: ZONE_W, h: ZONE_H },
+    { x: 0, y: ZONE_H, w: ZONE_W, h: ZONE_H },
+    { x: ZONE_W, y: ZONE_H, w: ZONE_W, h: ZONE_H }
+  ];
+
+  const keysDown = new Set();
+  document.addEventListener('keydown', (e) => {
+    keysDown.add(e.code);
+    e.preventDefault();
+  });
+  document.addEventListener('keyup', (e) => {
+    keysDown.delete(e.code);
+  });
+
+  let lastTime = performance.now();
+  function update(now) {
+    const dt = (now - lastTime) / 1000;
+    lastTime = now;
+
+    for (let i = 0; i < players.length; i++) {
+      const p = players[i];
+      const z = zones[i];
+      let dx = 0, dy = 0;
+      if (keysDown.has(p.keys.up)) dy -= 1;
+      if (keysDown.has(p.keys.down)) dy += 1;
+      if (keysDown.has(p.keys.left)) dx -= 1;
+      if (keysDown.has(p.keys.right)) dx += 1;
+
+      if (dx !== 0 || dy !== 0) {
+        const len = Math.sqrt(dx * dx + dy * dy);
+        dx /= len; dy /= len;
+      }
+
+      p.x += dx * SPEED * dt;
+      p.y += dy * SPEED * dt;
+
+      // Clamp within zone
+      p.x = Math.max(z.x + 15, Math.min(z.x + z.w - 15, p.x));
+      p.y = Math.max(z.y + 15, Math.min(z.y + z.h - 15, p.y));
+
+      // Trail
+      p.trail.push({ x: p.x, y: p.y });
+      if (p.trail.length > 30) p.trail.shift();
+    }
+
+    draw();
+    requestAnimationFrame(update);
+  }
+
+  function draw() {
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, W, H);
+
+    // Draw zones
+    for (let i = 0; i < zones.length; i++) {
+      const z = zones[i];
+      ctx.strokeStyle = players[i].color + '44';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(z.x + 2, z.y + 2, z.w - 4, z.h - 4);
+
+      // Zone label
+      ctx.fillStyle = players[i].color + '66';
+      ctx.font = 'bold 14px Inter, sans-serif';
+      ctx.textAlign = 'left';
+      const keyLabels = {
+        0: 'WASD',
+        1: 'IJKL',
+        2: 'Arrows',
+        3: 'Numpad'
+      };
+      ctx.fillText(players[i].name + ' (' + keyLabels[i] + ')', z.x + 10, z.y + 22);
+    }
+
+    // Divider lines
+    ctx.strokeStyle = '#333355';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(ZONE_W, 0);
+    ctx.lineTo(ZONE_W, H);
+    ctx.moveTo(0, ZONE_H);
+    ctx.lineTo(W, ZONE_H);
+    ctx.stroke();
+
+    // Draw players
+    for (const p of players) {
+      // Trail
+      for (let i = 0; i < p.trail.length; i++) {
+        const alpha = (i / p.trail.length) * 0.3;
+        ctx.fillStyle = p.color + Math.floor(alpha * 255).toString(16).padStart(2, '0');
+        const r = 4 + (i / p.trail.length) * 6;
+        ctx.beginPath();
+        ctx.arc(p.trail[i].x, p.trail[i].y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Player dot
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 12, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#1a1a2e';
+      ctx.font = 'bold 10px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(p.name, p.x, p.y + 4);
+    }
+
+    // Active keys display
+    ctx.fillStyle = '#555577';
+    ctx.font = '11px JetBrains Mono, monospace';
+    ctx.textAlign = 'center';
+    const activeKeys = Array.from(keysDown).join(', ');
+    ctx.fillText('Active keys: ' + (activeKeys || 'none'), W / 2, H - 8);
+  }
+
+  requestAnimationFrame(update);
+})();
+</script>

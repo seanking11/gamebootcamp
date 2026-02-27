@@ -1,0 +1,772 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 11: First-Person Game (FPS)">
+  <div class="container page-content">
+    <div class="module-header">
+      <div class="module-number">Module 11</div>
+      <h1>First-Person Game (FPS)</h1>
+      <p class="module-theme">Weeks 21-22 | The leap into 3D &mdash; where the camera becomes the player.</p>
+    </div>
+
+    <blockquote>
+      <p>"You don't control a character in an FPS. You ARE the character. The camera isn't showing you the world &mdash; it is your eyes."</p>
+    </blockquote>
+
+    <hr />
+
+    <h2>Prerequisites</h2>
+    <table>
+      <thead><tr><th>Module</th><th>What You Used From It</th></tr></thead>
+      <tbody>
+        <tr><td>Module 01 - Pong</td><td>Game loop, input handling, collision detection fundamentals</td></tr>
+        <tr><td>Module 03 - Top-Down Shooter</td><td>Vector math, projectile systems, enemy spawning, aiming mechanics</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h2>Week 1: History &amp; Design Theory</h2>
+
+    <h3>The Origin</h3>
+    <p>John Carmack's <strong>Wolfenstein 3D</strong> (id Software, 1992) made 3D real-time gameplay possible on consumer hardware through a raycasting trick: the game world was actually a 2D grid, but by casting rays from the player's position and calculating wall distances, it rendered a convincing first-person perspective. The walls were always the same height. There was no looking up or down. It was an illusion &mdash; and it was enough to create an entirely new genre.</p>
+
+    <h3>How the Genre Evolved</h3>
+    <p><strong>Doom</strong> (id Software, 1993) shattered Wolfenstein's limitations. Variable-height floors and ceilings, ambient lighting, non-orthogonal walls, and a new rendering engine created spaces that felt genuinely three-dimensional. Just as importantly, the WAD file system let anyone create and share custom levels and mods. Doom did not just define the FPS &mdash; it created the modding community.</p>
+
+    <p><strong>Half-Life</strong> (Valve, 1998) asked: what if an FPS told a story without ever taking control away from the player? No cutscenes. No text crawls. Every narrative beat happened in real-time while you held the controls. Half-Life proved the first-person camera was not just a combat interface but a storytelling device.</p>
+
+    <p><strong>Halo: Combat Evolved</strong> (Bungie, 2001) solved the problem everyone said was unsolvable: FPS controls on a gamepad. The twin-stick layout combined with generous aim assist and the "30 seconds of fun" design philosophy made console FPS a mainstream genre.</p>
+
+    <p>Modern competitive FPS design (Overwatch, Valorant) layers character-ability systems and team composition strategy on top of the mechanical aiming skill that has been the genre's core since Wolfenstein.</p>
+
+    <h3>What Makes FPS Games Great</h3>
+    <p>The FPS is the most <em>embodied</em> genre in gaming. Because the camera is the player's eyes, every design decision &mdash; field of view, head bob, weapon sway, recoil &mdash; directly affects how the player physically feels. The genre's depth comes from the tension between precision and chaos. Aiming is a fine-motor skill, but the game is constantly disrupting your aim with movement, threats from multiple directions, and time pressure.</p>
+
+    <h3>The Essential Mechanic</h3>
+    <p><strong>Aiming and shooting in 3D space from a first-person perspective</strong> &mdash; the player IS the camera. Every shot is cast from the center of the player's view into the world, making the act of looking and the act of aiming the same thing.</p>
+
+    <hr />
+
+    <h2>Week 2: Build the MVP</h2>
+
+    <h3>What You're Building</h3>
+    <p>A first-person 3D environment where you can move, look around, and shoot at targets or enemies. This is a shooting gallery or simple arena &mdash; not a full campaign. The goal is to internalize 3D space, camera control, and raycasting for interaction.</p>
+
+    <h3>Core Concepts (Must Implement)</h3>
+
+    <h4>1. 3D Coordinate Systems and Transforms</h4>
+    <p>In 2D, you worked with (x, y). Now every object has a position (x, y, z), a rotation (pitch, yaw, roll), and a scale &mdash; collectively called a <strong>transform</strong>. Transforms are hierarchical: a gun attached to a hand inherits the hand's position and rotation.</p>
+
+    <pre is:raw><code>transform:
+  position = (x, y, z)
+  rotation = (pitch, yaw, roll)   // or a quaternion
+  scale    = (sx, sy, sz)
+
+// Child transforms are relative to their parent:
+gun.worldPosition = hand.worldPosition + hand.rotation * gun.localPosition</code></pre>
+
+    <p><strong>Why it matters:</strong> Every object in a 3D game exists as a transform. This is the atomic unit of 3D game development.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: 3D Coordinate System</div>
+      <p class="demo-hint">Drag on the canvas to rotate the 3D wireframe cube. Use the sliders to move the cube along X, Y, and Z axes. The axes are labeled and color-coded: Red=X, Green=Y, Blue=Z.</p>
+      <canvas id="demo-3d" width="760" height="420"></canvas>
+      <div class="demo-controls">
+        <label style="color:#ef4444;">X: <input type="range" id="slider-x" min="-100" max="100" value="0" style="width:120px"></label>
+        <label style="color:#22c55e;">Y: <input type="range" id="slider-y" min="-100" max="100" value="0" style="width:120px"></label>
+        <label style="color:#3b82f6;">Z: <input type="range" id="slider-z" min="-100" max="100" value="0" style="width:120px"></label>
+      </div>
+    </div>
+
+    <h4>2. First-Person Camera</h4>
+    <p>The camera is a perspective projection: objects farther away appear smaller, creating depth. The player controls pitch (looking up/down) and yaw (looking left/right) with the mouse. Pitch must be clamped to prevent the camera from flipping upside down.</p>
+
+    <pre is:raw><code>// Mouse-look each frame:
+yaw   += mouseX * sensitivity
+pitch += mouseY * sensitivity
+pitch  = clamp(pitch, -89, +89)  // prevent gimbal flip
+
+camera.rotation = quaternion_from_euler(pitch, yaw, 0)</code></pre>
+
+    <p>Field of view (FOV) has a dramatic effect on game feel: narrow FOV (60 degrees) feels zoomed-in and claustrophobic; wide FOV (100+ degrees) gives peripheral awareness but distorts edges. Most FPS games default to 80-90 degrees.</p>
+
+    <p><strong>Why it matters:</strong> The first-person camera IS the player's interface with the game. Understanding perspective projection explains why objects scale with distance and why FOV changes how the game feels.</p>
+
+    <h4>3. 3D Character Controller</h4>
+    <p>Movement must be relative to the camera's facing direction, not the world axes.</p>
+
+    <pre is:raw><code>// Get camera's forward and right vectors, flattened to ground plane:
+forward = camera.forward
+forward.y = 0
+forward = normalize(forward)
+
+right = camera.right
+right.y = 0
+right = normalize(right)
+
+moveDir = forward * inputVertical + right * inputHorizontal
+moveDir = normalize(moveDir) * moveSpeed
+player.position += moveDir * dt</code></pre>
+
+    <p><strong>Why it matters:</strong> Camera-relative movement is what makes 3D controls feel intuitive. If "forward" always meant world-north regardless of where the player was looking, the controls would feel broken.</p>
+
+    <h4>4. Raycasting for Shooting</h4>
+    <p>When the player fires, cast an invisible ray from the camera's center point straight forward into the scene. Check what the ray intersects first &mdash; that is what gets hit.</p>
+
+    <pre is:raw><code>// On fire input:
+ray.origin    = camera.position
+ray.direction = camera.forward
+
+hit = raycast(ray.origin, ray.direction, maxDistance)
+
+if hit:
+  if hit.object.hasComponent("Health"):
+    hit.object.takeDamage(weaponDamage)
+  spawn_impact_effect(hit.point, hit.normal)</code></pre>
+
+    <p><strong>Why it matters:</strong> Raycasting is the fundamental spatial query in 3D games. Beyond shooting, it is used for ground detection, line-of-sight checks, mouse picking, and AI perception.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Raycasting Demo</div>
+      <p class="demo-hint">Left side: top-down 2D map. Click to place or remove walls. Right side: simulated first-person raycast view (Wolfenstein-style). The view updates in real-time as walls change. Drag on the map to look around.</p>
+      <canvas id="demo-raycast" width="760" height="420"></canvas>
+    </div>
+
+    <h4>5. 3D Collision and Physics</h4>
+    <p>In 3D, colliders are volumes: boxes, spheres, or capsules. The player is typically a capsule. Gravity pulls downward each frame, and ground detection determines whether the player is grounded.</p>
+
+    <pre is:raw><code>// Gravity:
+velocity.y -= gravity * dt
+
+// Ground detection:
+groundHit = raycast(player.position, DOWN, playerHeight/2 + skinWidth)
+if groundHit:
+  isGrounded = true
+  velocity.y = max(velocity.y, 0)
+  player.position.y = groundHit.point.y + playerHeight/2
+
+player.position += velocity * dt</code></pre>
+
+    <p><strong>Why it matters:</strong> 3D collision is the same concept as 2D AABB from Module 1, extended by one dimension.</p>
+
+    <h4>6. Basic Lighting</h4>
+    <p>Place at least an ambient light and a directional light. Lighting transforms a flat-looking scene into one with depth, mood, and readability.</p>
+
+    <pre is:raw><code>ambientLight:
+  color = (0.2, 0.2, 0.3)
+  intensity = 0.3
+
+directionalLight:
+  direction = normalize(-1, -1, -0.5)
+  color = (1.0, 0.95, 0.8)
+  intensity = 0.7
+  castsShadows = true</code></pre>
+
+    <p><strong>Why it matters:</strong> Lighting is one of the biggest differences between "programmer art that looks flat" and "a scene that feels like a place."</p>
+
+    <h4>7. Level Geometry and BSP Concepts</h4>
+    <p>3D levels are built from meshes &mdash; collections of triangles. The concept of BSP (Binary Space Partitioning), pioneered by Doom, recursively divides space into regions to determine what is visible from any given point.</p>
+
+    <pre is:raw><code>// Conceptual BSP: split space with a plane
+if player is in front of dividing plane:
+  render front geometry first, then back
+else:
+  render back geometry first, then front
+
+// In practice, engines use frustum culling, occlusion culling, and LOD</code></pre>
+
+    <p><strong>Why it matters:</strong> Understanding how 3D space is organized explains why level design is both an art and a technical discipline.</p>
+
+    <h4>8. HUD Overlay</h4>
+    <p>Game UI is rendered in <strong>screen space</strong> &mdash; fixed to the camera's output, not positioned in the 3D world.</p>
+
+    <pre is:raw><code>// Screen-space UI (drawn after 3D scene):
+draw_crosshair(screen.center)
+draw_text("HP: " + player.health, position=(10, 10))
+draw_text("Ammo: " + weapon.ammo, position=(10, 40))</code></pre>
+
+    <p><strong>Why it matters:</strong> The distinction between screen space and world space is fundamental to 3D game UI.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: FOV Slider</div>
+      <p class="demo-hint">Adjust the FOV (field of view) slider to see how it changes the perceived depth and space. Narrow FOV feels zoomed-in; wide FOV gives peripheral vision but distorts edges. The scene shows a corridor with pillars.</p>
+      <canvas id="demo-fov" width="760" height="380"></canvas>
+      <div class="demo-controls">
+        <label style="color:#f59e0b;">FOV: <input type="range" id="slider-fov" min="30" max="140" value="80" style="width:240px"></label>
+        <span class="value-display" id="fov-display">80&deg;</span>
+      </div>
+    </div>
+
+    <hr />
+
+    <h3>Stretch Goals</h3>
+    <ul>
+      <li><strong>Weapon model and animation</strong> &mdash; A 3D model visible in the lower-right with a fire animation.</li>
+      <li><strong>Enemy AI with navigation</strong> &mdash; Enemies that move toward the player using simple pathfinding.</li>
+      <li><strong>Sound spatialization</strong> &mdash; 3D audio where sounds have position and attenuate with distance.</li>
+      <li><strong>Multiple weapon types</strong> &mdash; Hitscan (raycast, instant) vs. projectile (moving object with travel time).</li>
+    </ul>
+
+    <h3>MVP Spec</h3>
+    <table>
+      <thead><tr><th>Feature</th><th>Required</th></tr></thead>
+      <tbody>
+        <tr><td>3D environment you can walk around in</td><td>Yes</td></tr>
+        <tr><td>First-person camera with mouse-look</td><td>Yes</td></tr>
+        <tr><td>WASD movement relative to camera direction</td><td>Yes</td></tr>
+        <tr><td>Shooting via raycasting (click to fire, hit detection)</td><td>Yes</td></tr>
+        <tr><td>Targets or enemies that take damage and react</td><td>Yes</td></tr>
+        <tr><td>3D colliders preventing walking through walls</td><td>Yes</td></tr>
+        <tr><td>Basic lighting (ambient + directional)</td><td>Yes</td></tr>
+        <tr><td>HUD with crosshair, health, and score/ammo</td><td>Yes</td></tr>
+        <tr><td>Weapon viewmodel</td><td>Stretch</td></tr>
+        <tr><td>Enemy AI with movement</td><td>Stretch</td></tr>
+        <tr><td>3D spatial audio</td><td>Stretch</td></tr>
+        <tr><td>Multiple weapon types</td><td>Stretch</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliverable</h3>
+    <p>A playable first-person 3D game with movement, shooting, and hit detection. Write-up: What did you learn? What was the hardest part of the transition from 2D to 3D?</p>
+
+    <hr />
+
+    <h2>Analogies by Background</h2>
+    <blockquote><p>These analogies map 3D game dev concepts to patterns you already know. Find your background below.</p></blockquote>
+
+    <h3>For Backend Developers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>3D Coordinate Systems &amp; Transforms</td><td>Like nested namespaces or hierarchical routing &mdash; a child's position is relative to its parent</td></tr>
+        <tr><td>First-Person Camera</td><td>Like a database view or projection &mdash; the same underlying 3D world data, filtered and transformed</td></tr>
+        <tr><td>3D Character Controller</td><td>Like request routing with middleware context &mdash; "forward" is resolved relative to the current session state</td></tr>
+        <tr><td>Raycasting for Shooting</td><td>Like a database query with a spatial index &mdash; "find the first row that intersects this line"</td></tr>
+        <tr><td>3D Collision &amp; Physics</td><td>Like connection validation with constraints &mdash; the capsule collider is an acceptance boundary</td></tr>
+        <tr><td>Basic Lighting</td><td>Like log levels or monitoring dashboards &mdash; ambient is your baseline (INFO), directional highlights specific areas</td></tr>
+        <tr><td>Level Geometry / BSP</td><td>Like a B-tree index for spatial data &mdash; BSP partitions space for fast lookups</td></tr>
+        <tr><td>HUD Overlay</td><td>Like a response wrapper &mdash; the 3D scene is the payload, the HUD is the metadata envelope</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Frontend Developers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>3D Coordinate Systems &amp; Transforms</td><td>Like nested CSS transforms &mdash; a child element's transform is relative to its parent's coordinate system</td></tr>
+        <tr><td>First-Person Camera</td><td>Like a Three.js PerspectiveCamera &mdash; FOV, aspect ratio, near/far clipping planes</td></tr>
+        <tr><td>3D Character Controller</td><td>Like making scroll direction relative to the viewport, not the document</td></tr>
+        <tr><td>Raycasting for Shooting</td><td>Like <code>document.elementFromPoint(x, y)</code> or Three.js Raycaster</td></tr>
+        <tr><td>3D Collision &amp; Physics</td><td>Like collision detection in drag-and-drop with getBoundingClientRect(), extended to 3D</td></tr>
+        <tr><td>Basic Lighting</td><td>Like CSS lighting effects &mdash; ambient is a global <code>filter: brightness()</code></td></tr>
+        <tr><td>Level Geometry / BSP</td><td>Like virtual scrolling or windowing (react-window) &mdash; only rendering visible DOM nodes</td></tr>
+        <tr><td>HUD Overlay</td><td>Like a <code>position: fixed</code> overlay on top of a 3D canvas</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Data / ML Engineers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>3D Coordinate Systems &amp; Transforms</td><td>Like affine transformation matrices &mdash; position, rotation, and scale compose into 4x4 matrices</td></tr>
+        <tr><td>First-Person Camera</td><td>Like a projection from 3D to 2D &mdash; the perspective matrix maps coordinates, identical to pinhole camera model</td></tr>
+        <tr><td>3D Character Controller</td><td>Like transforming a velocity vector from a local coordinate frame to world coordinates</td></tr>
+        <tr><td>Raycasting for Shooting</td><td>Like a line-intersection query on a KD-tree or BVH</td></tr>
+        <tr><td>3D Collision &amp; Physics</td><td>Like constraint satisfaction with continuous simulation &mdash; Euler integration of forces</td></tr>
+        <tr><td>Basic Lighting</td><td>Like the Phong reflection model &mdash; ambient + diffuse + specular as dot products</td></tr>
+        <tr><td>Level Geometry / BSP</td><td>Like spatial partitioning structures (KD-trees, octrees) used for nearest-neighbor search</td></tr>
+        <tr><td>HUD Overlay</td><td>Like plotting annotations on top of a 3D visualization</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li>Wolfenstein 3D faked 3D with raycasting on a 2D map. How does knowing this change how you think about the relationship between a game's internal data representation and what the player sees?</li>
+      <li>Why does field of view matter so much in an FPS? Try playing the same scene at 60 FOV vs. 110 FOV &mdash; how does it change the feel of movement, aiming, and spatial awareness?</li>
+      <li>Half-Life told its story entirely through the first-person camera without ever taking control away. What are the advantages and limitations of this approach compared to cutscenes?</li>
+      <li>The transition from 2D to 3D adds one axis, but the complexity increase is not linear. What specific problems did you encounter that do not exist in 2D?</li>
+    </ol>
+
+    <nav class="module-nav">
+      <a href={`${base}modules/10-deckbuilder/`}>&larr; Module 10: Deckbuilder</a>
+      <a href={`${base}modules/12-3d-platformer/`}>Module 12: 3D Platformer &rarr;</a>
+    </nav>
+  </div>
+</BaseLayout>
+
+<script>
+// ============================================================
+// DEMO 1: 3D COORDINATE SYSTEM
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-3d');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const sliderX = document.getElementById('slider-x');
+  const sliderY = document.getElementById('slider-y');
+  const sliderZ = document.getElementById('slider-z');
+
+  let rotY = 0.5, rotX = 0.4;
+  let dragging = false, lastMX = 0, lastMY = 0;
+
+  canvas.addEventListener('mousedown', function(e) { dragging = true; lastMX = e.clientX; lastMY = e.clientY; });
+  canvas.addEventListener('mousemove', function(e) {
+    if (!dragging) return;
+    rotY += (e.clientX - lastMX) * 0.008;
+    rotX += (e.clientY - lastMY) * 0.008;
+    rotX = Math.max(-1.2, Math.min(1.2, rotX));
+    lastMX = e.clientX;
+    lastMY = e.clientY;
+  });
+  canvas.addEventListener('mouseup', function() { dragging = false; });
+  canvas.addEventListener('mouseleave', function() { dragging = false; });
+
+  // Touch support
+  canvas.addEventListener('touchstart', function(e) { e.preventDefault(); dragging = true; lastMX = e.touches[0].clientX; lastMY = e.touches[0].clientY; }, { passive: false });
+  canvas.addEventListener('touchmove', function(e) {
+    e.preventDefault();
+    if (!dragging) return;
+    rotY += (e.touches[0].clientX - lastMX) * 0.008;
+    rotX += (e.touches[0].clientY - lastMY) * 0.008;
+    rotX = Math.max(-1.2, Math.min(1.2, rotX));
+    lastMX = e.touches[0].clientX;
+    lastMY = e.touches[0].clientY;
+  }, { passive: false });
+  canvas.addEventListener('touchend', function() { dragging = false; });
+
+  function project(x, y, z) {
+    // Rotate around Y axis
+    const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
+    let x2 = x * cosY - z * sinY;
+    let z2 = x * sinY + z * cosY;
+    // Rotate around X axis
+    const cosX = Math.cos(rotX), sinX = Math.sin(rotX);
+    let y2 = y * cosX - z2 * sinX;
+    let z3 = y * sinX + z2 * cosX;
+    // Simple perspective
+    const scale = 300 / (300 + z3 + 200);
+    return { x: W / 2 + x2 * scale, y: H / 2 - y2 * scale, z: z3 };
+  }
+
+  function drawLine3D(x1, y1, z1, x2, y2, z2, color, lw) {
+    const p1 = project(x1, y1, z1);
+    const p2 = project(x2, y2, z2);
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lw || 1.5;
+    ctx.stroke();
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+
+    const ox = parseInt(sliderX.value);
+    const oy = parseInt(sliderY.value);
+    const oz = parseInt(sliderZ.value);
+
+    // Grid on XZ plane
+    ctx.globalAlpha = 0.2;
+    for (let i = -150; i <= 150; i += 30) {
+      drawLine3D(i, 0, -150, i, 0, 150, '#3f3f46', 0.5);
+      drawLine3D(-150, 0, i, 150, 0, i, '#3f3f46', 0.5);
+    }
+    ctx.globalAlpha = 1;
+
+    // Axes
+    const axLen = 160;
+    drawLine3D(0, 0, 0, axLen, 0, 0, '#ef4444', 2.5); // X red
+    drawLine3D(0, 0, 0, 0, axLen, 0, '#22c55e', 2.5); // Y green
+    drawLine3D(0, 0, 0, 0, 0, axLen, '#3b82f6', 2.5); // Z blue
+
+    // Axis labels
+    const lx = project(axLen + 15, 0, 0);
+    const ly = project(0, axLen + 15, 0);
+    const lz = project(0, 0, axLen + 15);
+    ctx.font = '700 14px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ef4444'; ctx.fillText('X', lx.x, lx.y);
+    ctx.fillStyle = '#22c55e'; ctx.fillText('Y', ly.x, ly.y);
+    ctx.fillStyle = '#3b82f6'; ctx.fillText('Z', lz.x, lz.y);
+
+    // Cube
+    const s = 50;
+    const verts = [
+      [-s + ox, -s + oy, -s + oz], [s + ox, -s + oy, -s + oz],
+      [s + ox, s + oy, -s + oz], [-s + ox, s + oy, -s + oz],
+      [-s + ox, -s + oy, s + oz], [s + ox, -s + oy, s + oz],
+      [s + ox, s + oy, s + oz], [-s + ox, s + oy, s + oz]
+    ];
+    const edges = [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+
+    // Sort edges by average z for basic depth sorting
+    const projVerts = verts.map(function(v) { return project(v[0], v[1], v[2]); });
+
+    // Draw cube faces (very simple, just edges)
+    for (const e of edges) {
+      const p1 = projVerts[e[0]];
+      const p2 = projVerts[e[1]];
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // Draw vertices
+    for (const p of projVerts) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#f59e0b';
+      ctx.fill();
+    }
+
+    // Position display
+    ctx.fillStyle = '#a1a1aa';
+    ctx.font = '12px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('Position: (' + ox + ', ' + oy + ', ' + oz + ')', 16, 24);
+
+    ctx.fillStyle = '#71717a';
+    ctx.font = '11px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Drag to rotate. Use sliders to move the cube.', W / 2, H - 12);
+
+    requestAnimationFrame(render);
+  }
+  requestAnimationFrame(render);
+})();
+
+
+// ============================================================
+// DEMO 2: RAYCASTING (WOLFENSTEIN-STYLE)
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-raycast');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const mapW = 16, mapH = 16;
+  const cellSize = Math.floor(H / mapH);
+  const mapPxW = cellSize * mapW;
+  const viewX = mapPxW + 20;
+  const viewW = W - viewX - 10;
+  const viewH = H;
+
+  // 1 = wall, 0 = empty
+  const map = [
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,1,1,0,0,0,0,0,1,1,0,0,0,1,
+    1,0,0,1,0,0,0,0,0,0,0,1,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,1,1,1,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,1,0,1,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,1,0,1,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,1,0,0,0,0,0,0,0,1,0,0,0,1,
+    1,0,0,1,1,0,0,0,0,0,1,1,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+  ];
+
+  let playerX = 2.5, playerY = 2.5, playerAngle = 0;
+  const FOV = Math.PI / 3;
+  const numRays = Math.floor(viewW / 3);
+
+  function getCanvasPos(e) {
+    const r = canvas.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height };
+  }
+
+  let mapDragging = false;
+  canvas.addEventListener('mousedown', function(e) {
+    const p = getCanvasPos(e);
+    if (p.x < mapPxW && p.y < mapPxW) {
+      const gx = Math.floor(p.x / cellSize);
+      const gy = Math.floor(p.y / cellSize);
+      if (gx > 0 && gx < mapW - 1 && gy > 0 && gy < mapH - 1) {
+        // Toggle wall, but not on player
+        const idx = gy * mapW + gx;
+        if (Math.abs(gx + 0.5 - playerX) > 0.8 || Math.abs(gy + 0.5 - playerY) > 0.8) {
+          map[idx] = map[idx] ? 0 : 1;
+        }
+      }
+      mapDragging = true;
+    }
+  });
+
+  canvas.addEventListener('mousemove', function(e) {
+    if (!mapDragging) return;
+    const p = getCanvasPos(e);
+    if (p.x < mapPxW) {
+      // Rotate player to look toward mouse
+      const mx = p.x / cellSize;
+      const my = p.y / cellSize;
+      playerAngle = Math.atan2(my - playerY, mx - playerX);
+    }
+  });
+
+  canvas.addEventListener('mouseup', function() { mapDragging = false; });
+
+  function castRay(x, y, angle) {
+    const dx = Math.cos(angle) * 0.02;
+    const dy = Math.sin(angle) * 0.02;
+    let rx = x, ry = y;
+    for (let i = 0; i < 800; i++) {
+      rx += dx;
+      ry += dy;
+      const gx = Math.floor(rx);
+      const gy = Math.floor(ry);
+      if (gx < 0 || gx >= mapW || gy < 0 || gy >= mapH) return { dist: 999, side: 0 };
+      if (map[gy * mapW + gx]) {
+        const dist = Math.sqrt((rx - x) * (rx - x) + (ry - y) * (ry - y));
+        // Determine side hit for shading
+        const prevGx = Math.floor(rx - dx);
+        const side = (prevGx !== gx) ? 0 : 1;
+        return { dist: dist, side: side };
+      }
+    }
+    return { dist: 999, side: 0 };
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Draw 2D map
+    for (let y = 0; y < mapH; y++) {
+      for (let x = 0; x < mapW; x++) {
+        const val = map[y * mapW + x];
+        ctx.fillStyle = val ? '#4a4a4e' : '#141416';
+        ctx.fillRect(x * cellSize, y * cellSize, cellSize - 1, cellSize - 1);
+      }
+    }
+
+    // Draw player on map
+    const px = playerX * cellSize;
+    const py = playerY * cellSize;
+    ctx.beginPath();
+    ctx.arc(px, py, 4, 0, Math.PI * 2);
+    ctx.fillStyle = '#f59e0b';
+    ctx.fill();
+
+    // Direction line
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    ctx.lineTo(px + Math.cos(playerAngle) * 20, py + Math.sin(playerAngle) * 20);
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Cast rays and draw 3D view
+    const rayStep = FOV / numRays;
+    const startAngle = playerAngle - FOV / 2;
+
+    for (let i = 0; i < numRays; i++) {
+      const angle = startAngle + i * rayStep;
+      const result = castRay(playerX, playerY, angle);
+
+      // Fix fisheye
+      const corrected = result.dist * Math.cos(angle - playerAngle);
+
+      // Draw ray on map (faintly)
+      const rayEndX = playerX + Math.cos(angle) * result.dist;
+      const rayEndY = playerY + Math.sin(angle) * result.dist;
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.lineTo(rayEndX * cellSize, rayEndY * cellSize);
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.08)';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+
+      // 3D column
+      const wallHeight = Math.min(viewH, viewH / (corrected + 0.001));
+      const colX = viewX + (i / numRays) * viewW;
+      const colW = viewW / numRays + 1;
+      const colTop = (viewH - wallHeight) / 2;
+
+      // Ceiling
+      ctx.fillStyle = '#0a0a1a';
+      ctx.fillRect(colX, 0, colW, colTop);
+
+      // Wall
+      const brightness = Math.max(0.15, 1 - corrected / 12);
+      const shade = result.side ? brightness * 0.7 : brightness;
+      const r = Math.floor(80 * shade);
+      const g = Math.floor(80 * shade);
+      const b = Math.floor(90 * shade);
+      ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
+      ctx.fillRect(colX, colTop, colW, wallHeight);
+
+      // Floor
+      ctx.fillStyle = '#1a1a1e';
+      ctx.fillRect(colX, colTop + wallHeight, colW, viewH - colTop - wallHeight);
+    }
+
+    // Divider
+    ctx.strokeStyle = '#3f3f46';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(mapPxW + 10, 0);
+    ctx.lineTo(mapPxW + 10, H);
+    ctx.stroke();
+
+    // Labels
+    ctx.fillStyle = '#71717a';
+    ctx.font = '10px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('2D Map (click=wall, drag=look)', mapPxW / 2, H - 6);
+    ctx.fillText('Raycast 3D View', viewX + viewW / 2, H - 6);
+
+    requestAnimationFrame(render);
+  }
+  requestAnimationFrame(render);
+})();
+
+
+// ============================================================
+// DEMO 3: FOV SLIDER
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-fov');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const fovSlider = document.getElementById('slider-fov');
+  const fovDisplay = document.getElementById('fov-display');
+
+  function render() {
+    const fov = parseInt(fovSlider.value);
+    fovDisplay.textContent = fov + '\u00B0';
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Simulated first-person corridor view
+    const fovRad = fov * Math.PI / 180;
+    const halfFov = fovRad / 2;
+
+    // Draw sky
+    const grad = ctx.createLinearGradient(0, 0, 0, H / 2);
+    grad.addColorStop(0, '#0a0a2a');
+    grad.addColorStop(1, '#1a1a3a');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H / 2);
+
+    // Draw floor
+    const fgrad = ctx.createLinearGradient(0, H / 2, 0, H);
+    fgrad.addColorStop(0, '#1a1a1e');
+    fgrad.addColorStop(1, '#2a2a2e');
+    ctx.fillStyle = fgrad;
+    ctx.fillRect(0, H / 2, W, H / 2);
+
+    // Draw corridor walls (perspective based on FOV)
+    const numPillars = 8;
+    const corridorDepth = 10;
+    const corridorWidth = 4;
+
+    for (let d = numPillars; d >= 1; d--) {
+      const depth = d * (corridorDepth / numPillars);
+      const scale = 1 / (depth * Math.tan(halfFov) * 0.5 + 0.5);
+      const wallH = H * scale * 0.8;
+      const wallW = W * scale;
+
+      const centerX = W / 2;
+      const centerY = H / 2;
+
+      // Left wall
+      const leftX = centerX - wallW / 2;
+      ctx.fillStyle = 'rgb(' + Math.floor(40 + 15 * (numPillars - d)) + ',' + Math.floor(40 + 15 * (numPillars - d)) + ',' + Math.floor(50 + 15 * (numPillars - d)) + ')';
+      ctx.fillRect(leftX, centerY - wallH / 2, 4 + (numPillars - d) * 2, wallH);
+
+      // Right wall
+      const rightX = centerX + wallW / 2;
+      ctx.fillRect(rightX - 4 - (numPillars - d) * 2, centerY - wallH / 2, 4 + (numPillars - d) * 2, wallH);
+
+      // Floor line
+      ctx.strokeStyle = 'rgba(63, 63, 70, ' + (0.2 + (numPillars - d) * 0.08) + ')';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(leftX, centerY + wallH / 2);
+      ctx.lineTo(rightX, centerY + wallH / 2);
+      ctx.stroke();
+
+      // Ceiling line
+      ctx.beginPath();
+      ctx.moveTo(leftX, centerY - wallH / 2);
+      ctx.lineTo(rightX, centerY - wallH / 2);
+      ctx.stroke();
+
+      // Pillars on sides (every other depth)
+      if (d % 2 === 0) {
+        const pillarW = 6 + (numPillars - d) * 3;
+        const pillarH = wallH * 0.9;
+        ctx.fillStyle = '#f59e0b' + Math.floor(20 + (numPillars - d) * 10).toString(16).padStart(2, '0');
+        ctx.fillRect(leftX + 2, centerY - pillarH / 2, pillarW, pillarH);
+        ctx.fillRect(rightX - pillarW - 2, centerY - pillarH / 2, pillarW, pillarH);
+      }
+    }
+
+    // Crosshair
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(W / 2 - 12, H / 2);
+    ctx.lineTo(W / 2 + 12, H / 2);
+    ctx.moveTo(W / 2, H / 2 - 12);
+    ctx.lineTo(W / 2, H / 2 + 12);
+    ctx.stroke();
+
+    // FOV angle visualization (bottom)
+    const arcY = H - 40;
+    const arcR = 30;
+    ctx.beginPath();
+    ctx.moveTo(W / 2, arcY);
+    ctx.lineTo(W / 2 - Math.sin(halfFov) * arcR * 3, arcY - Math.cos(halfFov) * arcR);
+    ctx.strokeStyle = '#f59e0b55';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(W / 2, arcY);
+    ctx.lineTo(W / 2 + Math.sin(halfFov) * arcR * 3, arcY - Math.cos(halfFov) * arcR);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(W / 2, arcY, arcR, -Math.PI / 2 - halfFov, -Math.PI / 2 + halfFov);
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Labels
+    ctx.fillStyle = '#f59e0b';
+    ctx.font = '700 16px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('FOV: ' + fov + '\u00B0', W / 2, 28);
+
+    let feelLabel = '';
+    if (fov < 50) feelLabel = 'Scoped / Zoomed In';
+    else if (fov < 70) feelLabel = 'Narrow - Claustrophobic';
+    else if (fov < 95) feelLabel = 'Standard FPS';
+    else if (fov < 115) feelLabel = 'Wide - Peripheral Awareness';
+    else feelLabel = 'Ultra-Wide - Distorted';
+
+    ctx.fillStyle = '#a1a1aa';
+    ctx.font = '12px Inter, sans-serif';
+    ctx.fillText(feelLabel, W / 2, 48);
+
+    requestAnimationFrame(render);
+  }
+  requestAnimationFrame(render);
+})();
+</script>

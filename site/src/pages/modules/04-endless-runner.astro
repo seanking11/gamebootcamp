@@ -62,6 +62,21 @@ const base = import.meta.env.BASE_URL;
     <p>The pipeline: <strong>random seed &rarr; candidate &rarr; validate &rarr; place or retry</strong>.</p>
     <p><strong>Why it matters:</strong> PCG is used in roguelikes, open worlds, loot tables, and any system where hand-authored content can't scale. The constraint-validation loop (generate, check, accept or retry) is a pattern that recurs across many domains of software engineering.</p>
 
+    <!-- DEMO 4: Procedural Generation with Constraints -->
+    <div class="demo-container">
+      <div class="demo-label">Interactive Demo</div>
+      <div class="demo-hint">Generate obstacle sequences and see how constraints prevent impossible gaps.</div>
+      <canvas id="procgen-canvas" width="760" height="350"></canvas>
+      <div class="demo-controls">
+        <button id="procgen-generate">Generate</button>
+        <label>
+          <input type="checkbox" id="procgen-constrain" checked />
+          With Constraints
+        </label>
+        <span class="value-display" id="procgen-status"></span>
+      </div>
+    </div>
+
     <h4>2. World Streaming / Ring Buffer</h4>
     <p>Maintain a sliding window of active world chunks. As the player advances, chunks that scroll off the trailing edge are recycled to the leading edge with new content.</p>
     <pre is:raw><code>chunks = [chunk0, chunk1, chunk2, chunk3]  // only 4 in memory
@@ -72,12 +87,35 @@ on_chunk_exit(old_chunk):
   old_chunk.move_to(leading_edge)</code></pre>
     <p><strong>Why it matters:</strong> This is a circular buffer applied to spatial data. It solves the fundamental problem of "infinite content, finite memory" by recycling a fixed number of chunks rather than allocating endlessly.</p>
 
+    <!-- DEMO 1: Ring Buffer Visualizer -->
+    <div class="demo-container">
+      <div class="demo-label">Interactive Demo</div>
+      <div class="demo-hint">Watch 5 chunks scroll left. When a chunk exits the left edge, it teleports to the right with new random content (a ring buffer in action).</div>
+      <canvas id="ringbuf-canvas" width="760" height="300"></canvas>
+      <div class="demo-controls">
+        <label>Speed <input type="range" id="ringbuf-speed" min="0.5" max="4" step="0.1" value="1.5" /> <span class="value-display" id="ringbuf-speed-val">1.5</span></label>
+        <button id="ringbuf-reset">Reset</button>
+      </div>
+    </div>
+
     <h4>3. Difficulty Scaling</h4>
     <p>A function that maps elapsed time or distance to game parameters:</p>
     <pre is:raw><code>speed = min(MAX_SPEED, BASE_SPEED + distance * RAMP_RATE)
 obstacle_density = lerp(EASY_DENSITY, HARD_DENSITY, distance / RAMP_DISTANCE)
 gap_width = lerp(EASY_GAP, HARD_GAP, distance / RAMP_DISTANCE)</code></pre>
     <p><strong>Why it matters:</strong> Dynamic difficulty is a design tool across every genre. The curve-as-parameter pattern introduces <em>tuning knobs</em> as first-class design elements &mdash; values you expose and iterate on rather than hardcode.</p>
+
+    <!-- DEMO 2: Difficulty Curve Grapher -->
+    <div class="demo-container">
+      <div class="demo-label">Interactive Demo</div>
+      <div class="demo-hint">Drag the sliders to shape the difficulty curve. Drag the dot on the curve to simulate a player position.</div>
+      <canvas id="curve-canvas" width="760" height="300"></canvas>
+      <div class="demo-controls">
+        <label>Base Speed <input type="range" id="curve-base" min="1" max="8" step="0.5" value="2" /> <span class="value-display" id="curve-base-val">2</span></label>
+        <label>Ramp Rate <input type="range" id="curve-rate" min="0.001" max="0.02" step="0.001" value="0.005" /> <span class="value-display" id="curve-rate-val">0.005</span></label>
+        <label>Max Speed <input type="range" id="curve-max" min="5" max="20" step="0.5" value="12" /> <span class="value-display" id="curve-max-val">12</span></label>
+      </div>
+    </div>
 
     <h4>4. Single-Input Design</h4>
     <p>Map one action (tap/spacebar) to context-dependent behavior through an input abstraction layer:</p>
@@ -100,9 +138,38 @@ spacebar  &rarr; "primary"  &rarr; jump (if grounded) / double-jump (if airborne
   // depth_factor: 0.1 (far clouds), 0.5 (mid buildings), 0.8 (near ground)</code></pre>
     <p><strong>Why it matters:</strong> Introduces z-ordering and render layers. The parallax math is the conceptual foundation for perspective projection in 3D.</p>
 
+    <!-- DEMO 3: Parallax Scrolling Demo -->
+    <div class="demo-container">
+      <div class="demo-label">Interactive Demo</div>
+      <div class="demo-hint">Three layers scroll at different speeds to create depth. Adjust each layer's speed factor.</div>
+      <canvas id="parallax-canvas" width="760" height="250"></canvas>
+      <div class="demo-controls">
+        <label>Far (sky) <input type="range" id="parallax-far" min="0" max="1" step="0.05" value="0.2" /> <span class="value-display" id="parallax-far-val">0.2x</span></label>
+        <label>Mid (hills) <input type="range" id="parallax-mid" min="0" max="1.5" step="0.05" value="0.5" /> <span class="value-display" id="parallax-mid-val">0.5x</span></label>
+        <label>Near (ground) <input type="range" id="parallax-near" min="0" max="2" step="0.05" value="1.0" /> <span class="value-display" id="parallax-near-val">1.0x</span></label>
+        <label>Scroll Speed <input type="range" id="parallax-speed" min="0.5" max="5" step="0.25" value="2" /> <span class="value-display" id="parallax-speed-val">2</span></label>
+      </div>
+    </div>
+
     <h4>7. Speed-as-Score</h4>
     <p>Use cumulative distance as the primary score metric, displayed in real-time as a continuously incrementing counter.</p>
     <p><strong>Why it matters:</strong> Implicit scoring &mdash; the score emerges from survival, not discrete events. The pacing variable (speed) is itself the progression metric.</p>
+
+    <h3>Putting It All Together</h3>
+    <p>The mini runner below combines every concept from this module: ring-buffer world streaming, procedurally generated gaps with constraint validation, a difficulty curve that ramps speed over distance, parallax scrolling, single-input jump controls, and a persistent high score saved to localStorage.</p>
+
+    <!-- DEMO 5: Mini Endless Runner -->
+    <div class="demo-container">
+      <div class="demo-label">Playable Demo</div>
+      <div class="demo-hint">Press Space or click/tap the canvas to jump. Speed increases over time. How far can you go?</div>
+      <canvas id="runner-canvas" width="760" height="400"></canvas>
+      <div class="demo-controls">
+        <span class="value-display" id="runner-score">Distance: 0</span>
+        <span class="value-display" id="runner-highscore">Best: 0</span>
+        <span class="value-display" id="runner-speed">Speed: 2.0</span>
+        <button id="runner-restart">Restart</button>
+      </div>
+    </div>
 
     <h3>Stretch Goals (If Time Allows)</h3>
     <ul>
@@ -205,4 +272,1183 @@ spacebar  &rarr; "primary"  &rarr; jump (if grounded) / double-jump (if airborne
       <a href={`${base}modules/05-puzzle/`}>Module 05: Puzzle Game &rarr;</a>
     </nav>
   </div>
+
+  <script>
+    // =========================================================================
+    //  MODULE 04 — INTERACTIVE DEMOS
+    //  All five demos: vanilla JS + Canvas 2D
+    // =========================================================================
+
+    (function () {
+      // ----- Utility helpers ------------------------------------------------
+      function rand(min, max) { return Math.random() * (max - min) + min; }
+      function randInt(min, max) { return Math.floor(rand(min, max + 1)); }
+      function lerp(a, b, t) { return a + (b - a) * Math.max(0, Math.min(1, t)); }
+      function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+      var COLORS = {
+        bg:       '#0d0d0f',
+        surface:  '#141416',
+        border:   '#27272a',
+        text:     '#fafafa',
+        muted:    '#a1a1aa',
+        dim:      '#71717a',
+        accent:   '#f59e0b',
+        green:    '#22c55e',
+        blue:     '#3b82f6',
+        red:      '#ef4444',
+        purple:   '#a855f7',
+      };
+
+      var CHUNK_COLORS = ['#ef4444','#3b82f6','#22c55e','#a855f7','#f59e0b','#06b6d4','#ec4899','#84cc16'];
+
+      // Helper: get DPR-aware context
+      function initCanvas(id, w, h) {
+        var c = document.getElementById(id);
+        if (!c) return null;
+        var dpr = window.devicePixelRatio || 1;
+        c.width = w * dpr;
+        c.height = h * dpr;
+        c.style.width = w + 'px';
+        c.style.height = h + 'px';
+        var ctx = c.getContext('2d');
+        ctx.scale(dpr, dpr);
+        return { canvas: c, ctx: ctx, w: w, h: h };
+      }
+
+      // =====================================================================
+      //  DEMO 1 — Ring Buffer Visualizer
+      // =====================================================================
+      (function ringBufferDemo() {
+        var d = initCanvas('ringbuf-canvas', 760, 300);
+        if (!d) return;
+        var ctx = d.ctx, W = d.w, H = d.h, canvas = d.canvas;
+
+        var NUM_CHUNKS = 5;
+        var CHUNK_W = 140;
+        var CHUNK_H = 100;
+        var Y_TOP = 30;
+        var GAP = 12;
+        var speed = 1.5;
+        var recycleLog = [];
+        var recycleLogTimer = 0;
+
+        function makeContent() {
+          var blocks = [];
+          var cols = randInt(2, 5);
+          var rows = randInt(2, 4);
+          var bw = (CHUNK_W - 16) / cols;
+          var bh = (CHUNK_H - 16) / rows;
+          for (var r = 0; r < rows; r++) {
+            for (var c = 0; c < cols; c++) {
+              if (Math.random() > 0.35) {
+                blocks.push({
+                  x: 8 + c * bw + 2,
+                  y: 8 + r * bh + 2,
+                  w: bw - 4,
+                  h: bh - 4,
+                  color: CHUNK_COLORS[randInt(0, CHUNK_COLORS.length - 1)]
+                });
+              }
+            }
+          }
+          return blocks;
+        }
+
+        var chunks = [];
+        function resetChunks() {
+          chunks = [];
+          recycleLog = [];
+          for (var i = 0; i < NUM_CHUNKS; i++) {
+            chunks.push({
+              idx: i,
+              x: i * (CHUNK_W + GAP) + 40,
+              blocks: makeContent(),
+              recycled: false,
+              recycleFlash: 0,
+              color: CHUNK_COLORS[i % CHUNK_COLORS.length]
+            });
+          }
+        }
+        resetChunks();
+
+        var sliderEl = document.getElementById('ringbuf-speed');
+        var valEl = document.getElementById('ringbuf-speed-val');
+        var resetBtn = document.getElementById('ringbuf-reset');
+        if (sliderEl) sliderEl.addEventListener('input', function () {
+          speed = parseFloat(this.value);
+          if (valEl) valEl.textContent = speed.toFixed(1);
+        });
+        if (resetBtn) resetBtn.addEventListener('click', resetChunks);
+
+        function rightEdge() {
+          var mx = -Infinity;
+          for (var i = 0; i < chunks.length; i++) {
+            if (chunks[i].x + CHUNK_W > mx) mx = chunks[i].x + CHUNK_W;
+          }
+          return mx;
+        }
+
+        function tick(dt) {
+          var dx = speed * 100 * dt;
+          for (var i = 0; i < chunks.length; i++) {
+            var ch = chunks[i];
+            ch.x -= dx;
+            if (ch.recycleFlash > 0) ch.recycleFlash -= dt;
+            // recycled off left
+            if (ch.x + CHUNK_W < -10) {
+              ch.x = rightEdge() + GAP;
+              ch.blocks = makeContent();
+              ch.recycled = true;
+              ch.recycleFlash = 1.0;
+              recycleLog.push({ idx: ch.idx, time: 2.0 });
+              if (recycleLog.length > 6) recycleLog.shift();
+            }
+          }
+          for (var j = recycleLog.length - 1; j >= 0; j--) {
+            recycleLog[j].time -= dt;
+            if (recycleLog[j].time <= 0) recycleLog.splice(j, 1);
+          }
+        }
+
+        function draw() {
+          ctx.fillStyle = COLORS.bg;
+          ctx.fillRect(0, 0, W, H);
+
+          // visible area marker
+          ctx.strokeStyle = COLORS.border;
+          ctx.setLineDash([4, 4]);
+          ctx.strokeRect(10, Y_TOP - 5, W - 20, CHUNK_H + 30);
+          ctx.setLineDash([]);
+          ctx.fillStyle = COLORS.dim;
+          ctx.font = '11px Inter, sans-serif';
+          ctx.fillText('Visible Area', 16, Y_TOP + CHUNK_H + 40);
+
+          // chunks
+          for (var i = 0; i < chunks.length; i++) {
+            var ch = chunks[i];
+            var flash = ch.recycleFlash > 0 ? ch.recycleFlash : 0;
+
+            // chunk bg
+            ctx.fillStyle = flash > 0.5 ? COLORS.green : COLORS.surface;
+            ctx.fillRect(ch.x, Y_TOP, CHUNK_W, CHUNK_H);
+            ctx.strokeStyle = flash > 0 ? COLORS.green : COLORS.border;
+            ctx.lineWidth = flash > 0 ? 2 : 1;
+            ctx.strokeRect(ch.x, Y_TOP, CHUNK_W, CHUNK_H);
+            ctx.lineWidth = 1;
+
+            // blocks inside
+            for (var b = 0; b < ch.blocks.length; b++) {
+              var bl = ch.blocks[b];
+              ctx.fillStyle = bl.color;
+              ctx.globalAlpha = 0.8;
+              ctx.fillRect(ch.x + bl.x, Y_TOP + bl.y, bl.w, bl.h);
+              ctx.globalAlpha = 1;
+            }
+
+            // index label
+            ctx.fillStyle = COLORS.text;
+            ctx.font = 'bold 13px JetBrains Mono, monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('Chunk ' + ch.idx, ch.x + CHUNK_W / 2, Y_TOP + CHUNK_H + 18);
+            ctx.textAlign = 'left';
+          }
+
+          // Buffer state below
+          var bufY = Y_TOP + CHUNK_H + 60;
+          ctx.fillStyle = COLORS.muted;
+          ctx.font = '12px Inter, sans-serif';
+          ctx.fillText('Ring Buffer State:', 16, bufY);
+
+          var bx = 16;
+          var by = bufY + 10;
+          for (var k = 0; k < chunks.length; k++) {
+            var c = chunks[k];
+            var onScreen = (c.x + CHUNK_W > 0 && c.x < W);
+            ctx.fillStyle = onScreen ? COLORS.surface : '#1a1a1e';
+            ctx.fillRect(bx, by, 80, 36);
+            ctx.strokeStyle = c.recycleFlash > 0 ? COLORS.green : (onScreen ? COLORS.accent : COLORS.border);
+            ctx.lineWidth = c.recycleFlash > 0 ? 2 : 1;
+            ctx.strokeRect(bx, by, 80, 36);
+            ctx.lineWidth = 1;
+
+            ctx.fillStyle = onScreen ? COLORS.text : COLORS.dim;
+            ctx.font = '11px JetBrains Mono, monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('[' + c.idx + ']', bx + 40, by + 15);
+            ctx.fillStyle = onScreen ? COLORS.green : COLORS.dim;
+            ctx.font = '9px Inter, sans-serif';
+            ctx.fillText(onScreen ? 'active' : 'off-screen', bx + 40, by + 29);
+            ctx.textAlign = 'left';
+
+            bx += 90;
+          }
+
+          // Recycle log
+          if (recycleLog.length > 0) {
+            var ly = by + 52;
+            ctx.fillStyle = COLORS.dim;
+            ctx.font = '11px Inter, sans-serif';
+            ctx.fillText('Recycle events:', 16, ly);
+            for (var m = 0; m < recycleLog.length; m++) {
+              var rl = recycleLog[m];
+              ctx.globalAlpha = clamp(rl.time, 0, 1);
+              ctx.fillStyle = COLORS.green;
+              ctx.fillText('Chunk ' + rl.idx + ' recycled to leading edge', 130 + m * 0, ly + (m + 1) * 16);
+            }
+            ctx.globalAlpha = 1;
+          }
+        }
+
+        var lastT = 0;
+        function loop(ts) {
+          var dt = Math.min((ts - lastT) / 1000, 0.05);
+          lastT = ts;
+          tick(dt);
+          draw();
+          requestAnimationFrame(loop);
+        }
+        requestAnimationFrame(function (ts) { lastT = ts; loop(ts); });
+      })();
+
+      // =====================================================================
+      //  DEMO 2 — Difficulty Curve Grapher
+      // =====================================================================
+      (function curveDemo() {
+        var d = initCanvas('curve-canvas', 760, 300);
+        if (!d) return;
+        var ctx = d.ctx, W = d.w, H = d.h, canvas = d.canvas;
+
+        var PAD_L = 55, PAD_R = 20, PAD_T = 30, PAD_B = 50;
+        var graphW = W - PAD_L - PAD_R;
+        var graphH = H - PAD_T - PAD_B;
+        var MAX_DIST = 2000;
+
+        var baseSpeed = 2, rampRate = 0.005, maxSpeed = 12;
+        var playerDist = 400; // in distance units
+        var draggingDot = false;
+
+        var baseEl = document.getElementById('curve-base');
+        var rateEl = document.getElementById('curve-rate');
+        var maxEl  = document.getElementById('curve-max');
+        var baseValEl = document.getElementById('curve-base-val');
+        var rateValEl = document.getElementById('curve-rate-val');
+        var maxValEl  = document.getElementById('curve-max-val');
+
+        function bindSlider(el, valEl, setter, fmt) {
+          if (!el) return;
+          el.addEventListener('input', function () {
+            var v = parseFloat(this.value);
+            setter(v);
+            if (valEl) valEl.textContent = fmt ? fmt(v) : v;
+          });
+        }
+        bindSlider(baseEl, baseValEl, function (v) { baseSpeed = v; });
+        bindSlider(rateEl, rateValEl, function (v) { rampRate = v; }, function(v){ return v.toFixed(3); });
+        bindSlider(maxEl,  maxValEl,  function (v) { maxSpeed = v; });
+
+        function speedAt(dist) {
+          return Math.min(maxSpeed, baseSpeed + dist * rampRate);
+        }
+
+        function distToX(dist) { return PAD_L + (dist / MAX_DIST) * graphW; }
+        function speedToY(spd) { return PAD_T + graphH - (spd / 20) * graphH; }
+        function xToDist(x) { return clamp(((x - PAD_L) / graphW) * MAX_DIST, 0, MAX_DIST); }
+
+        // Mouse interaction for dragging the dot
+        function getPos(e) {
+          var r = canvas.getBoundingClientRect();
+          return { x: (e.clientX - r.left) * (W / r.width), y: (e.clientY - r.top) * (H / r.height) };
+        }
+
+        canvas.addEventListener('mousedown', function (e) {
+          var p = getPos(e);
+          var dx = p.x - distToX(playerDist);
+          var dy = p.y - speedToY(speedAt(playerDist));
+          if (dx * dx + dy * dy < 200) draggingDot = true;
+        });
+        canvas.addEventListener('mousemove', function (e) {
+          if (!draggingDot) return;
+          var p = getPos(e);
+          playerDist = xToDist(p.x);
+        });
+        canvas.addEventListener('mouseup', function () { draggingDot = false; });
+        canvas.addEventListener('mouseleave', function () { draggingDot = false; });
+
+        // Touch
+        canvas.addEventListener('touchstart', function (e) {
+          e.preventDefault();
+          var t = e.touches[0];
+          var p = getPos(t);
+          var dx = p.x - distToX(playerDist);
+          var dy = p.y - speedToY(speedAt(playerDist));
+          if (dx * dx + dy * dy < 400) draggingDot = true;
+        }, { passive: false });
+        canvas.addEventListener('touchmove', function (e) {
+          if (!draggingDot) return;
+          e.preventDefault();
+          var t = e.touches[0];
+          var p = getPos(t);
+          playerDist = xToDist(p.x);
+        }, { passive: false });
+        canvas.addEventListener('touchend', function () { draggingDot = false; });
+
+        function draw() {
+          ctx.fillStyle = COLORS.bg;
+          ctx.fillRect(0, 0, W, H);
+
+          // Grid
+          ctx.strokeStyle = '#1c1c20';
+          ctx.lineWidth = 1;
+          for (var s = 0; s <= 20; s += 2) {
+            var gy = speedToY(s);
+            ctx.beginPath(); ctx.moveTo(PAD_L, gy); ctx.lineTo(W - PAD_R, gy); ctx.stroke();
+          }
+          for (var dd = 0; dd <= MAX_DIST; dd += 200) {
+            var gx = distToX(dd);
+            ctx.beginPath(); ctx.moveTo(gx, PAD_T); ctx.lineTo(gx, PAD_T + graphH); ctx.stroke();
+          }
+
+          // Axes
+          ctx.strokeStyle = COLORS.border;
+          ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(PAD_L, PAD_T); ctx.lineTo(PAD_L, PAD_T + graphH); ctx.lineTo(W - PAD_R, PAD_T + graphH); ctx.stroke();
+
+          // Labels
+          ctx.fillStyle = COLORS.dim;
+          ctx.font = '11px Inter, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('Distance', W / 2, H - 8);
+          ctx.save();
+          ctx.translate(14, PAD_T + graphH / 2);
+          ctx.rotate(-Math.PI / 2);
+          ctx.fillText('Speed', 0, 0);
+          ctx.restore();
+
+          // Y-axis ticks
+          ctx.textAlign = 'right';
+          ctx.font = '10px JetBrains Mono, monospace';
+          ctx.fillStyle = COLORS.dim;
+          for (var s2 = 0; s2 <= 20; s2 += 4) {
+            ctx.fillText(s2, PAD_L - 6, speedToY(s2) + 3);
+          }
+          // X-axis ticks
+          ctx.textAlign = 'center';
+          for (var d2 = 0; d2 <= MAX_DIST; d2 += 400) {
+            ctx.fillText(d2, distToX(d2), PAD_T + graphH + 16);
+          }
+
+          // Max speed line
+          ctx.setLineDash([6, 4]);
+          ctx.strokeStyle = COLORS.red + '80';
+          ctx.beginPath();
+          ctx.moveTo(PAD_L, speedToY(maxSpeed));
+          ctx.lineTo(W - PAD_R, speedToY(maxSpeed));
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = COLORS.red;
+          ctx.font = '10px Inter, sans-serif';
+          ctx.textAlign = 'left';
+          ctx.fillText('Max Speed = ' + maxSpeed, W - PAD_R - 100, speedToY(maxSpeed) - 6);
+
+          // The curve
+          ctx.strokeStyle = COLORS.accent;
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          for (var i = 0; i <= graphW; i++) {
+            var dist = (i / graphW) * MAX_DIST;
+            var spd = speedAt(dist);
+            var px = PAD_L + i;
+            var py = speedToY(spd);
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+          }
+          ctx.stroke();
+          ctx.lineWidth = 1;
+
+          // Fill under curve
+          ctx.globalAlpha = 0.08;
+          ctx.fillStyle = COLORS.accent;
+          ctx.lineTo(W - PAD_R, PAD_T + graphH);
+          ctx.lineTo(PAD_L, PAD_T + graphH);
+          ctx.closePath();
+          ctx.fill();
+          ctx.globalAlpha = 1;
+
+          // Player dot
+          var dotX = distToX(playerDist);
+          var dotY = speedToY(speedAt(playerDist));
+
+          // Crosshair lines
+          ctx.setLineDash([3, 3]);
+          ctx.strokeStyle = COLORS.accent + '50';
+          ctx.beginPath(); ctx.moveTo(dotX, PAD_T + graphH); ctx.lineTo(dotX, dotY); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(PAD_L, dotY); ctx.lineTo(dotX, dotY); ctx.stroke();
+          ctx.setLineDash([]);
+
+          // Dot
+          ctx.beginPath();
+          ctx.arc(dotX, dotY, 7, 0, Math.PI * 2);
+          ctx.fillStyle = COLORS.accent;
+          ctx.fill();
+          ctx.strokeStyle = COLORS.text;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.lineWidth = 1;
+
+          // Dot label
+          ctx.fillStyle = COLORS.text;
+          ctx.font = '11px JetBrains Mono, monospace';
+          ctx.textAlign = 'left';
+          var spLabel = speedAt(playerDist).toFixed(1);
+          ctx.fillText('d=' + Math.round(playerDist) + '  v=' + spLabel, dotX + 12, dotY - 8);
+
+          // Formula
+          ctx.fillStyle = COLORS.muted;
+          ctx.font = '12px JetBrains Mono, monospace';
+          ctx.textAlign = 'left';
+          ctx.fillText('speed = min(' + maxSpeed + ', ' + baseSpeed + ' + dist * ' + rampRate.toFixed(3) + ')', PAD_L + 4, PAD_T + 16);
+        }
+
+        function loop() {
+          draw();
+          requestAnimationFrame(loop);
+        }
+        requestAnimationFrame(loop);
+      })();
+
+      // =====================================================================
+      //  DEMO 3 — Parallax Scrolling Demo
+      // =====================================================================
+      (function parallaxDemo() {
+        var d = initCanvas('parallax-canvas', 760, 250);
+        if (!d) return;
+        var ctx = d.ctx, W = d.w, H = d.h;
+
+        var farFactor = 0.2, midFactor = 0.5, nearFactor = 1.0, scrollSpeed = 2;
+        var cameraX = 0;
+
+        var farEl  = document.getElementById('parallax-far');
+        var midEl  = document.getElementById('parallax-mid');
+        var nearEl = document.getElementById('parallax-near');
+        var spdEl  = document.getElementById('parallax-speed');
+        var farValEl  = document.getElementById('parallax-far-val');
+        var midValEl  = document.getElementById('parallax-mid-val');
+        var nearValEl = document.getElementById('parallax-near-val');
+        var spdValEl  = document.getElementById('parallax-speed-val');
+
+        function bind(el, valEl, setter, suffix) {
+          if (!el) return;
+          el.addEventListener('input', function () {
+            var v = parseFloat(this.value);
+            setter(v);
+            if (valEl) valEl.textContent = v.toFixed(suffix === 'x' ? 1 : (suffix ? 0 : 1)) + (suffix === 'x' ? 'x' : '');
+          });
+        }
+        bind(farEl, farValEl, function(v){ farFactor=v; }, 'x');
+        bind(midEl, midValEl, function(v){ midFactor=v; }, 'x');
+        bind(nearEl, nearValEl, function(v){ nearFactor=v; }, 'x');
+        bind(spdEl, spdValEl, function(v){ scrollSpeed=v; });
+
+        // Pre-generate shapes for each layer
+        function generateLayer(count, minH, maxH, minW, maxW) {
+          var shapes = [];
+          for (var i = 0; i < count; i++) {
+            shapes.push({ x: i * (W / count * 1.5) + rand(0, 50), w: rand(minW, maxW), h: rand(minH, maxH) });
+          }
+          return shapes;
+        }
+
+        // Stars for sky
+        var stars = [];
+        for (var si = 0; si < 60; si++) stars.push({ x: rand(0, W * 3), y: rand(4, 70), r: rand(0.5, 1.5), b: rand(0.3, 1) });
+
+        // Far layer: distant mountains/hills
+        var farShapes = generateLayer(10, 30, 60, 80, 160);
+        // Mid layer: buildings/trees
+        var midShapes = generateLayer(14, 20, 50, 30, 60);
+        // Near layer: ground features
+        var nearShapes = generateLayer(20, 10, 25, 20, 40);
+
+        function drawLayerRepeating(shapes, factor, baseY, heightScale, color, outlineColor) {
+          var offset = (cameraX * factor) % (W * 1.5);
+          ctx.fillStyle = color;
+          for (var i = 0; i < shapes.length; i++) {
+            var s = shapes[i];
+            var sx = s.x - offset;
+            // wrap
+            while (sx > W + 200) sx -= W * 1.5;
+            while (sx + s.w < -200) sx += W * 1.5;
+            var sh = s.h * heightScale;
+            ctx.fillRect(sx, baseY - sh, s.w, sh);
+            if (outlineColor) {
+              ctx.strokeStyle = outlineColor;
+              ctx.strokeRect(sx, baseY - sh, s.w, sh);
+            }
+          }
+        }
+
+        function draw() {
+          // Sky gradient
+          var grad = ctx.createLinearGradient(0, 0, 0, H);
+          grad.addColorStop(0, '#0a0a1a');
+          grad.addColorStop(0.5, '#111128');
+          grad.addColorStop(1, '#1a1a2e');
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, W, H);
+
+          // Stars
+          var starOff = (cameraX * 0.05) % (W * 3);
+          for (var si2 = 0; si2 < stars.length; si2++) {
+            var st = stars[si2];
+            var stx = st.x - starOff;
+            while (stx < -10) stx += W * 3;
+            while (stx > W + 10) stx -= W * 3;
+            ctx.globalAlpha = st.b;
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(stx, st.y, st.r, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.globalAlpha = 1;
+
+          // Far layer (mountains) — depth_factor label
+          var farY = H * 0.65;
+          drawLayerRepeating(farShapes, farFactor, farY, 1, '#1e2a45', '#2a3a5a');
+          // fill ground below
+          ctx.fillStyle = '#1e2a45';
+          ctx.fillRect(0, farY, W, H - farY);
+
+          // Mid layer (buildings)
+          var midY = H * 0.78;
+          drawLayerRepeating(midShapes, midFactor, midY, 1, '#2a3a2a', '#3a5a3a');
+          ctx.fillStyle = '#2a3a2a';
+          ctx.fillRect(0, midY, W, H - midY);
+
+          // Near layer (ground details)
+          var nearY = H * 0.9;
+          drawLayerRepeating(nearShapes, nearFactor, nearY, 1, '#3a2a1e', '#5a4a3e');
+          ctx.fillStyle = '#3a2a1e';
+          ctx.fillRect(0, nearY, W, H - nearY);
+
+          // Ground line
+          ctx.fillStyle = '#5a4a3e';
+          ctx.fillRect(0, H * 0.9, W, H * 0.1);
+
+          // Layer labels
+          ctx.font = '11px Inter, sans-serif';
+          ctx.textAlign = 'left';
+          ctx.fillStyle = '#4a6a9a';
+          ctx.fillText('Far layer: ' + farFactor.toFixed(1) + 'x', 10, farY - 10);
+          ctx.fillStyle = '#5a8a5a';
+          ctx.fillText('Mid layer: ' + midFactor.toFixed(1) + 'x', 10, midY - 8);
+          ctx.fillStyle = '#8a6a4e';
+          ctx.fillText('Near layer: ' + nearFactor.toFixed(1) + 'x', 10, nearY - 6);
+        }
+
+        var lastT = 0;
+        function loop(ts) {
+          var dt = Math.min((ts - lastT) / 1000, 0.05);
+          lastT = ts;
+          cameraX += scrollSpeed * 80 * dt;
+          draw();
+          requestAnimationFrame(loop);
+        }
+        requestAnimationFrame(function (ts) { lastT = ts; loop(ts); });
+      })();
+
+      // =====================================================================
+      //  DEMO 4 — Procedural Generation with Constraints
+      // =====================================================================
+      (function procgenDemo() {
+        var d = initCanvas('procgen-canvas', 760, 350);
+        if (!d) return;
+        var ctx = d.ctx, W = d.w, H = d.h;
+
+        var constrainEl = document.getElementById('procgen-constrain');
+        var genBtn = document.getElementById('procgen-generate');
+        var statusEl = document.getElementById('procgen-status');
+
+        var GROUND_Y = 200;
+        var PLAT_H = 30;
+        var MAX_JUMP = 140; // pixels — the max distance a player can jump
+        var MIN_GAP = 30;
+        var MAX_GAP_UNCONSTRAINED = 220;
+        var MAX_GAP_CONSTRAINED = MAX_JUMP * 0.9;
+
+        var platforms = [];
+        var invalidGaps = [];
+
+        function generate() {
+          platforms = [];
+          invalidGaps = [];
+          var withConstraints = constrainEl ? constrainEl.checked : true;
+          var x = 20;
+          var totalInvalid = 0;
+
+          // First platform
+          platforms.push({ x: x, w: rand(60, 120), y: GROUND_Y });
+          x += platforms[0].w;
+
+          for (var i = 0; i < 8; i++) {
+            var gapW = rand(MIN_GAP, withConstraints ? MAX_GAP_CONSTRAINED : MAX_GAP_UNCONSTRAINED);
+            var isInvalid = gapW > MAX_JUMP;
+
+            if (isInvalid) {
+              invalidGaps.push({ x: x, w: gapW });
+              totalInvalid++;
+            }
+
+            x += gapW;
+            var platW = rand(40, 90);
+            platforms.push({ x: x, w: platW, y: GROUND_Y, invalid: isInvalid });
+            x += platW;
+          }
+
+          if (statusEl) {
+            if (withConstraints) {
+              statusEl.textContent = 'All gaps jumpable!';
+              statusEl.style.color = COLORS.green;
+            } else {
+              statusEl.textContent = totalInvalid + ' impossible gap' + (totalInvalid !== 1 ? 's' : '') + '!';
+              statusEl.style.color = totalInvalid > 0 ? COLORS.red : COLORS.green;
+            }
+          }
+        }
+
+        generate();
+        if (genBtn) genBtn.addEventListener('click', generate);
+        if (constrainEl) constrainEl.addEventListener('change', generate);
+
+        function draw() {
+          ctx.fillStyle = COLORS.bg;
+          ctx.fillRect(0, 0, W, H);
+
+          // Title
+          ctx.fillStyle = COLORS.muted;
+          ctx.font = '12px Inter, sans-serif';
+          ctx.textAlign = 'left';
+          var constrainedNow = constrainEl ? constrainEl.checked : true;
+          ctx.fillText(constrainedNow ? 'Mode: With Constraints (all gaps solvable)' : 'Mode: Without Constraints (some gaps may be impossible)', 16, 22);
+
+          // Max jump distance legend
+          ctx.fillStyle = COLORS.dim;
+          ctx.font = '11px Inter, sans-serif';
+          ctx.fillText('Max jump distance:', 16, GROUND_Y + PLAT_H + 60);
+
+          ctx.setLineDash([4, 4]);
+          ctx.strokeStyle = COLORS.accent;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(160, GROUND_Y + PLAT_H + 54);
+          ctx.lineTo(160 + MAX_JUMP, GROUND_Y + PLAT_H + 54);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.lineWidth = 1;
+
+          // Arrow heads
+          ctx.fillStyle = COLORS.accent;
+          ctx.beginPath(); ctx.moveTo(160, GROUND_Y + PLAT_H + 50); ctx.lineTo(160, GROUND_Y + PLAT_H + 58); ctx.lineTo(155, GROUND_Y + PLAT_H + 54); ctx.fill();
+          ctx.beginPath(); ctx.moveTo(160 + MAX_JUMP, GROUND_Y + PLAT_H + 50); ctx.lineTo(160 + MAX_JUMP, GROUND_Y + PLAT_H + 58); ctx.lineTo(165 + MAX_JUMP, GROUND_Y + PLAT_H + 54); ctx.fill();
+
+          ctx.fillStyle = COLORS.accent;
+          ctx.font = '11px JetBrains Mono, monospace';
+          ctx.fillText(MAX_JUMP + 'px', 160 + MAX_JUMP / 2 - 15, GROUND_Y + PLAT_H + 50);
+
+          // Draw platforms and gaps
+          for (var i = 0; i < platforms.length; i++) {
+            var p = platforms[i];
+
+            // Platform
+            ctx.fillStyle = p.invalid ? COLORS.red + '40' : COLORS.surface;
+            ctx.fillRect(p.x, p.y, p.w, PLAT_H);
+            ctx.strokeStyle = p.invalid ? COLORS.red : COLORS.green;
+            ctx.lineWidth = p.invalid ? 2 : 1;
+            ctx.strokeRect(p.x, p.y, p.w, PLAT_H);
+            ctx.lineWidth = 1;
+
+            // Gap annotation
+            if (i < platforms.length - 1) {
+              var nextP = platforms[i + 1];
+              var gapStart = p.x + p.w;
+              var gapEnd = nextP.x;
+              var gapW = gapEnd - gapStart;
+              var isInvalid = gapW > MAX_JUMP;
+
+              // gap fill
+              if (isInvalid) {
+                ctx.fillStyle = COLORS.red + '15';
+                ctx.fillRect(gapStart, GROUND_Y - 40, gapW, PLAT_H + 40);
+              }
+
+              // gap width label
+              ctx.fillStyle = isInvalid ? COLORS.red : COLORS.muted;
+              ctx.font = '10px JetBrains Mono, monospace';
+              ctx.textAlign = 'center';
+              ctx.fillText(Math.round(gapW) + 'px', gapStart + gapW / 2, GROUND_Y - 8);
+
+              // gap bracket
+              ctx.strokeStyle = isInvalid ? COLORS.red : COLORS.dim;
+              ctx.beginPath();
+              ctx.moveTo(gapStart + 2, GROUND_Y - 2);
+              ctx.lineTo(gapStart + 2, GROUND_Y - 14);
+              ctx.lineTo(gapEnd - 2, GROUND_Y - 14);
+              ctx.lineTo(gapEnd - 2, GROUND_Y - 2);
+              ctx.stroke();
+
+              // Max jump dotted line over gap
+              if (isInvalid) {
+                ctx.setLineDash([3, 3]);
+                ctx.strokeStyle = COLORS.accent + '80';
+                ctx.beginPath();
+                ctx.moveTo(gapStart, GROUND_Y + PLAT_H / 2);
+                ctx.lineTo(gapStart + MAX_JUMP, GROUND_Y + PLAT_H / 2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // X mark
+                ctx.fillStyle = COLORS.red;
+                ctx.font = 'bold 16px Inter, sans-serif';
+                ctx.fillText('X', gapStart + gapW / 2, GROUND_Y + PLAT_H / 2 + 6);
+              } else {
+                // Checkmark
+                ctx.fillStyle = COLORS.green;
+                ctx.font = '14px Inter, sans-serif';
+                ctx.fillText('\u2713', gapStart + gapW / 2, GROUND_Y + PLAT_H + 18);
+              }
+              ctx.textAlign = 'left';
+            }
+          }
+
+          // Player on first platform
+          if (platforms.length > 0) {
+            var fp = platforms[0];
+            ctx.fillStyle = COLORS.accent;
+            ctx.fillRect(fp.x + fp.w / 2 - 8, fp.y - 24, 16, 24);
+            ctx.fillStyle = COLORS.text;
+            ctx.font = '10px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('player', fp.x + fp.w / 2, fp.y - 28);
+            ctx.textAlign = 'left';
+          }
+
+          // Legend
+          var legY = H - 40;
+          ctx.fillStyle = COLORS.dim;
+          ctx.font = '11px Inter, sans-serif';
+          ctx.fillText('Legend:', 16, legY);
+
+          ctx.fillStyle = COLORS.green;
+          ctx.fillRect(70, legY - 8, 12, 12);
+          ctx.fillStyle = COLORS.dim;
+          ctx.fillText('Jumpable', 86, legY);
+
+          ctx.fillStyle = COLORS.red;
+          ctx.fillRect(160, legY - 8, 12, 12);
+          ctx.fillStyle = COLORS.dim;
+          ctx.fillText('Impossible (gap > max jump)', 176, legY);
+        }
+
+        draw();
+        // Redraw on button / checkbox changes already handled by generate -> draw
+        var origGenerate = generate;
+        generate = function () { origGenerate(); draw(); };
+        if (genBtn) genBtn.addEventListener('click', function() {}); // already bound above
+        // Re-bind to the new generate
+        if (genBtn) { genBtn.onclick = generate; }
+        if (constrainEl) { constrainEl.onchange = generate; }
+      })();
+
+      // =====================================================================
+      //  DEMO 5 — Mini Endless Runner
+      // =====================================================================
+      (function runnerDemo() {
+        var d = initCanvas('runner-canvas', 760, 400);
+        if (!d) return;
+        var ctx = d.ctx, W = d.w, H = d.h, canvas = d.canvas;
+
+        var scoreEl = document.getElementById('runner-score');
+        var highEl  = document.getElementById('runner-highscore');
+        var speedEl = document.getElementById('runner-speed');
+        var restartBtn = document.getElementById('runner-restart');
+
+        var GROUND_Y = 330;
+        var GRAVITY = 1400;
+        var JUMP_VEL = -520;
+        var BASE_SPEED = 180;
+        var MAX_SPEED = 500;
+        var RAMP_RATE = 0.015;
+        var PLAYER_W = 24;
+        var PLAYER_H = 32;
+        var PLAYER_X = 100;
+        var CHUNK_W = 200;
+
+        // Parallax layers for runner
+        var rStars = [];
+        for (var i = 0; i < 40; i++) rStars.push({ x: rand(0, W * 4), y: rand(5, 80), r: rand(0.5, 1.5), b: rand(0.3, 1) });
+        var rFar = []; for (var f = 0; f < 16; f++) rFar.push({ x: f * 100 + rand(0, 30), w: rand(60, 120), h: rand(30, 60) });
+        var rMid = []; for (var m = 0; m < 20; m++) rMid.push({ x: m * 70 + rand(0, 20), w: rand(25, 50), h: rand(20, 50) });
+
+        var highScore = 0;
+        try { highScore = parseInt(localStorage.getItem('m04_runner_high') || '0', 10) || 0; } catch(e) {}
+
+        var state, player, chunks, distance, speed, gameOver, started;
+
+        function initGame() {
+          player = { y: GROUND_Y - PLAYER_H, vy: 0, grounded: true };
+          chunks = [];
+          distance = 0;
+          speed = BASE_SPEED;
+          gameOver = false;
+          started = false;
+
+          // Generate initial ground chunks
+          var x = 0;
+          for (var i = 0; i < 8; i++) {
+            chunks.push(makeChunk(x, i < 3)); // first 3 are safe (solid ground)
+            x += CHUNK_W;
+          }
+          updateUI();
+        }
+
+        function makeChunk(x, safe) {
+          var hasGap = false;
+          var gapStart = 0;
+          var gapWidth = 0;
+
+          if (!safe && Math.random() > 0.35) {
+            hasGap = true;
+            // Max jumpable gap based on current speed
+            var maxJumpDist = speed * 0.45;
+            gapWidth = rand(40, Math.min(maxJumpDist * 0.85, CHUNK_W * 0.6));
+            gapStart = rand(20, CHUNK_W - gapWidth - 20);
+          }
+
+          return {
+            x: x,
+            w: CHUNK_W,
+            hasGap: hasGap,
+            gapStart: gapStart,
+            gapWidth: gapWidth,
+            decorations: generateDecorations()
+          };
+        }
+
+        function generateDecorations() {
+          var decs = [];
+          var n = randInt(0, 3);
+          for (var i = 0; i < n; i++) {
+            decs.push({ xOff: rand(10, CHUNK_W - 20), h: rand(4, 12), w: rand(3, 8) });
+          }
+          return decs;
+        }
+
+        function updateUI() {
+          if (scoreEl) scoreEl.textContent = 'Distance: ' + Math.floor(distance);
+          if (highEl) highEl.textContent = 'Best: ' + highScore;
+          if (speedEl) speedEl.textContent = 'Speed: ' + speed.toFixed(1);
+        }
+
+        function jump() {
+          if (gameOver) { initGame(); return; }
+          if (!started) started = true;
+          if (player.grounded) {
+            player.vy = JUMP_VEL;
+            player.grounded = false;
+          }
+        }
+
+        // Input
+        window.addEventListener('keydown', function (e) {
+          if (e.code === 'Space' || e.key === ' ') {
+            // Only handle if runner canvas is visible-ish
+            var rect = canvas.getBoundingClientRect();
+            if (rect.top < window.innerHeight && rect.bottom > 0) {
+              e.preventDefault();
+              jump();
+            }
+          }
+        });
+        canvas.addEventListener('click', jump);
+        canvas.addEventListener('touchstart', function (e) { e.preventDefault(); jump(); }, { passive: false });
+        if (restartBtn) restartBtn.addEventListener('click', function () { initGame(); });
+
+        function isOnGround(px, pw) {
+          // Check if the player's feet area is over solid ground
+          var leftFoot = px + 4;
+          var rightFoot = px + pw - 4;
+          for (var i = 0; i < chunks.length; i++) {
+            var ch = chunks[i];
+            // Check if feet are within this chunk's x range
+            if (rightFoot > ch.x && leftFoot < ch.x + ch.w) {
+              if (ch.hasGap) {
+                var gapL = ch.x + ch.gapStart;
+                var gapR = gapL + ch.gapWidth;
+                // Player falls if both feet are over the gap
+                if (leftFoot >= gapL && rightFoot <= gapR) {
+                  return false;
+                }
+                // Player falls if center is over gap
+                var center = (leftFoot + rightFoot) / 2;
+                if (center > gapL && center < gapR && leftFoot > gapL - 6) {
+                  return false;
+                }
+              }
+              return true;
+            }
+          }
+          return false;
+        }
+
+        function tick(dt) {
+          if (gameOver || !started) return;
+
+          speed = Math.min(MAX_SPEED, BASE_SPEED + distance * RAMP_RATE);
+          distance += speed * dt;
+
+          // Move chunks
+          var dx = speed * dt;
+          for (var i = chunks.length - 1; i >= 0; i--) {
+            chunks[i].x -= dx;
+            if (chunks[i].x + CHUNK_W < -50) {
+              chunks.splice(i, 1);
+            }
+          }
+
+          // Add new chunks at the right
+          var rightmost = 0;
+          for (var j = 0; j < chunks.length; j++) {
+            var re = chunks[j].x + chunks[j].w;
+            if (re > rightmost) rightmost = re;
+          }
+          while (rightmost < W + CHUNK_W * 2) {
+            chunks.push(makeChunk(rightmost, false));
+            rightmost += CHUNK_W;
+          }
+
+          // Player physics
+          if (!player.grounded) {
+            player.vy += GRAVITY * dt;
+            player.y += player.vy * dt;
+          }
+
+          // Ground check
+          if (player.y >= GROUND_Y - PLAYER_H) {
+            if (isOnGround(PLAYER_X, PLAYER_W)) {
+              player.y = GROUND_Y - PLAYER_H;
+              player.vy = 0;
+              player.grounded = true;
+            }
+          }
+
+          // If player is on ground level but over a gap, start falling
+          if (player.grounded) {
+            if (!isOnGround(PLAYER_X, PLAYER_W)) {
+              player.grounded = false;
+            }
+          }
+
+          // Death: fell off screen
+          if (player.y > H + 50) {
+            gameOver = true;
+            if (Math.floor(distance) > highScore) {
+              highScore = Math.floor(distance);
+              try { localStorage.setItem('m04_runner_high', String(highScore)); } catch(e) {}
+            }
+          }
+
+          updateUI();
+        }
+
+        function drawParallaxBg() {
+          // Sky
+          var grad = ctx.createLinearGradient(0, 0, 0, H);
+          grad.addColorStop(0, '#05050f');
+          grad.addColorStop(0.6, '#0a0a1e');
+          grad.addColorStop(1, '#141428');
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, W, H);
+
+          // Stars — 0.05x
+          var starOff = (distance * 0.05) % (W * 4);
+          for (var s = 0; s < rStars.length; s++) {
+            var st = rStars[s];
+            var stx = st.x - starOff;
+            while (stx < -10) stx += W * 4;
+            while (stx > W + 10) stx -= W * 4;
+            ctx.globalAlpha = st.b;
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(stx, st.y, st.r, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.globalAlpha = 1;
+
+          // Far buildings — 0.15x
+          var farOff = (distance * 0.15) % (W * 2);
+          ctx.fillStyle = '#12162a';
+          for (var f = 0; f < rFar.length; f++) {
+            var fb = rFar[f];
+            var fx = fb.x - farOff;
+            while (fx < -200) fx += W * 2;
+            while (fx > W + 200) fx -= W * 2;
+            ctx.fillRect(fx, GROUND_Y - fb.h - 40, fb.w, fb.h + 40);
+          }
+
+          // Mid trees — 0.4x
+          var midOff = (distance * 0.4) % (W * 2);
+          ctx.fillStyle = '#1a2a1a';
+          for (var m2 = 0; m2 < rMid.length; m2++) {
+            var mb = rMid[m2];
+            var mx = mb.x - midOff;
+            while (mx < -100) mx += W * 2;
+            while (mx > W + 100) mx -= W * 2;
+            ctx.fillRect(mx, GROUND_Y - mb.h - 10, mb.w, mb.h + 10);
+          }
+        }
+
+        function draw() {
+          drawParallaxBg();
+
+          // Ground chunks
+          for (var i = 0; i < chunks.length; i++) {
+            var ch = chunks[i];
+
+            if (ch.hasGap) {
+              // Draw ground with gap
+              var gapL = ch.x + ch.gapStart;
+              var gapR = gapL + ch.gapWidth;
+
+              // Left part
+              if (ch.gapStart > 0) {
+                ctx.fillStyle = '#2a2a30';
+                ctx.fillRect(ch.x, GROUND_Y, ch.gapStart, H - GROUND_Y);
+                ctx.fillStyle = '#3a3a42';
+                ctx.fillRect(ch.x, GROUND_Y, ch.gapStart, 3);
+              }
+
+              // Right part
+              var rightStart = ch.gapStart + ch.gapWidth;
+              var rightW = ch.w - rightStart;
+              if (rightW > 0) {
+                ctx.fillStyle = '#2a2a30';
+                ctx.fillRect(ch.x + rightStart, GROUND_Y, rightW, H - GROUND_Y);
+                ctx.fillStyle = '#3a3a42';
+                ctx.fillRect(ch.x + rightStart, GROUND_Y, rightW, 3);
+              }
+
+              // Gap darkness
+              ctx.fillStyle = '#050508';
+              ctx.fillRect(gapL, GROUND_Y, ch.gapWidth, H - GROUND_Y);
+
+              // Gap edge highlights
+              ctx.fillStyle = '#4a4a52';
+              ctx.fillRect(gapL - 1, GROUND_Y, 2, H - GROUND_Y);
+              ctx.fillRect(gapR - 1, GROUND_Y, 2, H - GROUND_Y);
+
+            } else {
+              // Solid ground
+              ctx.fillStyle = '#2a2a30';
+              ctx.fillRect(ch.x, GROUND_Y, ch.w, H - GROUND_Y);
+              ctx.fillStyle = '#3a3a42';
+              ctx.fillRect(ch.x, GROUND_Y, ch.w, 3);
+            }
+
+            // Decorations on ground
+            for (var dd = 0; dd < ch.decorations.length; dd++) {
+              var dec = ch.decorations[dd];
+              var decX = ch.x + dec.xOff;
+              // Only draw if not over a gap
+              if (ch.hasGap) {
+                var gL = ch.x + ch.gapStart;
+                var gR = gL + ch.gapWidth;
+                if (decX > gL && decX < gR) continue;
+              }
+              ctx.fillStyle = '#3a3a42';
+              ctx.fillRect(decX, GROUND_Y - dec.h, dec.w, dec.h);
+            }
+          }
+
+          // Player
+          var py = player.y;
+          // Body
+          ctx.fillStyle = COLORS.accent;
+          ctx.fillRect(PLAYER_X, py, PLAYER_W, PLAYER_H);
+          // Eye
+          ctx.fillStyle = COLORS.bg;
+          ctx.fillRect(PLAYER_X + PLAYER_W - 8, py + 6, 5, 5);
+          // Legs (if grounded)
+          if (player.grounded) {
+            ctx.fillStyle = COLORS.accent;
+            ctx.fillRect(PLAYER_X + 3, py + PLAYER_H, 6, 5);
+            ctx.fillRect(PLAYER_X + PLAYER_W - 9, py + PLAYER_H, 6, 5);
+          } else {
+            // Tuck legs when jumping
+            ctx.fillStyle = COLORS.accent;
+            ctx.fillRect(PLAYER_X + 3, py + PLAYER_H - 2, 8, 4);
+            ctx.fillRect(PLAYER_X + PLAYER_W - 11, py + PLAYER_H - 2, 8, 4);
+          }
+
+          // HUD
+          ctx.fillStyle = COLORS.text;
+          ctx.font = 'bold 16px JetBrains Mono, monospace';
+          ctx.textAlign = 'left';
+          ctx.fillText(Math.floor(distance) + 'm', 16, 28);
+          ctx.font = '12px JetBrains Mono, monospace';
+          ctx.fillStyle = COLORS.dim;
+          ctx.fillText('BEST: ' + highScore + 'm', 16, 46);
+          ctx.fillText('SPD: ' + speed.toFixed(0), 16, 62);
+
+          // Game over or start screen
+          if (gameOver) {
+            ctx.fillStyle = 'rgba(10,10,11,0.7)';
+            ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = COLORS.red;
+            ctx.font = 'bold 28px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('GAME OVER', W / 2, H / 2 - 30);
+            ctx.fillStyle = COLORS.text;
+            ctx.font = '18px JetBrains Mono, monospace';
+            ctx.fillText(Math.floor(distance) + 'm', W / 2, H / 2 + 5);
+            if (Math.floor(distance) >= highScore && distance > 0) {
+              ctx.fillStyle = COLORS.accent;
+              ctx.font = '14px Inter, sans-serif';
+              ctx.fillText('NEW BEST!', W / 2, H / 2 + 30);
+            }
+            ctx.fillStyle = COLORS.muted;
+            ctx.font = '14px Inter, sans-serif';
+            ctx.fillText('Press Space or click to restart', W / 2, H / 2 + 60);
+            ctx.textAlign = 'left';
+          } else if (!started) {
+            ctx.fillStyle = 'rgba(10,10,11,0.5)';
+            ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = COLORS.accent;
+            ctx.font = 'bold 22px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('ENDLESS RUNNER', W / 2, H / 2 - 20);
+            ctx.fillStyle = COLORS.muted;
+            ctx.font = '14px Inter, sans-serif';
+            ctx.fillText('Press Space or click/tap to jump', W / 2, H / 2 + 15);
+            ctx.fillStyle = COLORS.dim;
+            ctx.font = '12px Inter, sans-serif';
+            ctx.fillText('Speed increases over time. How far can you go?', W / 2, H / 2 + 40);
+            ctx.textAlign = 'left';
+          }
+        }
+
+        initGame();
+
+        var lastT = 0;
+        function loop(ts) {
+          var dt = Math.min((ts - lastT) / 1000, 0.05);
+          lastT = ts;
+          tick(dt);
+          draw();
+          requestAnimationFrame(loop);
+        }
+        requestAnimationFrame(function (ts) { lastT = ts; loop(ts); });
+      })();
+
+    })();
+  </script>
 </BaseLayout>

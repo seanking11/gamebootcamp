@@ -5,15 +5,21 @@ const base = import.meta.env.BASE_URL;
 
 <BaseLayout title="Module 02: 2D Platformer">
   <div class="container page-content">
+
+    <!-- Module Header -->
     <div class="module-header">
       <div class="module-number">Module 02</div>
       <h1>2D Platformer</h1>
-      <p class="module-theme">Physics, spatial design, and "game feel"</p>
+      <p class="module-theme">Weeks 3-4 | Physics, spatial design, and "game feel"</p>
     </div>
 
     <blockquote>
       <p>"A platformer lives or dies on whether the jump feels right."</p>
     </blockquote>
+
+    <!-- ============================================================ -->
+    <!-- WEEK 1: HISTORY & DESIGN THEORY                              -->
+    <!-- ============================================================ -->
 
     <hr />
 
@@ -40,12 +46,18 @@ const base = import.meta.env.BASE_URL;
 
     <hr />
 
+    <!-- ============================================================ -->
+    <!-- WEEK 2: BUILD THE MVP                                        -->
+    <!-- ============================================================ -->
+
     <h2>Week 2: Build the MVP</h2>
 
     <h3>What You're Building</h3>
     <p>A single-screen (or short-scrolling) level with platforms the player can jump between. That's the core. If the jump feels good, you've succeeded.</p>
 
     <h3>Core Concepts (Must Implement)</h3>
+
+    <!-- ==================== CONCEPT 1: GRAVITY ==================== -->
 
     <h4>1. Gravity &amp; Acceleration-Based Movement</h4>
     <p>Apply a constant downward acceleration to the player's y-velocity each frame:</p>
@@ -54,9 +66,25 @@ y += vy * dt</code></pre>
     <p>This produces a parabolic jump arc &mdash; fundamentally different from Pong's linear ball motion.</p>
     <p><strong>Why it matters:</strong> This is Euler integration. The pattern (accumulate forces &rarr; update velocity &rarr; update position) is the foundation of every physics system from Phaser's Arcade to Box2D to Havok.</p>
 
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Gravity &amp; Jump Arc</div>
+      <p class="demo-hint">Use the sliders to adjust gravity and jump force, then press Spacebar or click "Jump" to launch the character. A dotted path traces the parabolic arc. Watch how the velocity values update in real-time.</p>
+      <canvas id="demo-gravity" width="760" height="400"></canvas>
+      <div class="demo-controls">
+        <button id="gravity-jump-btn">Jump (Space)</button>
+        <label>Gravity <input type="range" id="gravity-slider" min="400" max="2400" value="1200" step="50" /> <span class="value-display" id="gravity-val">1200</span></label>
+        <label>Jump Force <input type="range" id="jump-slider" min="200" max="900" value="500" step="25" /> <span class="value-display" id="jump-val">500</span></label>
+        <span class="value-display" id="gravity-vdisp">vy: 0</span>
+      </div>
+    </div>
+
+    <!-- ==================== CONCEPT 2: GROUNDED STATE ==================== -->
+
     <h4>2. Grounded-State Detection</h4>
     <p>Track whether the player is standing on a surface. Only allow jump input when <code>isGrounded === true</code>.</p>
     <p><strong>Why it matters:</strong> Input processing must be context-dependent. This pattern recurs in dashing, wall-jumping, attacking &mdash; any ability with preconditions.</p>
+
+    <!-- ==================== CONCEPT 3: TILEMAP ==================== -->
 
     <h4>3. Tilemap / Level Data</h4>
     <p>Represent the level as a 2D array of integers:</p>
@@ -65,6 +93,8 @@ y += vy * dt</code></pre>
 2 = hazard (stretch)</code></pre>
     <p>Render and collide against it by mapping world coordinates to grid indices.</p>
     <p><strong>Why it matters:</strong> Tilemaps are the most common spatial data structure in 2D games (roguelikes, RTSs, puzzle games). They make collision lookups fast by converting world positions directly to grid indices.</p>
+
+    <!-- ==================== CONCEPT 4: TILE COLLISION ==================== -->
 
     <h4>4. Tile-Based Collision Resolution</h4>
     <p>Resolve collisions between the player (a moving AABB) and static tile geometry:</p>
@@ -76,6 +106,18 @@ y += vy * dt</code></pre>
     <p>Resolving one axis before the other prevents corner-catching and tunneling bugs.</p>
     <p><strong>Why it matters:</strong> Axis-separated resolution is the standard approach in 2D engines. Understanding the <em>why</em> prevents a class of bugs that plagues beginners.</p>
 
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Tilemap Collision</div>
+      <p class="demo-hint">Click tiles to toggle them solid (brown) or empty. Use Arrow keys or WASD to move the character. The character falls with gravity and collides with solid tiles. Tiles being checked for collision are highlighted in yellow.</p>
+      <canvas id="demo-tilemap" width="760" height="400"></canvas>
+      <div class="demo-controls">
+        <button id="tilemap-reset-btn">Reset Grid</button>
+        <span class="value-display" id="tilemap-info">Click tiles to build, arrow keys to move</span>
+      </div>
+    </div>
+
+    <!-- ==================== CONCEPT 5: STATE MACHINE ==================== -->
+
     <h4>5. Player State Machine</h4>
     <p>An explicit FSM: <code>Idle</code>, <code>Running</code>, <code>Jumping</code>, <code>Falling</code>. Each state governs:</p>
     <ul>
@@ -85,13 +127,64 @@ y += vy * dt</code></pre>
     </ul>
     <p><strong>Why it matters:</strong> The State pattern applied to games. Scales to enemy AI, menu flow, network state, and any behavior with distinct modes.</p>
 
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Player State Machine Visualizer</div>
+      <p class="demo-hint">Use Arrow keys or WASD to control the character below. The FSM diagram above highlights the current state in real-time. Watch how states transition as you move, jump, and land.</p>
+      <canvas id="demo-fsm" width="760" height="250"></canvas>
+    </div>
+
+    <!-- ==================== CONCEPT 6: CAMERA ==================== -->
+
     <h4>6. Camera / Viewport Scrolling</h4>
     <p>If your level is larger than one screen, translate all rendered positions by a camera offset so the player stays centered (or within a deadzone).</p>
     <p><strong>Why it matters:</strong> Introduces the distinction between <em>world space</em> and <em>screen space</em> &mdash; fundamental to every game with a movable viewport.</p>
 
+    <!-- ==================== CONCEPT 7: ANIMATION ==================== -->
+
     <h4>7. Sprite Animation</h4>
     <p>Cycle through sprite frames based on the player's state. Idle loops, run cycles, jump/fall frames.</p>
     <p><strong>Why it matters:</strong> Visual output reflects logical state. The renderer displays what the state machine dictates &mdash; it never drives it.</p>
+
+    <hr />
+
+    <!-- ==================== COYOTE TIME ==================== -->
+
+    <h3>Why "Game Feel" Matters: Coyote Time</h3>
+
+    <p>One of the most important invisible affordances in a platformer is <strong>coyote time</strong> &mdash; a brief grace period after walking off a ledge during which the player can still jump. Without it, players who press jump one frame late simply fall. With it, the game feels generous and responsive.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Coyote Time Comparison</div>
+      <p class="demo-hint">Click "Run" on each side to see the difference. Left: NO coyote time (the character cannot jump once it leaves the ledge). Right: WITH coyote time (6-frame grace period). The timeline bar shows the grace window. The difference is viscerally obvious.</p>
+      <canvas id="demo-coyote" width="760" height="300"></canvas>
+      <div class="demo-controls">
+        <button id="coyote-run-left">Run Left Side (No Coyote)</button>
+        <button id="coyote-run-right">Run Right Side (With Coyote)</button>
+        <button id="coyote-reset">Reset Both</button>
+      </div>
+    </div>
+
+    <hr />
+
+    <!-- ==================== PUTTING IT ALL TOGETHER ==================== -->
+
+    <h3>Putting It All Together</h3>
+    <p>Below is a mini playable platformer combining every concept above: gravity, tile collision, a state machine, coyote time, and collectibles. Three small levels with platforms, coins, and a goal.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Mini Playable Platformer</div>
+      <p class="demo-hint">Arrow keys or WASD to move, Space to jump. Collect all the coins and reach the flag to advance. Three levels of increasing difficulty.</p>
+      <canvas id="demo-platformer" width="760" height="400"></canvas>
+      <div class="demo-controls">
+        <button id="plat-restart-btn">Restart Level</button>
+        <span class="value-display" id="plat-level-disp">Level 1</span>
+        <span class="value-display" id="plat-coin-disp">Coins: 0/0</span>
+      </div>
+    </div>
+
+    <hr />
+
+    <!-- ==================== STRETCH GOALS ==================== -->
 
     <h3>Stretch Goals (If Time Allows)</h3>
     <ul>
@@ -124,6 +217,8 @@ y += vy * dt</code></pre>
       <li>A playable platformer level</li>
       <li>Write-up: What did you learn? What was harder than expected?</li>
     </ul>
+
+    <!-- ==================== ANALOGIES ==================== -->
 
     <h2>Analogies by Background</h2>
 
@@ -195,3 +290,1459 @@ y += vy * dt</code></pre>
     </nav>
   </div>
 </BaseLayout>
+
+<script>
+// ============================================================
+// DEMO 1: GRAVITY & JUMP ARC
+// ============================================================
+(function() {
+  var canvas = document.getElementById('demo-gravity');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width, H = canvas.height;
+
+  var gravSlider = document.getElementById('gravity-slider');
+  var jumpSlider = document.getElementById('jump-slider');
+  var gravVal = document.getElementById('gravity-val');
+  var jumpVal = document.getElementById('jump-val');
+  var jumpBtn = document.getElementById('gravity-jump-btn');
+  var vDisp = document.getElementById('gravity-vdisp');
+
+  var GROUND_Y = H - 60;
+  var CHAR_W = 28, CHAR_H = 40;
+  var charX = 120, charY = GROUND_Y - CHAR_H;
+  var vy = 0;
+  var isGrounded = true;
+  var trail = [];
+  var lastTime = performance.now();
+
+  function getGravity() { return parseFloat(gravSlider.value); }
+  function getJumpForce() { return parseFloat(jumpSlider.value); }
+
+  gravSlider.addEventListener('input', function() { gravVal.textContent = gravSlider.value; });
+  jumpSlider.addEventListener('input', function() { jumpVal.textContent = jumpSlider.value; });
+
+  function doJump() {
+    if (!isGrounded) return;
+    vy = -getJumpForce();
+    isGrounded = false;
+    trail = [];
+  }
+
+  jumpBtn.addEventListener('click', doJump);
+  document.addEventListener('keydown', function(e) {
+    if (e.code === 'Space' && document.activeElement !== gravSlider && document.activeElement !== jumpSlider) {
+      // Only respond if canvas is somewhat visible
+      var rect = canvas.getBoundingClientRect();
+      if (rect.top < window.innerHeight && rect.bottom > 0) {
+        e.preventDefault();
+        doJump();
+      }
+    }
+  });
+
+  function draw(now) {
+    var rawDt = Math.min(now - lastTime, 50);
+    lastTime = now;
+    var dt = rawDt / 1000;
+
+    var gravity = getGravity();
+
+    if (!isGrounded) {
+      vy += gravity * dt;
+      charY += vy * dt;
+      trail.push({ x: charX + CHAR_W / 2, y: charY + CHAR_H / 2 });
+      if (trail.length > 300) trail.shift();
+
+      if (charY + CHAR_H >= GROUND_Y) {
+        charY = GROUND_Y - CHAR_H;
+        vy = 0;
+        isGrounded = true;
+      }
+    }
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Ground
+    ctx.fillStyle = '#27272a';
+    ctx.fillRect(0, GROUND_Y, W, H - GROUND_Y);
+    ctx.strokeStyle = '#3f3f46';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, GROUND_Y);
+    ctx.lineTo(W, GROUND_Y);
+    ctx.stroke();
+
+    // Grid lines for reference
+    ctx.strokeStyle = '#1c1c20';
+    ctx.lineWidth = 1;
+    for (var gy = 50; gy < GROUND_Y; gy += 50) {
+      ctx.beginPath();
+      ctx.moveTo(0, gy);
+      ctx.lineTo(W, gy);
+      ctx.stroke();
+    }
+
+    // Predicted arc (faint dotted line)
+    if (isGrounded) {
+      var predVy = -getJumpForce();
+      var predY = charY;
+      ctx.setLineDash([4, 6]);
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.3)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      var predX = charX + CHAR_W / 2;
+      ctx.moveTo(predX, predY + CHAR_H / 2);
+      for (var step = 0; step < 200; step++) {
+        predVy += gravity * 0.016;
+        predY += predVy * 0.016;
+        predX += 0.8;
+        if (predY + CHAR_H / 2 >= GROUND_Y) break;
+        ctx.lineTo(predX, predY + CHAR_H / 2);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Trail (dotted path of actual jump)
+    if (trail.length > 1) {
+      ctx.setLineDash([3, 5]);
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(trail[0].x, trail[0].y);
+      for (var i = 1; i < trail.length; i++) {
+        ctx.lineTo(trail[i].x, trail[i].y);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Character
+    var headR = 10;
+    var bodyTop = charY + headR * 2;
+    // Head
+    ctx.beginPath();
+    ctx.arc(charX + CHAR_W / 2, charY + headR, headR, 0, Math.PI * 2);
+    ctx.fillStyle = '#f59e0b';
+    ctx.fill();
+    // Body
+    ctx.fillStyle = '#f59e0b';
+    ctx.fillRect(charX + 6, bodyTop, CHAR_W - 12, CHAR_H - headR * 2 - 4);
+    // Eyes
+    ctx.fillStyle = '#0a0a0b';
+    ctx.fillRect(charX + CHAR_W / 2 + 2, charY + headR - 3, 3, 3);
+    ctx.fillRect(charX + CHAR_W / 2 - 5, charY + headR - 3, 3, 3);
+    // Legs
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 3;
+    if (!isGrounded) {
+      // Legs tucked
+      ctx.beginPath();
+      ctx.moveTo(charX + 8, charY + CHAR_H - 6);
+      ctx.lineTo(charX + 4, charY + CHAR_H + 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(charX + CHAR_W - 8, charY + CHAR_H - 6);
+      ctx.lineTo(charX + CHAR_W - 4, charY + CHAR_H + 2);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(charX + 8, charY + CHAR_H - 4);
+      ctx.lineTo(charX + 6, charY + CHAR_H);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(charX + CHAR_W - 8, charY + CHAR_H - 4);
+      ctx.lineTo(charX + CHAR_W - 6, charY + CHAR_H);
+      ctx.stroke();
+    }
+
+    // Velocity vector arrow
+    if (!isGrounded) {
+      var arrowScale = 0.15;
+      var arrowLen = vy * arrowScale;
+      var ax = charX + CHAR_W + 15;
+      var ay = charY + CHAR_H / 2;
+      ctx.strokeStyle = vy < 0 ? '#22c55e' : '#ef4444';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(ax, ay + arrowLen);
+      ctx.stroke();
+      // Arrowhead
+      var headSize = 6;
+      var dir = vy < 0 ? -1 : 1;
+      ctx.beginPath();
+      ctx.moveTo(ax, ay + arrowLen);
+      ctx.lineTo(ax - headSize, ay + arrowLen - headSize * dir);
+      ctx.lineTo(ax + headSize, ay + arrowLen - headSize * dir);
+      ctx.closePath();
+      ctx.fillStyle = vy < 0 ? '#22c55e' : '#ef4444';
+      ctx.fill();
+    }
+
+    // Info labels
+    ctx.fillStyle = '#71717a';
+    ctx.font = '12px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('Gravity: ' + gravity, 16, 24);
+    ctx.fillText('Jump: -' + getJumpForce(), 16, 42);
+    ctx.fillStyle = isGrounded ? '#22c55e' : '#ef4444';
+    ctx.fillText('grounded: ' + isGrounded, 16, 60);
+
+    vDisp.textContent = 'vy: ' + vy.toFixed(1);
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+
+// ============================================================
+// DEMO 2: TILEMAP COLLISION
+// ============================================================
+(function() {
+  var canvas = document.getElementById('demo-tilemap');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width, H = canvas.height;
+
+  var resetBtn = document.getElementById('tilemap-reset-btn');
+  var infoSpan = document.getElementById('tilemap-info');
+
+  var COLS = 16, ROWS = 8;
+  var TILE = Math.floor(Math.min(W / COLS, H / ROWS));
+  var OFFSET_X = Math.floor((W - COLS * TILE) / 2);
+  var OFFSET_Y = Math.floor((H - ROWS * TILE) / 2);
+
+  var grid = [];
+  function initGrid() {
+    grid = [];
+    for (var r = 0; r < ROWS; r++) {
+      grid[r] = [];
+      for (var c = 0; c < COLS; c++) {
+        // Bottom row is solid, plus some platforms
+        if (r === ROWS - 1) grid[r][c] = 1;
+        else if (r === 5 && c >= 4 && c <= 7) grid[r][c] = 1;
+        else if (r === 3 && c >= 9 && c <= 12) grid[r][c] = 1;
+        else if (r === 5 && c >= 12 && c <= 14) grid[r][c] = 1;
+        else grid[r][c] = 0;
+      }
+    }
+  }
+  initGrid();
+
+  var GRAV = 800;
+  var JUMP_FORCE = 380;
+  var MOVE_SPEED = 180;
+  var PW = TILE * 0.6, PH = TILE * 0.8;
+  var px = OFFSET_X + 2 * TILE + (TILE - PW) / 2;
+  var py = OFFSET_Y + (ROWS - 2) * TILE + TILE - PH;
+  var pvx = 0, pvy = 0;
+  var pGrounded = false;
+  var checkedTiles = [];
+  var lastTime = performance.now();
+
+  var keys = {};
+  document.addEventListener('keydown', function(e) {
+    keys[e.code] = true;
+    if ((e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') && pGrounded) {
+      var rect = canvas.getBoundingClientRect();
+      if (rect.top < window.innerHeight && rect.bottom > 0) {
+        e.preventDefault();
+        pvy = -JUMP_FORCE;
+        pGrounded = false;
+      }
+    }
+  });
+  document.addEventListener('keyup', function(e) { keys[e.code] = false; });
+
+  resetBtn.addEventListener('click', function() {
+    initGrid();
+    px = OFFSET_X + 2 * TILE + (TILE - PW) / 2;
+    py = OFFSET_Y + (ROWS - 2) * TILE + TILE - PH;
+    pvx = 0; pvy = 0; pGrounded = false;
+  });
+
+  function getCanvasPos(e) {
+    var rect = canvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left) * (W / rect.width),
+      y: (e.clientY - rect.top) * (H / rect.height)
+    };
+  }
+
+  canvas.addEventListener('click', function(e) {
+    var p = getCanvasPos(e);
+    var c = Math.floor((p.x - OFFSET_X) / TILE);
+    var r = Math.floor((p.y - OFFSET_Y) / TILE);
+    if (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
+      grid[r][c] = grid[r][c] === 1 ? 0 : 1;
+    }
+  });
+
+  function tileAt(r, c) {
+    if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return 0;
+    return grid[r][c];
+  }
+
+  function resolveCollision() {
+    checkedTiles = [];
+    // Get tiles player overlaps
+    var left = Math.floor((px - OFFSET_X) / TILE);
+    var right = Math.floor((px + PW - 1 - OFFSET_X) / TILE);
+    var top = Math.floor((py - OFFSET_Y) / TILE);
+    var bottom = Math.floor((py + PH - 1 - OFFSET_Y) / TILE);
+
+    pGrounded = false;
+
+    for (var r = Math.max(0, top); r <= Math.min(ROWS - 1, bottom); r++) {
+      for (var c = Math.max(0, left); c <= Math.min(COLS - 1, right); c++) {
+        checkedTiles.push({ r: r, c: c });
+        if (grid[r][c] !== 1) continue;
+
+        // Tile rect in world coords
+        var tx = OFFSET_X + c * TILE;
+        var ty = OFFSET_Y + r * TILE;
+
+        // Compute overlap on each axis
+        var overlapX, overlapY;
+        var pushX = 0, pushY = 0;
+
+        // X overlap
+        var fromRight = (px + PW) - tx;
+        var fromLeft = (tx + TILE) - px;
+        if (fromRight < fromLeft) {
+          overlapX = fromRight;
+          pushX = -overlapX;
+        } else {
+          overlapX = fromLeft;
+          pushX = overlapX;
+        }
+
+        // Y overlap
+        var fromBottom = (py + PH) - ty;
+        var fromTop = (ty + TILE) - py;
+        if (fromBottom < fromTop) {
+          overlapY = fromBottom;
+          pushY = -overlapY;
+        } else {
+          overlapY = fromTop;
+          pushY = overlapY;
+        }
+
+        // Push along shallowest axis
+        if (Math.abs(overlapX) < Math.abs(overlapY)) {
+          px += pushX;
+          pvx = 0;
+        } else {
+          py += pushY;
+          if (pushY < 0) {
+            // Landed on top
+            pGrounded = true;
+          }
+          pvy = 0;
+        }
+      }
+    }
+  }
+
+  function draw(now) {
+    var rawDt = Math.min(now - lastTime, 50);
+    lastTime = now;
+    var dt = rawDt / 1000;
+
+    // Input
+    pvx = 0;
+    if (keys['ArrowLeft'] || keys['KeyA']) pvx = -MOVE_SPEED;
+    if (keys['ArrowRight'] || keys['KeyD']) pvx = MOVE_SPEED;
+
+    // Physics
+    pvy += GRAV * dt;
+    px += pvx * dt;
+    py += pvy * dt;
+
+    // Keep in bounds
+    if (px < OFFSET_X) px = OFFSET_X;
+    if (px + PW > OFFSET_X + COLS * TILE) px = OFFSET_X + COLS * TILE - PW;
+    if (py < OFFSET_Y) { py = OFFSET_Y; pvy = 0; }
+    if (py + PH > OFFSET_Y + ROWS * TILE) {
+      py = OFFSET_Y + ROWS * TILE - PH;
+      pvy = 0;
+      pGrounded = true;
+    }
+
+    resolveCollision();
+
+    // Draw
+    ctx.clearRect(0, 0, W, H);
+
+    // Draw grid
+    for (var r = 0; r < ROWS; r++) {
+      for (var c = 0; c < COLS; c++) {
+        var tx = OFFSET_X + c * TILE;
+        var ty = OFFSET_Y + r * TILE;
+
+        // Check if this tile is being collision-checked
+        var isChecked = false;
+        for (var ci = 0; ci < checkedTiles.length; ci++) {
+          if (checkedTiles[ci].r === r && checkedTiles[ci].c === c) {
+            isChecked = true;
+            break;
+          }
+        }
+
+        if (grid[r][c] === 1) {
+          ctx.fillStyle = '#8B6914';
+          ctx.fillRect(tx, ty, TILE, TILE);
+          // Brick pattern
+          ctx.strokeStyle = '#6B5010';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(tx, ty, TILE, TILE);
+          ctx.beginPath();
+          ctx.moveTo(tx, ty + TILE / 2);
+          ctx.lineTo(tx + TILE, ty + TILE / 2);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(tx + TILE / 2, ty);
+          ctx.lineTo(tx + TILE / 2, ty + TILE / 2);
+          ctx.stroke();
+          if (isChecked) {
+            ctx.fillStyle = 'rgba(250, 204, 21, 0.3)';
+            ctx.fillRect(tx, ty, TILE, TILE);
+            ctx.strokeStyle = '#facc15';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(tx + 1, ty + 1, TILE - 2, TILE - 2);
+          }
+        } else {
+          ctx.strokeStyle = '#1c1c20';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(tx, ty, TILE, TILE);
+          if (isChecked) {
+            ctx.fillStyle = 'rgba(250, 204, 21, 0.1)';
+            ctx.fillRect(tx, ty, TILE, TILE);
+            ctx.strokeStyle = 'rgba(250, 204, 21, 0.4)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(tx + 1, ty + 1, TILE - 2, TILE - 2);
+          }
+        }
+      }
+    }
+
+    // Draw player
+    var headR = PW * 0.35;
+    ctx.beginPath();
+    ctx.arc(px + PW / 2, py + headR, headR, 0, Math.PI * 2);
+    ctx.fillStyle = '#3b82f6';
+    ctx.fill();
+    ctx.fillRect(px + PW * 0.2, py + headR * 2, PW * 0.6, PH - headR * 2 - 4);
+    // Eyes
+    ctx.fillStyle = '#fafafa';
+    var eyeDir = pvx > 0 ? 2 : (pvx < 0 ? -2 : 0);
+    ctx.fillRect(px + PW / 2 + eyeDir - 4, py + headR - 3, 3, 4);
+    ctx.fillRect(px + PW / 2 + eyeDir + 2, py + headR - 3, 3, 4);
+
+    // Grounded indicator
+    ctx.fillStyle = pGrounded ? '#22c55e' : '#ef4444';
+    ctx.font = '11px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('grounded: ' + pGrounded, 12, 20);
+    ctx.fillStyle = '#71717a';
+    ctx.fillText('vy: ' + pvy.toFixed(0), 12, 36);
+
+    infoSpan.textContent = 'Tiles checked: ' + checkedTiles.length + ' | Grid pos: [' + Math.floor((px - OFFSET_X) / TILE) + ',' + Math.floor((py - OFFSET_Y) / TILE) + ']';
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+
+// ============================================================
+// DEMO 3: COYOTE TIME COMPARISON
+// ============================================================
+(function() {
+  var canvas = document.getElementById('demo-coyote');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width, H = canvas.height;
+
+  var runLeftBtn = document.getElementById('coyote-run-left');
+  var runRightBtn = document.getElementById('coyote-run-right');
+  var resetBtn = document.getElementById('coyote-reset');
+
+  var HALF = W / 2;
+  var GROUND_Y = H - 70;
+  var LEDGE_Y = GROUND_Y - 80;
+  var LEDGE_W = 160;
+  var LEDGE_LEFT_X = 40;
+  var PW = 20, PH = 30;
+  var GRAV = 900;
+  var MOVE_SPEED = 120;
+  var JUMP_FORCE = 350;
+  var COYOTE_FRAMES = 6;
+  var FRAME_TIME = 1 / 60;
+
+  function makeSide(offsetX, hasCoyote) {
+    return {
+      x: LEDGE_LEFT_X + offsetX + 20,
+      y: LEDGE_Y - PH,
+      vy: 0,
+      grounded: true,
+      running: false,
+      phase: 'idle', // idle, running, offledge, jumped, falling, landed
+      coyoteCounter: 0,
+      jumpAttempted: false,
+      jumpSuccess: false,
+      framesSinceOffLedge: 0,
+      hasCoyote: hasCoyote,
+      offsetX: offsetX,
+      timeline: [],
+      timelineActive: false,
+      label: hasCoyote ? 'WITH Coyote Time' : 'NO Coyote Time'
+    };
+  }
+
+  var left = makeSide(0, false);
+  var right = makeSide(HALF, true);
+  var lastTime = performance.now();
+
+  function resetSides() {
+    left = makeSide(0, false);
+    right = makeSide(HALF, true);
+  }
+
+  resetBtn.addEventListener('click', resetSides);
+
+  function runSide(side) {
+    if (side.phase !== 'idle') return;
+    side.phase = 'running';
+    side.running = true;
+    side.timeline = [];
+    side.timelineActive = true;
+    side.jumpAttempted = false;
+    side.jumpSuccess = false;
+    side.framesSinceOffLedge = 0;
+    side.coyoteCounter = 0;
+  }
+
+  runLeftBtn.addEventListener('click', function() { runSide(left); });
+  runRightBtn.addEventListener('click', function() { runSide(right); });
+
+  function updateSide(side, dt) {
+    if (side.phase === 'idle' || side.phase === 'landed') return;
+
+    var ledgeRight = LEDGE_LEFT_X + side.offsetX + LEDGE_W;
+
+    if (side.phase === 'running') {
+      side.x += MOVE_SPEED * dt;
+      // Check if off ledge
+      if (side.x > ledgeRight) {
+        side.phase = 'offledge';
+        side.grounded = false;
+        side.coyoteCounter = COYOTE_FRAMES;
+        side.framesSinceOffLedge = 0;
+      }
+    }
+
+    if (side.phase === 'offledge') {
+      side.x += MOVE_SPEED * dt * 0.6;
+      side.vy += GRAV * dt;
+      side.y += side.vy * dt;
+      side.framesSinceOffLedge++;
+
+      if (side.hasCoyote) {
+        side.coyoteCounter--;
+        side.timeline.push({ frame: side.framesSinceOffLedge, canJump: side.coyoteCounter > 0 });
+      } else {
+        side.timeline.push({ frame: side.framesSinceOffLedge, canJump: false });
+      }
+
+      // Attempt jump 4 frames after leaving ledge
+      if (side.framesSinceOffLedge === 4) {
+        side.jumpAttempted = true;
+        var canJump = side.hasCoyote && side.coyoteCounter > 0;
+        if (canJump) {
+          side.vy = -JUMP_FORCE;
+          side.jumpSuccess = true;
+          side.phase = 'jumped';
+        }
+      }
+
+      // Hit ground
+      if (side.y + PH >= GROUND_Y) {
+        side.y = GROUND_Y - PH;
+        side.vy = 0;
+        side.phase = 'landed';
+        side.grounded = true;
+      }
+    }
+
+    if (side.phase === 'jumped') {
+      side.x += MOVE_SPEED * dt * 0.5;
+      side.vy += GRAV * dt;
+      side.y += side.vy * dt;
+
+      if (side.y + PH >= GROUND_Y) {
+        side.y = GROUND_Y - PH;
+        side.vy = 0;
+        side.phase = 'landed';
+      }
+    }
+  }
+
+  function drawSide(side) {
+    var ox = side.offsetX;
+    var ledgeX = LEDGE_LEFT_X + ox;
+
+    // Separator for right side
+    if (ox > 0) {
+      ctx.strokeStyle = '#27272a';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(HALF, 0);
+      ctx.lineTo(HALF, H);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Label
+    ctx.fillStyle = side.hasCoyote ? '#22c55e' : '#ef4444';
+    ctx.font = '600 13px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(side.label, ox + HALF / 2, 24);
+
+    // Ground
+    ctx.fillStyle = '#27272a';
+    ctx.fillRect(ox, GROUND_Y, HALF, H - GROUND_Y);
+
+    // Ledge
+    ctx.fillStyle = '#8B6914';
+    ctx.fillRect(ledgeX, LEDGE_Y, LEDGE_W, 16);
+    ctx.fillStyle = '#6B5010';
+    ctx.fillRect(ledgeX, LEDGE_Y + 16, LEDGE_W, 4);
+
+    // Edge marker
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(ledgeX + LEDGE_W, LEDGE_Y);
+    ctx.lineTo(ledgeX + LEDGE_W, GROUND_Y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#71717a';
+    ctx.font = '10px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('edge', ledgeX + LEDGE_W, LEDGE_Y - 6);
+
+    // Character
+    var headR = PW * 0.4;
+    ctx.beginPath();
+    ctx.arc(side.x + PW / 2, side.y + headR, headR, 0, Math.PI * 2);
+    ctx.fillStyle = side.jumpSuccess ? '#22c55e' : (side.phase === 'landed' && !side.jumpSuccess && side.jumpAttempted ? '#ef4444' : '#3b82f6');
+    ctx.fill();
+    ctx.fillRect(side.x + PW * 0.2, side.y + headR * 2, PW * 0.6, PH - headR * 2);
+
+    // Jump attempt marker
+    if (side.jumpAttempted) {
+      ctx.fillStyle = side.jumpSuccess ? '#22c55e' : '#ef4444';
+      ctx.font = '700 12px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(side.jumpSuccess ? 'JUMP!' : 'FAIL!', side.x + PW / 2, side.y - 10);
+    }
+
+    // Timeline bar
+    if (side.timeline.length > 0 || side.timelineActive) {
+      var barX = ox + 20;
+      var barY = H - 50;
+      var barW = HALF - 40;
+      var barH = 20;
+      var maxFrames = COYOTE_FRAMES + 4;
+
+      ctx.fillStyle = '#141416';
+      ctx.strokeStyle = '#3f3f46';
+      ctx.lineWidth = 1;
+      ctx.fillRect(barX, barY, barW, barH);
+      ctx.strokeRect(barX, barY, barW, barH);
+
+      // Frame labels
+      ctx.fillStyle = '#71717a';
+      ctx.font = '9px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('Frames after leaving ledge', barX + barW / 2, barY - 4);
+
+      // Draw coyote window
+      if (side.hasCoyote) {
+        var windowW = (COYOTE_FRAMES / maxFrames) * barW;
+        ctx.fillStyle = 'rgba(34, 197, 94, 0.2)';
+        ctx.fillRect(barX, barY, windowW, barH);
+        ctx.strokeStyle = '#22c55e';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(barX, barY, windowW, barH);
+        ctx.fillStyle = '#22c55e';
+        ctx.font = '8px "JetBrains Mono", monospace';
+        ctx.fillText('grace', barX + windowW / 2, barY + barH / 2 + 3);
+      }
+
+      // Draw timeline entries
+      for (var i = 0; i < side.timeline.length && i < maxFrames; i++) {
+        var fx = barX + (i / maxFrames) * barW;
+        var fw = barW / maxFrames;
+        if (i === 3) { // frame 4 = jump attempt
+          ctx.fillStyle = side.jumpSuccess ? 'rgba(34, 197, 94, 0.5)' : 'rgba(239, 68, 68, 0.5)';
+          ctx.fillRect(fx, barY, fw, barH);
+          ctx.fillStyle = '#fafafa';
+          ctx.font = '8px "JetBrains Mono", monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText(String.fromCharCode(8593), fx + fw / 2, barY + barH / 2 + 3);
+        }
+      }
+
+      // Frame numbers
+      for (var f = 0; f < maxFrames; f++) {
+        var numX = barX + (f / maxFrames) * barW + barW / maxFrames / 2;
+        ctx.fillStyle = '#52525b';
+        ctx.font = '8px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(String(f + 1), numX, barY + barH + 10);
+      }
+    }
+  }
+
+  function draw(now) {
+    var rawDt = Math.min(now - lastTime, 50);
+    lastTime = now;
+    var dt = rawDt / 1000;
+
+    updateSide(left, dt);
+    updateSide(right, dt);
+
+    ctx.clearRect(0, 0, W, H);
+
+    drawSide(left);
+    drawSide(right);
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+
+// ============================================================
+// DEMO 4: PLAYER STATE MACHINE VISUALIZER
+// ============================================================
+(function() {
+  var canvas = document.getElementById('demo-fsm');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width, H = canvas.height;
+
+  // FSM diagram in top half, character in bottom strip
+  var DIAGRAM_H = 140;
+  var CHAR_AREA_Y = 160;
+  var CHAR_AREA_H = H - CHAR_AREA_Y;
+  var GROUND_Y = H - 30;
+
+  var states = [
+    { name: 'Idle', x: 100, y: 70 },
+    { name: 'Running', x: 300, y: 70 },
+    { name: 'Jumping', x: 500, y: 70 },
+    { name: 'Falling', x: 680, y: 70 }
+  ];
+
+  var stateW = 100, stateH = 40;
+
+  // Transitions: from -> to with label
+  var transitions = [
+    { from: 0, to: 1, label: 'L/R pressed' },
+    { from: 1, to: 0, label: 'L/R released' },
+    { from: 0, to: 2, label: 'Jump' },
+    { from: 1, to: 2, label: 'Jump' },
+    { from: 2, to: 3, label: 'vy > 0' },
+    { from: 3, to: 0, label: 'Landed (still)' },
+    { from: 3, to: 1, label: 'Landed (moving)' }
+  ];
+
+  // Character
+  var cx = 380, cy = GROUND_Y - 26;
+  var cvx = 0, cvy = 0;
+  var cGrounded = true;
+  var currentState = 0; // 0=Idle, 1=Running, 2=Jumping, 3=Falling
+  var pulse = 0;
+  var animFrame = 0;
+  var animTimer = 0;
+  var lastTime = performance.now();
+
+  var GRAV = 1100;
+  var JUMP_F = 420;
+  var MOVE_SPD = 200;
+  var CW = 20, CH = 26;
+  var facingRight = true;
+
+  var keys = {};
+  document.addEventListener('keydown', function(e) {
+    keys[e.code] = true;
+    if ((e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') && cGrounded) {
+      var rect = canvas.getBoundingClientRect();
+      if (rect.top < window.innerHeight && rect.bottom > 0) {
+        e.preventDefault();
+        cvy = -JUMP_F;
+        cGrounded = false;
+        currentState = 2;
+      }
+    }
+  });
+  document.addEventListener('keyup', function(e) { keys[e.code] = false; });
+
+  function drawArrow(fromX, fromY, toX, toY, label, curved, curveDir) {
+    ctx.strokeStyle = '#3f3f46';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+
+    if (curved) {
+      var midX = (fromX + toX) / 2;
+      var midY = (fromY + toY) / 2 + (curveDir || 1) * 30;
+      ctx.moveTo(fromX, fromY);
+      ctx.quadraticCurveTo(midX, midY, toX, toY);
+      ctx.stroke();
+      // Arrowhead
+      var t = 0.98;
+      var ax = (1-t)*(1-t)*fromX + 2*(1-t)*t*midX + t*t*toX;
+      var ay = (1-t)*(1-t)*fromY + 2*(1-t)*t*midY + t*t*toY;
+      var angle = Math.atan2(toY - ay, toX - ax);
+      ctx.beginPath();
+      ctx.moveTo(toX, toY);
+      ctx.lineTo(toX - 7 * Math.cos(angle - 0.4), toY - 7 * Math.sin(angle - 0.4));
+      ctx.lineTo(toX - 7 * Math.cos(angle + 0.4), toY - 7 * Math.sin(angle + 0.4));
+      ctx.closePath();
+      ctx.fillStyle = '#3f3f46';
+      ctx.fill();
+      // Label
+      ctx.fillStyle = '#52525b';
+      ctx.font = '9px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, midX, midY + (curveDir > 0 ? 12 : -4));
+    } else {
+      ctx.moveTo(fromX, fromY);
+      ctx.lineTo(toX, toY);
+      ctx.stroke();
+      var angle2 = Math.atan2(toY - fromY, toX - fromX);
+      ctx.beginPath();
+      ctx.moveTo(toX, toY);
+      ctx.lineTo(toX - 7 * Math.cos(angle2 - 0.4), toY - 7 * Math.sin(angle2 - 0.4));
+      ctx.lineTo(toX - 7 * Math.cos(angle2 + 0.4), toY - 7 * Math.sin(angle2 + 0.4));
+      ctx.closePath();
+      ctx.fillStyle = '#3f3f46';
+      ctx.fill();
+      var mx = (fromX + toX) / 2;
+      var my = (fromY + toY) / 2 - 8;
+      ctx.fillStyle = '#52525b';
+      ctx.font = '9px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, mx, my);
+    }
+  }
+
+  function draw(now) {
+    var rawDt = Math.min(now - lastTime, 50);
+    lastTime = now;
+    var dt = rawDt / 1000;
+    pulse += 0.04;
+    animTimer += dt;
+    if (animTimer > 0.12) { animTimer = 0; animFrame = (animFrame + 1) % 4; }
+
+    // Input
+    var moving = false;
+    cvx = 0;
+    if (keys['ArrowLeft'] || keys['KeyA']) { cvx = -MOVE_SPD; moving = true; facingRight = false; }
+    if (keys['ArrowRight'] || keys['KeyD']) { cvx = MOVE_SPD; moving = true; facingRight = true; }
+
+    // Physics
+    if (!cGrounded) {
+      cvy += GRAV * dt;
+    }
+    cx += cvx * dt;
+    cy += cvy * dt;
+
+    // Ground
+    if (cy + CH >= GROUND_Y) {
+      cy = GROUND_Y - CH;
+      cvy = 0;
+      cGrounded = true;
+    }
+
+    // Bounds
+    if (cx < 100) cx = 100;
+    if (cx + CW > W - 100) cx = W - 100 - CW;
+
+    // State transitions
+    if (cGrounded) {
+      if (moving) currentState = 1;
+      else currentState = 0;
+    } else {
+      if (cvy < 0) currentState = 2;
+      else currentState = 3;
+    }
+
+    // Draw
+    ctx.clearRect(0, 0, W, H);
+
+    // Separator line
+    ctx.strokeStyle = '#1c1c20';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, CHAR_AREA_Y - 10);
+    ctx.lineTo(W, CHAR_AREA_Y - 10);
+    ctx.stroke();
+
+    // Draw transition arrows
+    // Idle -> Running (top, right)
+    drawArrow(states[0].x + stateW / 2, states[0].y - stateH / 2, states[1].x - stateW / 2, states[1].y - stateH / 2, 'L/R pressed', false);
+    // Running -> Idle (bottom, left)
+    drawArrow(states[1].x - stateW / 2, states[1].y + stateH / 2, states[0].x + stateW / 2, states[0].y + stateH / 2, 'L/R released', false);
+    // Idle -> Jumping
+    drawArrow(states[0].x, states[0].y - stateH / 2, states[2].x, states[2].y - stateH / 2, 'Jump', true, -1);
+    // Running -> Jumping
+    drawArrow(states[1].x + stateW / 2, states[1].y - stateH / 2 + 5, states[2].x - stateW / 2, states[2].y - stateH / 2 + 5, 'Jump', false);
+    // Jumping -> Falling
+    drawArrow(states[2].x + stateW / 2, states[2].y, states[3].x - stateW / 2, states[3].y, 'vy > 0', false);
+    // Falling -> Idle
+    drawArrow(states[3].x, states[3].y + stateH / 2, states[0].x, states[0].y + stateH / 2, 'Landed (still)', true, 1);
+    // Falling -> Running
+    drawArrow(states[3].x - stateW / 4, states[3].y + stateH / 2, states[1].x + stateW / 4, states[1].y + stateH / 2, 'Landed (moving)', true, 1);
+
+    // Draw state boxes
+    for (var i = 0; i < states.length; i++) {
+      var s = states[i];
+      var isActive = (i === currentState);
+      var bx = s.x - stateW / 2;
+      var by = s.y - stateH / 2;
+
+      if (isActive) {
+        ctx.fillStyle = 'rgba(245, 158, 11, 0.08)';
+        ctx.beginPath();
+        ctx.roundRect(bx - 4, by - 4, stateW + 8, stateH + 8, 10);
+        ctx.fill();
+      }
+
+      ctx.fillStyle = isActive ? '#f59e0b18' : '#141416';
+      ctx.strokeStyle = isActive ? '#f59e0b' : '#3f3f46';
+      ctx.lineWidth = isActive ? 2.5 : 1.5;
+      ctx.beginPath();
+      ctx.roundRect(bx, by, stateW, stateH, 6);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = isActive ? '#f59e0b' : '#a1a1aa';
+      ctx.font = (isActive ? '700' : '500') + ' 13px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(s.name, s.x, s.y);
+    }
+
+    // Draw character area ground
+    ctx.fillStyle = '#27272a';
+    ctx.fillRect(100, GROUND_Y, W - 200, 4);
+
+    // Platforms
+    ctx.fillStyle = '#3f3f46';
+    ctx.fillRect(250, GROUND_Y - 40, 80, 8);
+    ctx.fillRect(430, GROUND_Y - 60, 80, 8);
+
+    // Draw character
+    var headR = CW * 0.35;
+    var charColor = ['#71717a', '#3b82f6', '#22c55e', '#ef4444'][currentState];
+
+    // Idle bobbing
+    var bobY = 0;
+    if (currentState === 0) bobY = Math.sin(pulse * 1.5) * 1.5;
+    // Running lean
+    var lean = 0;
+    if (currentState === 1) lean = facingRight ? 2 : -2;
+
+    ctx.save();
+    ctx.translate(cx + CW / 2, cy + CH / 2 + bobY);
+
+    // Head
+    ctx.beginPath();
+    ctx.arc(lean, -CH / 2 + headR, headR, 0, Math.PI * 2);
+    ctx.fillStyle = charColor;
+    ctx.fill();
+
+    // Body
+    ctx.fillRect(-CW * 0.3 + lean, -CH / 2 + headR * 2, CW * 0.6, CH * 0.4);
+
+    // Legs (animated for running)
+    ctx.strokeStyle = charColor;
+    ctx.lineWidth = 3;
+    if (currentState === 1) {
+      var legAngle = Math.sin(animFrame * Math.PI / 2) * 6;
+      ctx.beginPath();
+      ctx.moveTo(-3 + lean, CH * 0.1);
+      ctx.lineTo(-3 + lean - legAngle, CH / 2 - 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(3 + lean, CH * 0.1);
+      ctx.lineTo(3 + lean + legAngle, CH / 2 - 2);
+      ctx.stroke();
+    } else if (currentState === 2) {
+      // Tucked
+      ctx.beginPath();
+      ctx.moveTo(-4, CH * 0.05);
+      ctx.lineTo(-6, CH * 0.15);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(4, CH * 0.05);
+      ctx.lineTo(6, CH * 0.15);
+      ctx.stroke();
+    } else {
+      // Standing
+      ctx.beginPath();
+      ctx.moveTo(-3, CH * 0.1);
+      ctx.lineTo(-4, CH / 2 - 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(3, CH * 0.1);
+      ctx.lineTo(4, CH / 2 - 2);
+      ctx.stroke();
+    }
+
+    // Eyes
+    ctx.fillStyle = '#0a0a0b';
+    var eyeDir2 = facingRight ? 1 : -1;
+    ctx.fillRect(eyeDir2 * 1 - 3 + lean, -CH / 2 + headR - 2, 2, 3);
+    ctx.fillRect(eyeDir2 * 1 + 2 + lean, -CH / 2 + headR - 2, 2, 3);
+
+    ctx.restore();
+
+    // State label under character
+    ctx.fillStyle = charColor;
+    ctx.font = '600 11px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(states[currentState].name.toUpperCase(), cx + CW / 2, H - 10);
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+
+// ============================================================
+// DEMO 5: MINI PLAYABLE PLATFORMER
+// ============================================================
+(function() {
+  var canvas = document.getElementById('demo-platformer');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width, H = canvas.height;
+
+  var restartBtn = document.getElementById('plat-restart-btn');
+  var levelDisp = document.getElementById('plat-level-disp');
+  var coinDisp = document.getElementById('plat-coin-disp');
+
+  var TILE = 40;
+  var COLS = 19, ROWS = 10;
+  var GRAV = 1400;
+  var JUMP_FORCE = 520;
+  var MOVE_SPEED = 220;
+  var PW = 20, PH = 28;
+  var COYOTE = 6;
+
+  // Tile types: 0=air, 1=solid, 2=coin, 3=flag
+  var levels = [
+    // Level 1: Simple platforms
+    [
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1],
+      [0,0,0,0,0,2,0,0,0,0,0,0,2,0,0,0,0,0,0],
+      [0,0,0,0,1,1,1,0,0,0,0,1,1,1,0,0,0,0,0],
+      [0,0,2,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0],
+      [0,1,1,1,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+    ],
+    // Level 2: Gaps and vertical platforming
+    [
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
+      [0,0,0,0,0,2,0,0,0,2,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,1,1,1,0,1,1,0,0,0,0,0,0,0,0,0],
+      [0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [1,1,1,1,0,0,0,1,1,0,0,0,1,1,1,1,1,1,1]
+    ],
+    // Level 3: Harder gaps and higher platforms
+    [
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1],
+      [0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [1,1,1,0,0,0,1,0,0,0,1,0,0,0,1,1,1,1,1]
+    ]
+  ];
+
+  var currentLevel = 0;
+  var grid, coins, totalCoins, collectedCoins, flagPos;
+  var px, py, pvx, pvy, pGrounded, coyoteTimer, facingRight;
+  var gameState, winTimer;
+  var lastTime = performance.now();
+
+  var keys = {};
+  document.addEventListener('keydown', function(e) { keys[e.code] = true; });
+  document.addEventListener('keyup', function(e) { keys[e.code] = false; });
+
+  function loadLevel(n) {
+    currentLevel = n;
+    var src = levels[n];
+    grid = [];
+    coins = [];
+    flagPos = null;
+    totalCoins = 0;
+    collectedCoins = 0;
+
+    for (var r = 0; r < ROWS; r++) {
+      grid[r] = [];
+      for (var c = 0; c < COLS; c++) {
+        var v = src[r][c];
+        if (v === 2) {
+          grid[r][c] = 0;
+          coins.push({ r: r, c: c, collected: false });
+          totalCoins++;
+        } else if (v === 3) {
+          grid[r][c] = 0;
+          flagPos = { r: r, c: c };
+        } else {
+          grid[r][c] = v;
+        }
+      }
+    }
+
+    px = 20;
+    py = (ROWS - 2) * TILE - PH;
+    pvx = 0;
+    pvy = 0;
+    pGrounded = false;
+    coyoteTimer = 0;
+    facingRight = true;
+    gameState = 'playing';
+    winTimer = 0;
+
+    levelDisp.textContent = 'Level ' + (n + 1);
+    coinDisp.textContent = 'Coins: ' + collectedCoins + '/' + totalCoins;
+  }
+
+  restartBtn.addEventListener('click', function() { loadLevel(currentLevel); });
+
+  function tileAt(r, c) {
+    if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return 0;
+    return grid[r][c];
+  }
+
+  function resolveCollisions() {
+    var wasGrounded = pGrounded;
+    pGrounded = false;
+
+    var left = Math.floor(px / TILE);
+    var right = Math.floor((px + PW - 1) / TILE);
+    var top = Math.floor(py / TILE);
+    var bottom = Math.floor((py + PH - 1) / TILE);
+
+    for (var r = Math.max(0, top); r <= Math.min(ROWS - 1, bottom); r++) {
+      for (var c = Math.max(0, left); c <= Math.min(COLS - 1, right); c++) {
+        if (grid[r][c] !== 1) continue;
+
+        var tx = c * TILE;
+        var ty = r * TILE;
+
+        var fromRight = (px + PW) - tx;
+        var fromLeft = (tx + TILE) - px;
+        var overlapX, pushX;
+        if (fromRight < fromLeft) { overlapX = fromRight; pushX = -overlapX; }
+        else { overlapX = fromLeft; pushX = overlapX; }
+
+        var fromBottom = (py + PH) - ty;
+        var fromTop = (ty + TILE) - py;
+        var overlapY, pushY;
+        if (fromBottom < fromTop) { overlapY = fromBottom; pushY = -overlapY; }
+        else { overlapY = fromTop; pushY = overlapY; }
+
+        if (Math.abs(overlapX) < Math.abs(overlapY)) {
+          px += pushX;
+          pvx = 0;
+        } else {
+          py += pushY;
+          if (pushY < 0) pGrounded = true;
+          pvy = 0;
+        }
+      }
+    }
+
+    // Coyote time
+    if (wasGrounded && !pGrounded && pvy >= 0) {
+      coyoteTimer = COYOTE;
+    }
+    if (pGrounded) coyoteTimer = COYOTE;
+    if (!pGrounded) coyoteTimer--;
+  }
+
+  function checkCoins() {
+    var pcx = px + PW / 2;
+    var pcy = py + PH / 2;
+    for (var i = 0; i < coins.length; i++) {
+      if (coins[i].collected) continue;
+      var cx2 = coins[i].c * TILE + TILE / 2;
+      var cy2 = coins[i].r * TILE + TILE / 2;
+      var dx = pcx - cx2;
+      var dy = pcy - cy2;
+      if (Math.sqrt(dx * dx + dy * dy) < TILE * 0.6) {
+        coins[i].collected = true;
+        collectedCoins++;
+        coinDisp.textContent = 'Coins: ' + collectedCoins + '/' + totalCoins;
+      }
+    }
+  }
+
+  function checkFlag() {
+    if (!flagPos) return;
+    var fcx = flagPos.c * TILE + TILE / 2;
+    var fcy = flagPos.r * TILE + TILE / 2;
+    var dx = (px + PW / 2) - fcx;
+    var dy = (py + PH / 2) - fcy;
+    if (Math.sqrt(dx * dx + dy * dy) < TILE * 0.7) {
+      gameState = 'win';
+      winTimer = 0;
+    }
+  }
+
+  function update(dt) {
+    if (gameState === 'win') {
+      winTimer += dt;
+      if (winTimer > 2 && currentLevel < levels.length - 1) {
+        loadLevel(currentLevel + 1);
+      }
+      return;
+    }
+
+    pvx = 0;
+    if (keys['ArrowLeft'] || keys['KeyA']) { pvx = -MOVE_SPEED; facingRight = false; }
+    if (keys['ArrowRight'] || keys['KeyD']) { pvx = MOVE_SPEED; facingRight = true; }
+
+    if ((keys['Space'] || keys['ArrowUp'] || keys['KeyW']) && coyoteTimer > 0 && pvy >= 0) {
+      pvy = -JUMP_FORCE;
+      pGrounded = false;
+      coyoteTimer = 0;
+    }
+
+    pvy += GRAV * dt;
+    px += pvx * dt;
+    py += pvy * dt;
+
+    // Bounds
+    if (px < 0) px = 0;
+    if (px + PW > COLS * TILE) px = COLS * TILE - PW;
+    if (py < 0) { py = 0; pvy = 0; }
+
+    // Fall off bottom -> respawn
+    if (py > ROWS * TILE + 40) {
+      loadLevel(currentLevel);
+      return;
+    }
+
+    resolveCollisions();
+    checkCoins();
+    checkFlag();
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Background gradient
+    var grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, '#0d0d14');
+    grad.addColorStop(1, '#0a0a0b');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    // Draw tiles
+    for (var r = 0; r < ROWS; r++) {
+      for (var c = 0; c < COLS; c++) {
+        if (grid[r][c] === 1) {
+          var tx = c * TILE;
+          var ty = r * TILE;
+          // Top edge (grass)
+          var hasAirAbove = (r === 0 || grid[r-1][c] !== 1);
+          if (hasAirAbove) {
+            ctx.fillStyle = '#22c55e';
+            ctx.fillRect(tx, ty, TILE, 4);
+            ctx.fillStyle = '#4a3728';
+            ctx.fillRect(tx, ty + 4, TILE, TILE - 4);
+          } else {
+            ctx.fillStyle = '#3d2b1f';
+            ctx.fillRect(tx, ty, TILE, TILE);
+          }
+          ctx.strokeStyle = '#2a1f16';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(tx, ty, TILE, TILE);
+        }
+      }
+    }
+
+    // Draw coins
+    var now2 = performance.now();
+    for (var i = 0; i < coins.length; i++) {
+      if (coins[i].collected) continue;
+      var coinX = coins[i].c * TILE + TILE / 2;
+      var coinY = coins[i].r * TILE + TILE / 2;
+      var coinBob = Math.sin(now2 * 0.004 + i) * 3;
+
+      ctx.beginPath();
+      ctx.arc(coinX, coinY + coinBob, 10, 0, Math.PI * 2);
+      ctx.fillStyle = '#f59e0b';
+      ctx.fill();
+      ctx.strokeStyle = '#d97706';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      // Shine
+      ctx.beginPath();
+      ctx.arc(coinX - 3, coinY + coinBob - 3, 3, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.fill();
+    }
+
+    // Draw flag
+    if (flagPos) {
+      var fx = flagPos.c * TILE + TILE / 2;
+      var fy = flagPos.r * TILE;
+      // Pole
+      ctx.strokeStyle = '#a1a1aa';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(fx, fy + TILE);
+      ctx.lineTo(fx, fy - 5);
+      ctx.stroke();
+      // Flag
+      ctx.fillStyle = '#22c55e';
+      ctx.beginPath();
+      ctx.moveTo(fx, fy);
+      ctx.lineTo(fx + 18, fy + 8);
+      ctx.lineTo(fx, fy + 16);
+      ctx.closePath();
+      ctx.fill();
+      // Ball on top
+      ctx.beginPath();
+      ctx.arc(fx, fy - 5, 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#f59e0b';
+      ctx.fill();
+    }
+
+    // Draw player
+    var headR = PW * 0.4;
+    var bodyColor = '#3b82f6';
+
+    ctx.save();
+    ctx.translate(px + PW / 2, py + PH / 2);
+    if (!facingRight) ctx.scale(-1, 1);
+
+    // Head
+    ctx.beginPath();
+    ctx.arc(0, -PH / 2 + headR, headR, 0, Math.PI * 2);
+    ctx.fillStyle = bodyColor;
+    ctx.fill();
+
+    // Body
+    ctx.fillStyle = bodyColor;
+    ctx.fillRect(-PW * 0.3, -PH / 2 + headR * 2, PW * 0.6, PH * 0.35);
+
+    // Legs
+    ctx.strokeStyle = bodyColor;
+    ctx.lineWidth = 3;
+    var legAnim = Math.abs(pvx) > 10 ? Math.sin(now2 * 0.015) * 5 : 0;
+    ctx.beginPath();
+    ctx.moveTo(-3, PH * 0.05);
+    ctx.lineTo(-3 - legAnim, PH / 2 - 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(3, PH * 0.05);
+    ctx.lineTo(3 + legAnim, PH / 2 - 2);
+    ctx.stroke();
+
+    // Eye
+    ctx.fillStyle = '#fafafa';
+    ctx.fillRect(1, -PH / 2 + headR - 2, 3, 3);
+
+    ctx.restore();
+
+    // Win overlay
+    if (gameState === 'win') {
+      ctx.fillStyle = 'rgba(10, 10, 11, 0.6)';
+      ctx.fillRect(0, 0, W, H);
+
+      ctx.fillStyle = '#22c55e';
+      ctx.font = '700 32px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      if (currentLevel < levels.length - 1) {
+        ctx.fillText('Level Complete!', W / 2, H / 2 - 16);
+        ctx.fillStyle = '#71717a';
+        ctx.font = '14px Inter, sans-serif';
+        ctx.fillText('Next level loading...', W / 2, H / 2 + 16);
+      } else {
+        ctx.fillText('You Win! All Levels Complete!', W / 2, H / 2 - 16);
+        ctx.fillStyle = '#71717a';
+        ctx.font = '14px Inter, sans-serif';
+        ctx.fillText('Click "Restart Level" to play again', W / 2, H / 2 + 16);
+      }
+    }
+
+    // HUD
+    ctx.fillStyle = '#71717a';
+    ctx.font = '11px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText('Arrow keys / WASD + Space', 8, 8);
+  }
+
+  function loop(now) {
+    var rawDt = Math.min(now - lastTime, 50);
+    lastTime = now;
+    var dt = rawDt / 1000;
+
+    // Prevent jump input from scrolling page
+    var rect = canvas.getBoundingClientRect();
+    var canvasVisible = rect.top < window.innerHeight && rect.bottom > 0;
+
+    if (canvasVisible && (keys['Space'] || keys['ArrowUp'] || keys['ArrowDown'])) {
+      // Already handled in keydown for jump
+    }
+
+    update(dt);
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  // Prevent space/arrow scrolling when canvas is visible
+  document.addEventListener('keydown', function(e) {
+    if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'ArrowDown') {
+      var rect = canvas.getBoundingClientRect();
+      if (rect.top < window.innerHeight && rect.bottom > 0) {
+        e.preventDefault();
+      }
+    }
+  });
+
+  loadLevel(0);
+  requestAnimationFrame(loop);
+})();
+</script>

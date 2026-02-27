@@ -5,10 +5,12 @@ const base = import.meta.env.BASE_URL;
 
 <BaseLayout title="Module 03: Top-Down Shooter">
   <div class="container page-content">
+
+    <!-- Module Header -->
     <div class="module-header">
       <div class="module-number">Module 03</div>
       <h1>Top-Down Shooter</h1>
-      <p class="module-theme">Entity management, enemy AI, and managing chaos</p>
+      <p class="module-theme">Weeks 5-6 | Entity management, enemy AI, and managing chaos</p>
     </div>
 
     <blockquote>
@@ -16,6 +18,10 @@ const base = import.meta.env.BASE_URL;
     </blockquote>
 
     <hr />
+
+    <!-- ============================================================ -->
+    <!-- WEEK 1: HISTORY & DESIGN THEORY                              -->
+    <!-- ============================================================ -->
 
     <h2>Week 1: History &amp; Design Theory</h2>
 
@@ -37,6 +43,10 @@ const base = import.meta.env.BASE_URL;
 
     <hr />
 
+    <!-- ============================================================ -->
+    <!-- WEEK 2: BUILD THE MVP                                        -->
+    <!-- ============================================================ -->
+
     <h2>Week 2: Build the MVP</h2>
 
     <h3>What You're Building</h3>
@@ -44,6 +54,8 @@ const base = import.meta.env.BASE_URL;
     <p>This module is where entity count explodes. Pong had 3 objects. The platformer had 1 player + static tiles. Here you might have dozens of enemies and hundreds of bullets alive at once.</p>
 
     <h3>Core Concepts (Must Implement)</h3>
+
+    <!-- ==================== CONCEPT 1: OBJECT POOLING ==================== -->
 
     <h4>1. Object Pooling</h4>
     <p>Pre-allocate a fixed-size array of bullet and enemy objects. Recycle them via an active/inactive flag instead of creating/destroying every frame.</p>
@@ -56,6 +68,20 @@ release(bullet):
   set active = false, reset position</code></pre>
     <p><strong>Why it matters:</strong> Allocation and deallocation are expensive operations. Pre-allocating and recycling objects avoids per-frame memory churn and is essential anywhere entities spawn and despawn frequently.</p>
 
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Object Pool Visualizer</div>
+      <p class="demo-hint">Click "Fire" to spawn bullets from the pool. Watch them fly across the screen and return to the pool when they exit. No new objects are created &mdash; they are recycled. The amber slots are active; dark slots are available.</p>
+      <canvas id="demo-pool" width="760" height="300"></canvas>
+      <div class="demo-controls">
+        <button id="pool-fire-btn">Fire</button>
+        <button id="pool-burst-btn">Burst (5)</button>
+        <button id="pool-reset-btn">Reset</button>
+        <span class="value-display" id="pool-count">Active: 0 / 20</span>
+      </div>
+    </div>
+
+    <!-- ==================== CONCEPT 2: SPAWN SYSTEM ==================== -->
+
     <h4>2. Spawn System &amp; Wave Design</h4>
     <p>A data-driven system that reads a spawn schedule and instantiates enemies:</p>
     <pre is:raw><code>waves = [
@@ -66,6 +92,8 @@ release(bullet):
     <p>Separate <em>what to spawn</em> (data) from <em>how to spawn</em> (logic).</p>
     <p><strong>Why it matters:</strong> Data-driven design &mdash; modifying behavior by editing data, not code. This is how professional games achieve content scalability without recompiling or redeploying.</p>
 
+    <!-- ==================== CONCEPT 3: 2D VECTOR MATH ==================== -->
+
     <h4>3. 2D Vector Math</h4>
     <p>You'll need:</p>
     <ul>
@@ -75,9 +103,20 @@ release(bullet):
     </ul>
     <p><strong>Why it matters:</strong> 2D vector math is the lingua franca of game programming. Everything here transfers to 3D with an added z-component.</p>
 
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Vector Math Playground</div>
+      <p class="demo-hint">Move your mouse to aim from the player (center dot). The direction vector, angle (atan2), and normalized components are shown live. Click to fire a bullet along the computed vector.</p>
+      <canvas id="demo-vector" width="760" height="400"></canvas>
+      <div id="vector-math" style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-dim); margin-top: 1rem; line-height: 1.8;"></div>
+    </div>
+
+    <!-- ==================== CONCEPT 4: PROJECTILE SYSTEM ==================== -->
+
     <h4>4. Projectile System</h4>
     <p>Bullets are fire-and-forget entities: spawned with a position, velocity vector, damage value, and owner tag. Each frame they move along their velocity. On collision with a valid target (not their owner), they deal damage and deactivate.</p>
     <p><strong>Why it matters:</strong> Autonomous entities with initial conditions. The owner-tag filtering introduces collision layers/masks.</p>
+
+    <!-- ==================== CONCEPT 5: COLLISION LAYERS ==================== -->
 
     <h4>5. Collision Layers / Masks</h4>
     <p>Assign entities to categories: <code>player</code>, <code>player-bullet</code>, <code>enemy</code>, <code>enemy-bullet</code>, <code>pickup</code>. Define which categories interact.</p>
@@ -85,9 +124,20 @@ release(bullet):
 enemy-bullet hits:  player (yes), enemy (no), enemy-bullet (no)</code></pre>
     <p><strong>Why it matters:</strong> Without collision filtering, every entity checks against every other entity, and friendly fire becomes unavoidable. Layers let you declaratively define interaction rules. Every engine uses this pattern.</p>
 
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Collision Layers Demo</div>
+      <p class="demo-hint">Colored entities move around the arena: blue (player), green (player-bullet), red (enemy), orange (enemy-bullet). Toggle the checkboxes in the matrix to control which layers can collide. When overlapping entities have collision enabled, they flash white.</p>
+      <canvas id="demo-collision" width="760" height="300"></canvas>
+      <div class="demo-controls" id="collision-controls" style="flex-direction: column; align-items: flex-start;"></div>
+    </div>
+
+    <!-- ==================== CONCEPT 6: HEALTH & DAMAGE ==================== -->
+
     <h4>6. Health &amp; Damage</h4>
     <p>Entities get an <code>hp</code> property. <code>takeDamage(amount)</code> decrements it. At <code>hp &lt;= 0</code>, trigger death (play effect, release back to pool).</p>
     <p><strong>Why it matters:</strong> Stateful entity interactions &mdash; one entity modifying another's state through a defined interface. Foundation of every RPG stat system, tower defense, and combat model.</p>
+
+    <!-- ==================== CONCEPT 7: ENEMY AI ==================== -->
 
     <h4>7. Enemy AI: Behavioral Patterns</h4>
     <p>Implement 2-3 distinct enemy behaviors as interchangeable functions:</p>
@@ -98,9 +148,46 @@ enemy-bullet hits:  player (yes), enemy (no), enemy-bullet (no)</code></pre>
     </ul>
     <p><strong>Why it matters:</strong> The Strategy pattern applied to game AI. Enemy variety comes from <em>combining simple behaviors</em>, not writing complex ones. Scales to behavior trees and utility AI.</p>
 
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Enemy Behavior Patterns</div>
+      <p class="demo-hint">Three enemy types move simultaneously. The crosshair follows your mouse (the "player" position). Toggle each type to see how different movement behaviors create visual variety from simple math.</p>
+      <canvas id="demo-enemy" width="760" height="400"></canvas>
+      <div class="demo-controls">
+        <label><input type="checkbox" id="enemy-linear" checked /> Linear (yellow)</label>
+        <label><input type="checkbox" id="enemy-sine" checked /> Sine-wave (cyan)</label>
+        <label><input type="checkbox" id="enemy-homing" checked /> Homing (magenta)</label>
+        <button id="enemy-reset-btn">Reset</button>
+      </div>
+    </div>
+
+    <!-- ==================== CONCEPT 8: SCORING ==================== -->
+
     <h4>8. Scoring with Combos</h4>
     <p>Rapid kills increment a combo counter that multiplies point values. A decay timer resets the multiplier if you stop killing.</p>
     <p><strong>Why it matters:</strong> Time-decaying state and feedback loops. Same pattern behind streak mechanics, idle-game generators, and engagement loops.</p>
+
+    <hr />
+
+    <!-- ==================== PUTTING IT ALL TOGETHER ==================== -->
+
+    <h3>Putting It All Together</h3>
+    <p>Below is a mini top-down shooter combining every concept above: object pooling, vector math, collision layers, enemy AI patterns, health, and scoring. WASD to move, mouse to aim, click to shoot. Survive the waves.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Mini Top-Down Shooter</div>
+      <p class="demo-hint">WASD to move. Aim with the mouse. Click to shoot. Enemies spawn from the edges in waves. Kill them before they reach you. Three enemy types use the behavior patterns from the demo above.</p>
+      <canvas id="demo-shooter" width="760" height="460"></canvas>
+      <div class="demo-controls">
+        <button id="shooter-restart-btn">Restart</button>
+        <span class="value-display" id="shooter-score">Score: 0</span>
+        <span class="value-display" id="shooter-wave">Wave: 1</span>
+        <span class="value-display" id="shooter-hp">HP: 5</span>
+      </div>
+    </div>
+
+    <hr />
+
+    <!-- ==================== STRETCH GOALS ==================== -->
 
     <h3>Stretch Goals (If Time Allows)</h3>
     <ul>
@@ -133,6 +220,10 @@ enemy-bullet hits:  player (yes), enemy (no), enemy-bullet (no)</code></pre>
       <li>A playable top-down shooter</li>
       <li>Write-up: What did you learn? What was harder than expected?</li>
     </ul>
+
+    <hr />
+
+    <!-- ==================== ANALOGIES BY BACKGROUND ==================== -->
 
     <h2>Analogies by Background</h2>
 
@@ -199,9 +290,1510 @@ enemy-bullet hits:  player (yes), enemy (no), enemy-bullet (no)</code></pre>
       <li>How would you design wave pacing to create "tension and release" &mdash; moments of intense action followed by breathers?</li>
     </ol>
 
+    <!-- Module Navigation -->
     <nav class="module-nav">
       <a href={`${base}modules/02-platformer/`}>&larr; Module 02: 2D Platformer</a>
       <a href={`${base}modules/04-endless-runner/`}>Module 04: Endless Runner &rarr;</a>
     </nav>
   </div>
 </BaseLayout>
+
+<script>
+// ============================================================
+// DEMO 1: OBJECT POOL VISUALIZER
+// ============================================================
+(function() {
+  var canvas = document.getElementById('demo-pool');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width, H = canvas.height;
+  var fireBtn = document.getElementById('pool-fire-btn');
+  var burstBtn = document.getElementById('pool-burst-btn');
+  var resetBtn = document.getElementById('pool-reset-btn');
+  var countDisp = document.getElementById('pool-count');
+
+  var POOL_SIZE = 20;
+  var pool = [];
+  var SLOT_R = 14;
+  var SLOT_GAP = 4;
+  var SLOT_Y = 50;
+  var ARENA_TOP = 100;
+  var BULLET_SPEED = 4;
+  var BULLET_R = 6;
+  var totalFired = 0;
+  var totalRecycled = 0;
+
+  function initPool() {
+    pool = [];
+    totalFired = 0;
+    totalRecycled = 0;
+    for (var i = 0; i < POOL_SIZE; i++) {
+      pool.push({ active: false, x: 60, y: 0, vx: 0, vy: 0, slot: i });
+    }
+  }
+
+  function acquire() {
+    for (var i = 0; i < pool.length; i++) {
+      if (!pool[i].active) {
+        pool[i].active = true;
+        return pool[i];
+      }
+    }
+    return null;
+  }
+
+  function release(b) {
+    b.active = false;
+    totalRecycled++;
+  }
+
+  function fireBullet() {
+    var b = acquire();
+    if (!b) return;
+    totalFired++;
+    var yRange = H - ARENA_TOP - 40;
+    b.x = 60;
+    b.y = ARENA_TOP + 20 + Math.random() * yRange;
+    var angle = (Math.random() - 0.5) * 0.6;
+    var spd = BULLET_SPEED + Math.random() * 2;
+    b.vx = Math.cos(angle) * spd;
+    b.vy = Math.sin(angle) * spd;
+  }
+
+  fireBtn.addEventListener('click', function() { fireBullet(); });
+  burstBtn.addEventListener('click', function() {
+    for (var i = 0; i < 5; i++) fireBullet();
+  });
+  resetBtn.addEventListener('click', function() { initPool(); });
+
+  function getSlotX(i) {
+    var totalW = POOL_SIZE * (SLOT_R * 2 + SLOT_GAP) - SLOT_GAP;
+    var startX = (W - totalW) / 2;
+    return startX + i * (SLOT_R * 2 + SLOT_GAP) + SLOT_R;
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Title
+    ctx.fillStyle = '#71717a';
+    ctx.font = '600 12px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('BULLET POOL (' + POOL_SIZE + ' slots)', 16, 24);
+
+    // Stats
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#f59e0b';
+    ctx.fillText('Fired: ' + totalFired + '  Recycled: ' + totalRecycled, W - 16, 24);
+
+    // Draw pool slots
+    var activeCount = 0;
+    for (var i = 0; i < POOL_SIZE; i++) {
+      var sx = getSlotX(i);
+      var isActive = pool[i].active;
+      if (isActive) activeCount++;
+
+      // Slot circle
+      ctx.beginPath();
+      ctx.arc(sx, SLOT_Y, SLOT_R, 0, Math.PI * 2);
+      if (isActive) {
+        ctx.fillStyle = 'rgba(245, 158, 11, 0.25)';
+        ctx.fill();
+        ctx.strokeStyle = '#f59e0b';
+      } else {
+        ctx.fillStyle = '#1c1c20';
+        ctx.fill();
+        ctx.strokeStyle = '#3f3f46';
+      }
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Slot index
+      ctx.fillStyle = isActive ? '#f59e0b' : '#3f3f46';
+      ctx.font = '500 9px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(i), sx, SLOT_Y);
+    }
+
+    // Draw separator line
+    ctx.strokeStyle = '#27272a';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(0, ARENA_TOP - 10);
+    ctx.lineTo(W, ARENA_TOP - 10);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = '#3f3f46';
+    ctx.font = '500 10px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText('ARENA', 16, ARENA_TOP - 6);
+
+    // Update and draw active bullets
+    for (var i = 0; i < POOL_SIZE; i++) {
+      var b = pool[i];
+      if (!b.active) continue;
+
+      b.x += b.vx;
+      b.y += b.vy;
+
+      // Off-screen: recycle
+      if (b.x > W + 20 || b.x < -20 || b.y < ARENA_TOP - 20 || b.y > H + 20) {
+        release(b);
+        continue;
+      }
+
+      // Draw connecting line from slot to bullet
+      var sx = getSlotX(b.slot);
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.12)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2, 4]);
+      ctx.beginPath();
+      ctx.moveTo(sx, SLOT_Y + SLOT_R);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Bullet glow
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, BULLET_R + 4, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.15)';
+      ctx.fill();
+
+      // Bullet
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, BULLET_R, 0, Math.PI * 2);
+      ctx.fillStyle = '#f59e0b';
+      ctx.fill();
+    }
+
+    countDisp.textContent = 'Active: ' + activeCount + ' / ' + POOL_SIZE;
+
+    requestAnimationFrame(draw);
+  }
+
+  initPool();
+  requestAnimationFrame(draw);
+})();
+
+
+// ============================================================
+// DEMO 2: VECTOR MATH PLAYGROUND
+// ============================================================
+(function() {
+  var canvas = document.getElementById('demo-vector');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width, H = canvas.height;
+  var mathDiv = document.getElementById('vector-math');
+
+  var playerX = W / 2, playerY = H / 2;
+  var mouseX = W / 2 + 100, mouseY = H / 2 - 80;
+  var bullets = [];
+  var BULLET_SPEED = 6;
+  var BULLET_R = 4;
+  var GRID_SIZE = 40;
+
+  function getCanvasPos(e) {
+    var rect = canvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left) * (W / rect.width),
+      y: (e.clientY - rect.top) * (H / rect.height)
+    };
+  }
+
+  canvas.addEventListener('mousemove', function(e) {
+    var p = getCanvasPos(e);
+    mouseX = p.x;
+    mouseY = p.y;
+  });
+
+  canvas.addEventListener('click', function(e) {
+    var p = getCanvasPos(e);
+    var dx = p.x - playerX;
+    var dy = p.y - playerY;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 1) return;
+    bullets.push({
+      x: playerX, y: playerY,
+      vx: (dx / dist) * BULLET_SPEED,
+      vy: (dy / dist) * BULLET_SPEED,
+      life: 0
+    });
+  });
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Draw subtle grid
+    ctx.strokeStyle = '#1a1a1e';
+    ctx.lineWidth = 1;
+    for (var gx = 0; gx < W; gx += GRID_SIZE) {
+      ctx.beginPath();
+      ctx.moveTo(gx, 0);
+      ctx.lineTo(gx, H);
+      ctx.stroke();
+    }
+    for (var gy = 0; gy < H; gy += GRID_SIZE) {
+      ctx.beginPath();
+      ctx.moveTo(0, gy);
+      ctx.lineTo(W, gy);
+      ctx.stroke();
+    }
+
+    // Axis through player
+    ctx.strokeStyle = '#27272a';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(0, playerY);
+    ctx.lineTo(W, playerY);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(playerX, 0);
+    ctx.lineTo(playerX, H);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Compute direction vector
+    var dx = mouseX - playerX;
+    var dy = mouseY - playerY;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    var nx = dist > 0 ? dx / dist : 1;
+    var ny = dist > 0 ? dy / dist : 0;
+    var angle = Math.atan2(dy, dx);
+    var angleDeg = angle * 180 / Math.PI;
+
+    // Draw direction line from player to mouse
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(playerX, playerY);
+    ctx.lineTo(mouseX, mouseY);
+    ctx.stroke();
+
+    // Arrowhead
+    var headLen = 12;
+    ctx.beginPath();
+    ctx.moveTo(mouseX, mouseY);
+    ctx.lineTo(mouseX - headLen * Math.cos(angle - 0.3), mouseY - headLen * Math.sin(angle - 0.3));
+    ctx.lineTo(mouseX - headLen * Math.cos(angle + 0.3), mouseY - headLen * Math.sin(angle + 0.3));
+    ctx.closePath();
+    ctx.fillStyle = '#f59e0b';
+    ctx.fill();
+
+    // Draw angle arc
+    var arcR = 50;
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    if (angle >= 0) {
+      ctx.arc(playerX, playerY, arcR, 0, angle);
+    } else {
+      ctx.arc(playerX, playerY, arcR, angle, 0);
+    }
+    ctx.stroke();
+
+    // Angle label
+    var labelAngle = angle / 2;
+    ctx.fillStyle = '#3b82f6';
+    ctx.font = '600 12px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(angleDeg.toFixed(1) + '\u00B0', playerX + (arcR + 20) * Math.cos(labelAngle), playerY + (arcR + 20) * Math.sin(labelAngle));
+
+    // Draw component vectors (dx, dy)
+    // X component
+    ctx.strokeStyle = '#22c55e';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.moveTo(playerX, playerY);
+    ctx.lineTo(mouseX, playerY);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(mouseX, playerY);
+    ctx.lineTo(mouseX, mouseY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Component labels
+    ctx.fillStyle = '#22c55e';
+    ctx.font = '500 11px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    var labelOffY = dy >= 0 ? -10 : 14;
+    ctx.fillText('dx: ' + dx.toFixed(0), (playerX + mouseX) / 2, playerY + labelOffY);
+    var labelOffX = dx >= 0 ? 14 : -14;
+    ctx.textAlign = dx >= 0 ? 'left' : 'right';
+    ctx.fillText('dy: ' + dy.toFixed(0), mouseX + labelOffX, (playerY + mouseY) / 2);
+
+    // Draw velocity vector (normalized * speed)
+    var velLen = 80;
+    var vx = nx * BULLET_SPEED;
+    var vy = ny * BULLET_SPEED;
+    ctx.strokeStyle = '#a855f7';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(playerX, playerY);
+    ctx.lineTo(playerX + nx * velLen, playerY + ny * velLen);
+    ctx.stroke();
+
+    // Velocity arrowhead
+    var vEndX = playerX + nx * velLen;
+    var vEndY = playerY + ny * velLen;
+    ctx.beginPath();
+    ctx.moveTo(vEndX, vEndY);
+    ctx.lineTo(vEndX - 8 * Math.cos(angle - 0.35), vEndY - 8 * Math.sin(angle - 0.35));
+    ctx.lineTo(vEndX - 8 * Math.cos(angle + 0.35), vEndY - 8 * Math.sin(angle + 0.35));
+    ctx.closePath();
+    ctx.fillStyle = '#a855f7';
+    ctx.fill();
+
+    // Velocity label
+    ctx.fillStyle = '#a855f7';
+    ctx.font = '500 10px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('vel(' + vx.toFixed(2) + ', ' + vy.toFixed(2) + ')', vEndX + 8, vEndY - 4);
+
+    // Player dot
+    ctx.beginPath();
+    ctx.arc(playerX, playerY, 10, 0, Math.PI * 2);
+    ctx.fillStyle = '#3b82f6';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(playerX, playerY, 15, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(59, 130, 246, 0.15)';
+    ctx.fill();
+
+    // Mouse crosshair
+    ctx.strokeStyle = '#f59e0b88';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(mouseX - 10, mouseY); ctx.lineTo(mouseX + 10, mouseY);
+    ctx.moveTo(mouseX, mouseY - 10); ctx.lineTo(mouseX, mouseY + 10);
+    ctx.stroke();
+
+    // Update and draw bullets
+    for (var i = bullets.length - 1; i >= 0; i--) {
+      var b = bullets[i];
+      b.x += b.vx;
+      b.y += b.vy;
+      b.life++;
+      if (b.x < -20 || b.x > W + 20 || b.y < -20 || b.y > H + 20) {
+        bullets.splice(i, 1);
+        continue;
+      }
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, BULLET_R, 0, Math.PI * 2);
+      ctx.fillStyle = '#f59e0b';
+      ctx.fill();
+      // trail
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, BULLET_R + 3, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.15)';
+      ctx.fill();
+    }
+
+    // Legend
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.font = '500 10px "JetBrains Mono", monospace';
+    ctx.fillStyle = '#f59e0b'; ctx.fillText('\u2500 Direction to mouse', 16, 12);
+    ctx.fillStyle = '#3b82f6'; ctx.fillText('\u2500 Angle (atan2)', 16, 26);
+    ctx.fillStyle = '#22c55e'; ctx.fillText('--- Components (dx, dy)', 16, 40);
+    ctx.fillStyle = '#a855f7'; ctx.fillText('\u2500 Velocity vector', 16, 54);
+
+    // Math display
+    if (mathDiv) {
+      mathDiv.innerHTML =
+        '<span style="color:#f59e0b">atan2(' + dy.toFixed(0) + ', ' + dx.toFixed(0) + ') = ' + angleDeg.toFixed(1) + '\u00B0' +
+        ' (' + angle.toFixed(3) + ' rad)</span>' +
+        '&nbsp;&nbsp;|&nbsp;&nbsp;' +
+        '<span style="color:#22c55e">normalized: (' + nx.toFixed(3) + ', ' + ny.toFixed(3) + ')</span>' +
+        '&nbsp;&nbsp;|&nbsp;&nbsp;' +
+        '<span style="color:#a855f7">velocity: (' + vx.toFixed(2) + ', ' + vy.toFixed(2) + ')</span>' +
+        '&nbsp;&nbsp;|&nbsp;&nbsp;' +
+        '<span style="color:#71717a">distance: ' + dist.toFixed(0) + 'px</span>';
+    }
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+
+// ============================================================
+// DEMO 3: ENEMY BEHAVIOR PATTERNS
+// ============================================================
+(function() {
+  var canvas = document.getElementById('demo-enemy');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width, H = canvas.height;
+  var cbLinear = document.getElementById('enemy-linear');
+  var cbSine = document.getElementById('enemy-sine');
+  var cbHoming = document.getElementById('enemy-homing');
+  var resetBtn = document.getElementById('enemy-reset-btn');
+
+  var mouseX = W / 2, mouseY = H / 2;
+  var time = 0;
+  var enemies = [];
+  var ENEMY_R = 12;
+  var SPAWN_INTERVAL = 80;
+  var frameCount = 0;
+
+  function getCanvasPos(e) {
+    var rect = canvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left) * (W / rect.width),
+      y: (e.clientY - rect.top) * (H / rect.height)
+    };
+  }
+
+  canvas.addEventListener('mousemove', function(e) {
+    var p = getCanvasPos(e);
+    mouseX = p.x;
+    mouseY = p.y;
+  });
+
+  function spawnEnemy(type) {
+    var side = Math.floor(Math.random() * 4);
+    var ex, ey, evx, evy;
+    if (side === 0) { ex = -ENEMY_R; ey = Math.random() * H; evx = 1; evy = 0; }
+    else if (side === 1) { ex = W + ENEMY_R; ey = Math.random() * H; evx = -1; evy = 0; }
+    else if (side === 2) { ex = Math.random() * W; ey = -ENEMY_R; evx = 0; evy = 1; }
+    else { ex = Math.random() * W; ey = H + ENEMY_R; evx = 0; evy = -1; }
+
+    var spd = 1.2 + Math.random() * 0.8;
+    enemies.push({
+      type: type,
+      x: ex, y: ey,
+      vx: evx * spd, vy: evy * spd,
+      baseAngle: Math.atan2(evy, evx),
+      angle: Math.atan2(evy, evx),
+      speed: spd,
+      time: 0,
+      amplitude: 40 + Math.random() * 30
+    });
+  }
+
+  function resetEnemies() {
+    enemies = [];
+    frameCount = 0;
+    time = 0;
+  }
+
+  resetBtn.addEventListener('click', resetEnemies);
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    time += 1 / 60;
+    frameCount++;
+
+    // Auto-spawn enemies
+    if (frameCount % SPAWN_INTERVAL === 0) {
+      if (cbLinear.checked) spawnEnemy('linear');
+      if (cbSine.checked) spawnEnemy('sine');
+      if (cbHoming.checked) spawnEnemy('homing');
+    }
+
+    // Draw mouse crosshair (target/player)
+    ctx.strokeStyle = '#3b82f688';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(mouseX - 15, mouseY); ctx.lineTo(mouseX + 15, mouseY);
+    ctx.moveTo(mouseX, mouseY - 15); ctx.lineTo(mouseX, mouseY + 15);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(mouseX, mouseY, 8, 0, Math.PI * 2);
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = '#3b82f6';
+    ctx.font = '500 10px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('PLAYER', mouseX, mouseY + 22);
+
+    // Update and draw enemies
+    for (var i = enemies.length - 1; i >= 0; i--) {
+      var e = enemies[i];
+      e.time += 1 / 60;
+
+      if (e.type === 'linear') {
+        e.x += e.vx;
+        e.y += e.vy;
+      } else if (e.type === 'sine') {
+        e.x += e.vx;
+        e.y += e.vy;
+        // Perpendicular oscillation
+        var perpX = -e.vy;
+        var perpY = e.vx;
+        var waveOffset = Math.sin(e.time * 3) * e.amplitude * (1 / 60);
+        e.x += perpX * waveOffset;
+        e.y += perpY * waveOffset;
+      } else if (e.type === 'homing') {
+        var hdx = mouseX - e.x;
+        var hdy = mouseY - e.y;
+        var hdist = Math.sqrt(hdx * hdx + hdy * hdy);
+        if (hdist > 1) {
+          var targetAngle = Math.atan2(hdy, hdx);
+          // Limited turn rate
+          var angleDiff = targetAngle - e.angle;
+          while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+          var turnRate = 0.03;
+          e.angle += Math.max(-turnRate, Math.min(turnRate, angleDiff));
+          e.x += Math.cos(e.angle) * e.speed;
+          e.y += Math.sin(e.angle) * e.speed;
+        }
+      }
+
+      // Remove if far off-screen
+      if (e.x < -60 || e.x > W + 60 || e.y < -60 || e.y > H + 60) {
+        // For homing, don't remove (they come back)
+        if (e.type !== 'homing') {
+          enemies.splice(i, 1);
+          continue;
+        }
+      }
+
+      // Visibility check
+      if ((e.type === 'linear' && !cbLinear.checked) ||
+          (e.type === 'sine' && !cbSine.checked) ||
+          (e.type === 'homing' && !cbHoming.checked)) {
+        continue;
+      }
+
+      // Draw enemy
+      var col, label;
+      if (e.type === 'linear') { col = '#eab308'; label = 'LIN'; }
+      else if (e.type === 'sine') { col = '#06b6d4'; label = 'SIN'; }
+      else { col = '#d946ef'; label = 'HOM'; }
+
+      // Direction indicator
+      var dirAngle = e.type === 'homing' ? e.angle : Math.atan2(e.vy, e.vx);
+      ctx.strokeStyle = col + '66';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(e.x, e.y);
+      ctx.lineTo(e.x + Math.cos(dirAngle) * 25, e.y + Math.sin(dirAngle) * 25);
+      ctx.stroke();
+
+      // Body
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, ENEMY_R, 0, Math.PI * 2);
+      ctx.fillStyle = col + '33';
+      ctx.fill();
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Label
+      ctx.fillStyle = col;
+      ctx.font = '700 8px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, e.x, e.y);
+    }
+
+    // Cap enemies to prevent overload
+    if (enemies.length > 60) {
+      enemies = enemies.slice(enemies.length - 60);
+    }
+
+    // Legend
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.font = '500 11px "JetBrains Mono", monospace';
+    ctx.fillStyle = '#eab308'; ctx.fillText('\u25CF Linear - straight line', 16, 12);
+    ctx.fillStyle = '#06b6d4'; ctx.fillText('\u25CF Sine-wave - oscillates', 16, 28);
+    ctx.fillStyle = '#d946ef'; ctx.fillText('\u25CF Homing - steers toward player', 16, 44);
+
+    // Enemy count
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#71717a';
+    ctx.fillText('Enemies: ' + enemies.length, W - 16, 12);
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+
+// ============================================================
+// DEMO 4: COLLISION LAYERS
+// ============================================================
+(function() {
+  var canvas = document.getElementById('demo-collision');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width, H = canvas.height;
+  var controlsDiv = document.getElementById('collision-controls');
+
+  var layers = [
+    { name: 'Player', color: '#3b82f6', shortName: 'PLR' },
+    { name: 'Player-Bullet', color: '#22c55e', shortName: 'P-B' },
+    { name: 'Enemy', color: '#ef4444', shortName: 'ENM' },
+    { name: 'Enemy-Bullet', color: '#f97316', shortName: 'E-B' }
+  ];
+
+  // Collision matrix: collisionMatrix[i][j] = true means layer i can collide with layer j
+  var collisionMatrix = [
+    [false, false, false, true],   // Player collides with: enemy-bullet
+    [false, false, true,  false],  // Player-bullet collides with: enemy
+    [false, true,  false, false],  // Enemy collides with: player-bullet
+    [true,  false, false, false]   // Enemy-bullet collides with: player
+  ];
+
+  // Build control matrix UI
+  var table = document.createElement('table');
+  table.style.cssText = 'border-collapse:collapse; font-size:0.75rem; margin-top:0.5rem;';
+  var headerRow = document.createElement('tr');
+  var emptyTh = document.createElement('th');
+  emptyTh.style.cssText = 'padding:4px 8px; color:var(--text-dim); font-weight:500;';
+  emptyTh.textContent = 'Collides with \u2192';
+  headerRow.appendChild(emptyTh);
+  for (var j = 0; j < layers.length; j++) {
+    var th = document.createElement('th');
+    th.style.cssText = 'padding:4px 8px; color:' + layers[j].color + '; font-weight:600; text-align:center; font-size:0.7rem;';
+    th.textContent = layers[j].shortName;
+    headerRow.appendChild(th);
+  }
+  table.appendChild(headerRow);
+
+  var checkboxes = [];
+  for (var i = 0; i < layers.length; i++) {
+    checkboxes[i] = [];
+    var row = document.createElement('tr');
+    var label = document.createElement('td');
+    label.style.cssText = 'padding:4px 8px; color:' + layers[i].color + '; font-weight:600; font-size:0.7rem;';
+    label.textContent = layers[i].shortName;
+    row.appendChild(label);
+    for (var j = 0; j < layers.length; j++) {
+      var td = document.createElement('td');
+      td.style.cssText = 'padding:4px 8px; text-align:center;';
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = collisionMatrix[i][j];
+      cb.style.accentColor = '#f59e0b';
+      (function(ii, jj, cbox) {
+        cbox.addEventListener('change', function() {
+          collisionMatrix[ii][jj] = cbox.checked;
+          // Mirror it
+          collisionMatrix[jj][ii] = cbox.checked;
+          // Sync the mirrored checkbox
+          if (checkboxes[jj] && checkboxes[jj][ii]) {
+            checkboxes[jj][ii].checked = cbox.checked;
+          }
+        });
+      })(i, j, cb);
+      checkboxes[i][j] = cb;
+      td.appendChild(cb);
+      row.appendChild(td);
+    }
+    table.appendChild(row);
+  }
+  controlsDiv.appendChild(table);
+
+  // Entities
+  var entities = [];
+  var ENTITY_R = 18;
+  var ARENA_PAD = 30;
+
+  function initEntities() {
+    entities = [];
+    for (var i = 0; i < layers.length; i++) {
+      var angle = Math.random() * Math.PI * 2;
+      var spd = 0.8 + Math.random() * 0.8;
+      entities.push({
+        layer: i,
+        x: ARENA_PAD + Math.random() * (W - ARENA_PAD * 2),
+        y: ARENA_PAD + Math.random() * (H - ARENA_PAD * 2),
+        vx: Math.cos(angle) * spd,
+        vy: Math.sin(angle) * spd,
+        flash: 0
+      });
+    }
+    // Add a few extra of each type
+    for (var i = 0; i < layers.length; i++) {
+      var angle = Math.random() * Math.PI * 2;
+      var spd = 0.6 + Math.random() * 0.6;
+      entities.push({
+        layer: i,
+        x: ARENA_PAD + Math.random() * (W - ARENA_PAD * 2),
+        y: ARENA_PAD + Math.random() * (H - ARENA_PAD * 2),
+        vx: Math.cos(angle) * spd,
+        vy: Math.sin(angle) * spd,
+        flash: 0
+      });
+    }
+  }
+
+  initEntities();
+
+  function circlesOverlap(a, b) {
+    var dx = a.x - b.x;
+    var dy = a.y - b.y;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    return dist < ENTITY_R * 2;
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Update entities
+    for (var i = 0; i < entities.length; i++) {
+      var e = entities[i];
+      e.x += e.vx;
+      e.y += e.vy;
+      if (e.flash > 0) e.flash -= 0.05;
+
+      // Bounce off walls
+      if (e.x - ENTITY_R < 0) { e.x = ENTITY_R; e.vx = Math.abs(e.vx); }
+      if (e.x + ENTITY_R > W) { e.x = W - ENTITY_R; e.vx = -Math.abs(e.vx); }
+      if (e.y - ENTITY_R < 0) { e.y = ENTITY_R; e.vy = Math.abs(e.vy); }
+      if (e.y + ENTITY_R > H) { e.y = H - ENTITY_R; e.vy = -Math.abs(e.vy); }
+    }
+
+    // Check collisions
+    for (var i = 0; i < entities.length; i++) {
+      for (var j = i + 1; j < entities.length; j++) {
+        var a = entities[i];
+        var b = entities[j];
+        if (circlesOverlap(a, b)) {
+          if (collisionMatrix[a.layer][b.layer]) {
+            a.flash = 1;
+            b.flash = 1;
+
+            // Draw collision line
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([2, 2]);
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.stroke();
+            ctx.setLineDash([]);
+          }
+        }
+      }
+    }
+
+    // Draw entities
+    for (var i = 0; i < entities.length; i++) {
+      var e = entities[i];
+      var col = layers[e.layer].color;
+
+      // Flash glow
+      if (e.flash > 0) {
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, ENTITY_R + 8, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, ' + (e.flash * 0.3) + ')';
+        ctx.fill();
+      }
+
+      // Body
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, ENTITY_R, 0, Math.PI * 2);
+      if (e.flash > 0) {
+        var r = Math.round(255 * e.flash + parseInt(col.slice(1, 3), 16) * (1 - e.flash));
+        var g = Math.round(255 * e.flash + parseInt(col.slice(3, 5), 16) * (1 - e.flash));
+        var bv = Math.round(255 * e.flash + parseInt(col.slice(5, 7), 16) * (1 - e.flash));
+        ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + bv + ')';
+      } else {
+        ctx.fillStyle = col + '55';
+      }
+      ctx.fill();
+      ctx.strokeStyle = e.flash > 0 ? '#ffffff' : col;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Label
+      ctx.fillStyle = e.flash > 0 ? '#ffffff' : col;
+      ctx.font = '700 8px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(layers[e.layer].shortName, e.x, e.y);
+    }
+
+    // Legend at top
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.font = '500 10px "JetBrains Mono", monospace';
+    var legendX = 12;
+    for (var i = 0; i < layers.length; i++) {
+      ctx.fillStyle = layers[i].color;
+      ctx.fillText('\u25CF ' + layers[i].name, legendX, 8);
+      legendX += ctx.measureText('\u25CF ' + layers[i].name).width + 20;
+    }
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+
+// ============================================================
+// DEMO 5: MINI TOP-DOWN SHOOTER
+// ============================================================
+(function() {
+  var canvas = document.getElementById('demo-shooter');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width, H = canvas.height;
+  var restartBtn = document.getElementById('shooter-restart-btn');
+  var scoreDisp = document.getElementById('shooter-score');
+  var waveDisp = document.getElementById('shooter-wave');
+  var hpDisp = document.getElementById('shooter-hp');
+
+  // Input
+  var keys = {};
+  var mouseX = W / 2, mouseY = H / 2;
+  var mouseDown = false;
+  var FIRE_RATE = 8; // frames between shots
+  var fireCooldown = 0;
+
+  // Player
+  var player = { x: W / 2, y: H / 2, r: 12, speed: 3.5, hp: 5, maxHp: 5, invuln: 0 };
+  var score = 0;
+  var combo = 0;
+  var comboTimer = 0;
+  var COMBO_DECAY = 2; // seconds
+  var gameState = 'playing'; // playing, gameover
+  var wave = 1;
+  var waveTimer = 0;
+  var waveDelay = 180; // frames between waves
+  var enemiesThisWave = 0;
+  var enemiesKilledThisWave = 0;
+  var enemiesToSpawn = 0;
+  var spawnTimer = 0;
+  var shakeX = 0, shakeY = 0, shakeDur = 0;
+
+  // Object pool for bullets
+  var BULLET_POOL_SIZE = 60;
+  var bullets = [];
+  for (var i = 0; i < BULLET_POOL_SIZE; i++) {
+    bullets.push({ active: false, x: 0, y: 0, vx: 0, vy: 0, r: 3, owner: 'player' });
+  }
+
+  function acquireBullet() {
+    for (var i = 0; i < bullets.length; i++) {
+      if (!bullets[i].active) {
+        bullets[i].active = true;
+        return bullets[i];
+      }
+    }
+    return null;
+  }
+
+  // Enemy pool
+  var ENEMY_POOL_SIZE = 40;
+  var enemies = [];
+  for (var i = 0; i < ENEMY_POOL_SIZE; i++) {
+    enemies.push({ active: false, x: 0, y: 0, vx: 0, vy: 0, r: 14, hp: 1, maxHp: 1, type: 'linear', angle: 0, time: 0, speed: 1, amplitude: 40, flash: 0 });
+  }
+
+  function acquireEnemy() {
+    for (var i = 0; i < enemies.length; i++) {
+      if (!enemies[i].active) {
+        enemies[i].active = true;
+        enemies[i].flash = 0;
+        return enemies[i];
+      }
+    }
+    return null;
+  }
+
+  // Particles
+  var particles = [];
+  function spawnParticles(x, y, color, count) {
+    for (var i = 0; i < count; i++) {
+      var angle = Math.random() * Math.PI * 2;
+      var spd = 1 + Math.random() * 3;
+      particles.push({
+        x: x, y: y,
+        vx: Math.cos(angle) * spd,
+        vy: Math.sin(angle) * spd,
+        life: 1,
+        decay: 0.02 + Math.random() * 0.02,
+        r: 2 + Math.random() * 3,
+        color: color
+      });
+    }
+  }
+
+  function getCanvasPos(e) {
+    var rect = canvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left) * (W / rect.width),
+      y: (e.clientY - rect.top) * (H / rect.height)
+    };
+  }
+
+  // Input handlers
+  document.addEventListener('keydown', function(e) {
+    keys[e.key.toLowerCase()] = true;
+    // Prevent scrolling with WASD
+    if (['w', 'a', 's', 'd', ' '].indexOf(e.key.toLowerCase()) >= 0) {
+      // Only prevent if canvas is visible in viewport
+      var rect = canvas.getBoundingClientRect();
+      if (rect.top < window.innerHeight && rect.bottom > 0) {
+        e.preventDefault();
+      }
+    }
+  });
+  document.addEventListener('keyup', function(e) {
+    keys[e.key.toLowerCase()] = false;
+  });
+
+  canvas.addEventListener('mousemove', function(e) {
+    var p = getCanvasPos(e);
+    mouseX = p.x;
+    mouseY = p.y;
+  });
+  canvas.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+    mouseDown = true;
+  });
+  canvas.addEventListener('mouseup', function() { mouseDown = false; });
+  canvas.addEventListener('mouseleave', function() { mouseDown = false; });
+
+  // Touch support
+  canvas.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    mouseDown = true;
+    var p = getCanvasPos(e.touches[0]);
+    mouseX = p.x;
+    mouseY = p.y;
+  }, { passive: false });
+  canvas.addEventListener('touchmove', function(e) {
+    e.preventDefault();
+    var p = getCanvasPos(e.touches[0]);
+    mouseX = p.x;
+    mouseY = p.y;
+  }, { passive: false });
+  canvas.addEventListener('touchend', function() { mouseDown = false; });
+
+  function initGame() {
+    player.x = W / 2;
+    player.y = H / 2;
+    player.hp = player.maxHp;
+    player.invuln = 0;
+    score = 0;
+    combo = 0;
+    comboTimer = 0;
+    wave = 1;
+    waveTimer = 0;
+    enemiesThisWave = 0;
+    enemiesKilledThisWave = 0;
+    enemiesToSpawn = 3;
+    spawnTimer = 0;
+    shakeDur = 0;
+    gameState = 'playing';
+    fireCooldown = 0;
+    for (var i = 0; i < bullets.length; i++) bullets[i].active = false;
+    for (var i = 0; i < enemies.length; i++) enemies[i].active = false;
+    particles = [];
+    updateHUD();
+  }
+
+  function updateHUD() {
+    var comboStr = combo > 1 ? ' (x' + combo + ')' : '';
+    scoreDisp.textContent = 'Score: ' + score + comboStr;
+    waveDisp.textContent = 'Wave: ' + wave;
+    hpDisp.textContent = 'HP: ' + player.hp;
+  }
+
+  function spawnWaveEnemy() {
+    var e = acquireEnemy();
+    if (!e) return;
+
+    // Pick side
+    var side = Math.floor(Math.random() * 4);
+    if (side === 0) { e.x = -20; e.y = Math.random() * H; }
+    else if (side === 1) { e.x = W + 20; e.y = Math.random() * H; }
+    else if (side === 2) { e.x = Math.random() * W; e.y = -20; }
+    else { e.x = Math.random() * W; e.y = H + 20; }
+
+    // Type distribution changes with waves
+    var roll = Math.random();
+    if (wave <= 2) {
+      e.type = 'linear';
+    } else if (wave <= 4) {
+      e.type = roll < 0.5 ? 'linear' : 'sine';
+    } else {
+      if (roll < 0.33) e.type = 'linear';
+      else if (roll < 0.66) e.type = 'sine';
+      else e.type = 'homing';
+    }
+
+    // Aim toward player initially
+    var dx = player.x - e.x;
+    var dy = player.y - e.y;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    e.angle = Math.atan2(dy, dx);
+    e.speed = 1 + Math.min(wave * 0.15, 2);
+    e.vx = (dx / dist) * e.speed;
+    e.vy = (dy / dist) * e.speed;
+    e.hp = e.type === 'linear' ? 1 : (e.type === 'sine' ? 2 : 3);
+    e.maxHp = e.hp;
+    e.r = e.type === 'homing' ? 16 : 14;
+    e.time = 0;
+    e.amplitude = 50;
+    e.flash = 0;
+    enemiesThisWave++;
+  }
+
+  function firePlayerBullet() {
+    if (fireCooldown > 0) return;
+    fireCooldown = FIRE_RATE;
+    var b = acquireBullet();
+    if (!b) return;
+    var dx = mouseX - player.x;
+    var dy = mouseY - player.y;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 1) return;
+    b.x = player.x;
+    b.y = player.y;
+    b.vx = (dx / dist) * 8;
+    b.vy = (dy / dist) * 8;
+    b.r = 3;
+    b.owner = 'player';
+  }
+
+  function shake(duration) {
+    shakeDur = duration;
+  }
+
+  restartBtn.addEventListener('click', initGame);
+
+  function update() {
+    if (gameState !== 'playing') return;
+
+    // Shake decay
+    if (shakeDur > 0) {
+      shakeDur--;
+      shakeX = (Math.random() - 0.5) * 6;
+      shakeY = (Math.random() - 0.5) * 6;
+    } else {
+      shakeX = 0;
+      shakeY = 0;
+    }
+
+    // Player movement
+    var moveX = 0, moveY = 0;
+    if (keys['w'] || keys['arrowup']) moveY -= 1;
+    if (keys['s'] || keys['arrowdown']) moveY += 1;
+    if (keys['a'] || keys['arrowleft']) moveX -= 1;
+    if (keys['d'] || keys['arrowright']) moveX += 1;
+
+    if (moveX !== 0 || moveY !== 0) {
+      var mDist = Math.sqrt(moveX * moveX + moveY * moveY);
+      player.x += (moveX / mDist) * player.speed;
+      player.y += (moveY / mDist) * player.speed;
+    }
+
+    // Clamp player to arena
+    player.x = Math.max(player.r, Math.min(W - player.r, player.x));
+    player.y = Math.max(player.r, Math.min(H - player.r, player.y));
+
+    // Invulnerability decay
+    if (player.invuln > 0) player.invuln--;
+
+    // Firing
+    if (fireCooldown > 0) fireCooldown--;
+    if (mouseDown) {
+      firePlayerBullet();
+    }
+
+    // Combo decay
+    if (combo > 0) {
+      comboTimer -= 1 / 60;
+      if (comboTimer <= 0) {
+        combo = 0;
+        comboTimer = 0;
+      }
+    }
+
+    // Wave spawning
+    if (enemiesToSpawn > 0) {
+      spawnTimer++;
+      if (spawnTimer >= 20) {
+        spawnTimer = 0;
+        spawnWaveEnemy();
+        enemiesToSpawn--;
+      }
+    }
+
+    // Check if wave is complete
+    var activeEnemyCount = 0;
+    for (var i = 0; i < enemies.length; i++) {
+      if (enemies[i].active) activeEnemyCount++;
+    }
+    if (enemiesToSpawn <= 0 && activeEnemyCount === 0) {
+      waveTimer++;
+      if (waveTimer >= waveDelay) {
+        wave++;
+        waveTimer = 0;
+        enemiesThisWave = 0;
+        enemiesKilledThisWave = 0;
+        enemiesToSpawn = Math.min(3 + wave * 2, 25);
+        updateHUD();
+      }
+    }
+
+    // Update bullets
+    for (var i = 0; i < bullets.length; i++) {
+      var b = bullets[i];
+      if (!b.active) continue;
+      b.x += b.vx;
+      b.y += b.vy;
+      if (b.x < -20 || b.x > W + 20 || b.y < -20 || b.y > H + 20) {
+        b.active = false;
+      }
+    }
+
+    // Update enemies
+    for (var i = 0; i < enemies.length; i++) {
+      var e = enemies[i];
+      if (!e.active) continue;
+      e.time += 1 / 60;
+      if (e.flash > 0) e.flash -= 0.08;
+
+      if (e.type === 'linear') {
+        e.x += e.vx;
+        e.y += e.vy;
+      } else if (e.type === 'sine') {
+        e.x += e.vx;
+        e.y += e.vy;
+        var perpX = -e.vy;
+        var perpY = e.vx;
+        var norm = Math.sqrt(perpX * perpX + perpY * perpY);
+        if (norm > 0) {
+          perpX /= norm;
+          perpY /= norm;
+        }
+        var waveOffset = Math.cos(e.time * 4) * e.amplitude * (1 / 60);
+        e.x += perpX * waveOffset;
+        e.y += perpY * waveOffset;
+      } else if (e.type === 'homing') {
+        var hdx = player.x - e.x;
+        var hdy = player.y - e.y;
+        var hdist = Math.sqrt(hdx * hdx + hdy * hdy);
+        if (hdist > 1) {
+          var targetAngle = Math.atan2(hdy, hdx);
+          var angleDiff = targetAngle - e.angle;
+          while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+          var turnRate = 0.035;
+          e.angle += Math.max(-turnRate, Math.min(turnRate, angleDiff));
+          e.x += Math.cos(e.angle) * e.speed;
+          e.y += Math.sin(e.angle) * e.speed;
+        }
+      }
+
+      // Remove if way off-screen (except homing)
+      if (e.type !== 'homing') {
+        if (e.x < -80 || e.x > W + 80 || e.y < -80 || e.y > H + 80) {
+          e.active = false;
+          continue;
+        }
+      }
+
+      // Bullet-enemy collision
+      for (var j = 0; j < bullets.length; j++) {
+        var b = bullets[j];
+        if (!b.active || b.owner !== 'player') continue;
+        var bdx = b.x - e.x;
+        var bdy = b.y - e.y;
+        var bDist = Math.sqrt(bdx * bdx + bdy * bdy);
+        if (bDist < e.r + b.r) {
+          b.active = false;
+          e.hp--;
+          e.flash = 1;
+          spawnParticles(b.x, b.y, '#f59e0b', 4);
+          if (e.hp <= 0) {
+            e.active = false;
+            enemiesKilledThisWave++;
+            // Scoring
+            combo++;
+            comboTimer = COMBO_DECAY;
+            var points = 10 * Math.max(1, combo);
+            score += points;
+            shake(4);
+            // Death particles
+            var deathCol = e.type === 'linear' ? '#eab308' : (e.type === 'sine' ? '#06b6d4' : '#d946ef');
+            spawnParticles(e.x, e.y, deathCol, 12);
+            updateHUD();
+          }
+          break;
+        }
+      }
+
+      // Enemy-player collision
+      if (e.active && player.invuln <= 0) {
+        var pdx = player.x - e.x;
+        var pdy = player.y - e.y;
+        var pDist = Math.sqrt(pdx * pdx + pdy * pdy);
+        if (pDist < player.r + e.r) {
+          player.hp--;
+          player.invuln = 60;
+          shake(8);
+          spawnParticles(player.x, player.y, '#ef4444', 8);
+          e.active = false;
+          updateHUD();
+          if (player.hp <= 0) {
+            gameState = 'gameover';
+            spawnParticles(player.x, player.y, '#3b82f6', 20);
+          }
+        }
+      }
+    }
+
+    // Update particles
+    for (var i = particles.length - 1; i >= 0; i--) {
+      var p = particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vx *= 0.96;
+      p.vy *= 0.96;
+      p.life -= p.decay;
+      if (p.life <= 0) {
+        particles.splice(i, 1);
+      }
+    }
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.save();
+    ctx.translate(shakeX, shakeY);
+
+    // Arena border
+    ctx.strokeStyle = '#27272a';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(0, 0, W, H);
+
+    // Grid lines
+    ctx.strokeStyle = '#1a1a1e';
+    ctx.lineWidth = 1;
+    for (var gx = 0; gx < W; gx += 80) {
+      ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke();
+    }
+    for (var gy = 0; gy < H; gy += 80) {
+      ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke();
+    }
+
+    // Draw particles
+    for (var i = 0; i < particles.length; i++) {
+      var p = particles[i];
+      ctx.globalAlpha = p.life;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r * p.life, 0, Math.PI * 2);
+      ctx.fillStyle = p.color;
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // Draw bullets
+    for (var i = 0; i < bullets.length; i++) {
+      var b = bullets[i];
+      if (!b.active) continue;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+      ctx.fillStyle = '#f59e0b';
+      ctx.fill();
+      // glow
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.r + 3, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.15)';
+      ctx.fill();
+    }
+
+    // Draw enemies
+    for (var i = 0; i < enemies.length; i++) {
+      var e = enemies[i];
+      if (!e.active) continue;
+
+      var col, label;
+      if (e.type === 'linear') { col = '#eab308'; label = 'LIN'; }
+      else if (e.type === 'sine') { col = '#06b6d4'; label = 'SIN'; }
+      else { col = '#d946ef'; label = 'HOM'; }
+
+      // Flash white on hit
+      var drawCol = e.flash > 0.5 ? '#ffffff' : col;
+
+      // Direction indicator
+      var dirAngle = e.type === 'homing' ? e.angle : Math.atan2(e.vy, e.vx);
+      ctx.strokeStyle = drawCol + '66';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(e.x, e.y);
+      ctx.lineTo(e.x + Math.cos(dirAngle) * 20, e.y + Math.sin(dirAngle) * 20);
+      ctx.stroke();
+
+      // Body
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2);
+      ctx.fillStyle = (e.flash > 0.5 ? 'rgba(255,255,255,0.3)' : col + '33');
+      ctx.fill();
+      ctx.strokeStyle = drawCol;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // HP bar
+      if (e.hp < e.maxHp) {
+        var barW = e.r * 2;
+        var barH = 3;
+        var barX = e.x - barW / 2;
+        var barY = e.y - e.r - 8;
+        ctx.fillStyle = '#27272a';
+        ctx.fillRect(barX, barY, barW, barH);
+        ctx.fillStyle = '#ef4444';
+        ctx.fillRect(barX, barY, barW * (e.hp / e.maxHp), barH);
+      }
+
+      // Label
+      ctx.fillStyle = drawCol;
+      ctx.font = '700 7px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, e.x, e.y);
+    }
+
+    // Draw player
+    if (gameState === 'playing') {
+      // Invulnerability blink
+      var visible = player.invuln <= 0 || Math.floor(player.invuln / 4) % 2 === 0;
+      if (visible) {
+        // Aim line
+        var aimDx = mouseX - player.x;
+        var aimDy = mouseY - player.y;
+        var aimDist = Math.sqrt(aimDx * aimDx + aimDy * aimDy);
+        if (aimDist > 0) {
+          ctx.strokeStyle = 'rgba(59, 130, 246, 0.3)';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 4]);
+          ctx.beginPath();
+          ctx.moveTo(player.x, player.y);
+          ctx.lineTo(player.x + (aimDx / aimDist) * 40, player.y + (aimDy / aimDist) * 40);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+
+        // Player body
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(59, 130, 246, 0.3)';
+        ctx.fill();
+        ctx.strokeStyle = '#3b82f6';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Player direction triangle
+        if (aimDist > 0) {
+          var a = Math.atan2(aimDy, aimDx);
+          var tipX = player.x + Math.cos(a) * (player.r + 4);
+          var tipY = player.y + Math.sin(a) * (player.r + 4);
+          ctx.beginPath();
+          ctx.moveTo(tipX, tipY);
+          ctx.lineTo(player.x + Math.cos(a + 2.5) * 8, player.y + Math.sin(a + 2.5) * 8);
+          ctx.lineTo(player.x + Math.cos(a - 2.5) * 8, player.y + Math.sin(a - 2.5) * 8);
+          ctx.closePath();
+          ctx.fillStyle = '#3b82f6';
+          ctx.fill();
+        }
+      }
+
+      // HP bar for player
+      var hpBarW = 30;
+      var hpBarH = 3;
+      var hpBarX = player.x - hpBarW / 2;
+      var hpBarY = player.y + player.r + 6;
+      ctx.fillStyle = '#27272a';
+      ctx.fillRect(hpBarX, hpBarY, hpBarW, hpBarH);
+      ctx.fillStyle = player.hp > 2 ? '#22c55e' : (player.hp > 1 ? '#eab308' : '#ef4444');
+      ctx.fillRect(hpBarX, hpBarY, hpBarW * (player.hp / player.maxHp), hpBarH);
+    }
+
+    // Crosshair
+    ctx.strokeStyle = 'rgba(250, 250, 250, 0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(mouseX - 8, mouseY); ctx.lineTo(mouseX - 3, mouseY);
+    ctx.moveTo(mouseX + 3, mouseY); ctx.lineTo(mouseX + 8, mouseY);
+    ctx.moveTo(mouseX, mouseY - 8); ctx.lineTo(mouseX, mouseY - 3);
+    ctx.moveTo(mouseX, mouseY + 3); ctx.lineTo(mouseX, mouseY + 8);
+    ctx.stroke();
+
+    // Wave indicator
+    if (enemiesToSpawn <= 0) {
+      var activeCount = 0;
+      for (var i = 0; i < enemies.length; i++) {
+        if (enemies[i].active) activeCount++;
+      }
+      if (activeCount === 0 && gameState === 'playing') {
+        ctx.fillStyle = '#71717a';
+        ctx.font = '600 14px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        var countdown = Math.ceil((waveDelay - waveTimer) / 60);
+        ctx.fillText('Wave ' + (wave + 1) + ' in ' + countdown + '...', W / 2, 30);
+      }
+    } else {
+      ctx.fillStyle = '#f59e0b';
+      ctx.font = '700 14px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('WAVE ' + wave, W / 2, 30);
+    }
+
+    // Combo display
+    if (combo > 1) {
+      ctx.fillStyle = '#f59e0b';
+      ctx.font = '700 18px "JetBrains Mono", monospace';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'top';
+      ctx.fillText('x' + combo + ' COMBO', W - 16, 12);
+      // Combo timer bar
+      var ctBarW = 80;
+      var ctBarH = 3;
+      ctx.fillStyle = '#27272a';
+      ctx.fillRect(W - 16 - ctBarW, 34, ctBarW, ctBarH);
+      ctx.fillStyle = '#f59e0b';
+      ctx.fillRect(W - 16 - ctBarW, 34, ctBarW * (comboTimer / COMBO_DECAY), ctBarH);
+    }
+
+    // Game over
+    if (gameState === 'gameover') {
+      ctx.fillStyle = 'rgba(10, 10, 11, 0.75)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#ef4444';
+      ctx.font = '700 36px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('GAME OVER', W / 2, H / 2 - 30);
+      ctx.fillStyle = '#f59e0b';
+      ctx.font = '600 20px "JetBrains Mono", monospace';
+      ctx.fillText('Score: ' + score, W / 2, H / 2 + 10);
+      ctx.fillStyle = '#71717a';
+      ctx.font = '14px Inter, sans-serif';
+      ctx.fillText('Survived to Wave ' + wave + '  |  Click "Restart" to play again', W / 2, H / 2 + 45);
+    }
+
+    ctx.restore();
+  }
+
+  function loop() {
+    update();
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  initGame();
+  requestAnimationFrame(loop);
+})();
+</script>

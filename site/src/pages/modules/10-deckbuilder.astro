@@ -1,0 +1,1141 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 10: Card / Deckbuilder Game">
+  <div class="container page-content">
+    <div class="module-header">
+      <div class="module-number">Module 10</div>
+      <h1>Card / Deckbuilder Game</h1>
+      <p class="module-theme">Weeks 19-20 | Building and curating a system (your deck) that generates emergent strategy through the random order of card draws.</p>
+    </div>
+
+    <hr />
+
+    <h2>Prerequisites</h2>
+    <table>
+      <thead>
+        <tr><th>Module</th><th>What You Used From It</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Module 01 - Pong</td><td>Basic game state management, input handling, and game loop fundamentals</td></tr>
+      </tbody>
+    </table>
+    <p><strong>Note:</strong> This module is the most different from all others in the bootcamp. Every previous module has been real-time &mdash; continuous input, frame-by-frame physics, spatial collision. This module is <strong>turn-based and UI-heavy</strong>. The gameplay loop is: draw cards, evaluate options, play cards, resolve effects, end turn. The hard part is not the game logic &mdash; it is making the cards <em>feel</em> good to play through animation and UI.</p>
+
+    <hr />
+
+    <h2>Week 1: History &amp; Design Theory</h2>
+
+    <h3>The Origin</h3>
+    <p><strong>Magic: The Gathering</strong> (Richard Garfield, Wizards of the Coast, 1993) invented the trading card game. Before Magic, games came in a box and every player had the same pieces. Garfield's breakthrough was that the game existed <em>between</em> the matches: you built your deck from a personal collection, choosing which cards to include based on strategy, synergy, and resource constraints. The mana system created a resource economy that forced tradeoffs every turn. A deck was not just a collection of powerful cards &mdash; it was a <em>system</em> with its own internal logic, card ratios, and win conditions. Magic proved that the metagame of construction could be as deep as the game itself.</p>
+
+    <h3>How the Genre Evolved</h3>
+    <p><strong>Hearthstone</strong> (Blizzard, 2014) proved that card games could thrive as digital-first experiences. Where Magic was designed for physical cards and adapted to digital, Hearthstone was built for screens from the start. It simplified Magic's complexity &mdash; no instant-speed responses during the opponent's turn, automatic mana growth each turn, a maximum of 7 minions on the board &mdash; making it accessible to players who would never walk into a game store. Crucially, Hearthstone demonstrated that digital cards could do things physical cards cannot: generate random outcomes, transform into other cards, create cards that never existed in the collection.</p>
+
+    <p><strong>Slay the Spire</strong> (MegaCrit, 2019) created a new genre by merging deckbuilding with the roguelike structure. Instead of constructing a deck before the game, you <em>built your deck as you played</em> &mdash; starting with a weak set of basic cards and adding new ones as rewards after each combat encounter. Slay the Spire's key insight was that smaller decks are often better than larger ones &mdash; adding a mediocre card dilutes the probability of drawing your powerful cards. This turned deckbuilding into an editing problem: what you leave out matters as much as what you include.</p>
+
+    <p><strong>Balatro</strong> (LocalThunk, 2024) exploded the assumption that deckbuilders need fantasy combat. Built around poker hands with modifier cards (Jokers) that transform scoring rules, Balatro proved that the deckbuilder structure works with <em>any</em> card system. <strong>Inscryption</strong> (Daniel Mullins, 2021) pushed in a different direction, wrapping a deckbuilder inside a horror narrative that broke the fourth wall. Together, these games show that the deckbuilder format is a container &mdash; a structure for emergent system-building that can hold any content.</p>
+
+    <h3>What Makes Deckbuilders Great</h3>
+    <p>A great deckbuilder makes you feel like an engineer. Your deck is a machine you are designing under constraints: limited resources to play cards, limited slots in your hand, limited opportunities to add new cards. The randomness of the draw order means your machine never runs exactly the same way twice, so you must build for <em>resilience</em> rather than a single perfect sequence. The best deckbuilders create moments where cards you added for different reasons accidentally combine into something powerful &mdash; emergent behavior from simple rules.</p>
+
+    <h3>The Essential Mechanic</h3>
+    <p>Building and curating a system (your deck) that generates emergent strategy through the random order of card draws.</p>
+
+    <hr />
+
+    <h2>Week 2: Build the MVP</h2>
+
+    <h3>What You're Building</h3>
+    <p>A single-player deckbuilder in the style of Slay the Spire: the player fights a series of enemies using a deck of cards, gaining new cards after each victory. Combat is turn-based with an energy system, and enemies telegraph their next action so the player can plan strategically.</p>
+
+    <h3>Core Concepts (Must Implement)</h3>
+
+    <h4>1. Deck, Hand, and Discard as Data Structures</h4>
+    <p>The core data model of a deckbuilder is three linked collections: the <strong>draw pile</strong> (a shuffled stack), the <strong>hand</strong> (an ordered array the player can see and interact with), and the <strong>discard pile</strong> (a stack of used cards). Drawing a card pops from the draw pile and pushes to the hand. Playing a card removes it from the hand and pushes to the discard pile. When the draw pile is empty, shuffle the discard pile and it <em>becomes</em> the new draw pile.</p>
+
+    <pre is:raw><code>class DeckState:
+    drawPile   = []   // Stack
+    hand       = []   // Array
+    discardPile = []  // Stack
+
+function shuffle(pile):
+    // Fisher-Yates shuffle
+    for i from pile.length - 1 down to 1:
+        j = randomInt(0, i)
+        swap(pile[i], pile[j])
+
+function drawCard(state, count):
+    for i in range(count):
+        if state.drawPile.isEmpty():
+            if state.discardPile.isEmpty():
+                return
+            state.drawPile = state.discardPile
+            state.discardPile = []
+            shuffle(state.drawPile)
+        card = state.drawPile.pop()
+        state.hand.append(card)
+
+function playCard(state, handIndex):
+    card = state.hand.removeAt(handIndex)
+    state.discardPile.push(card)
+    return card</code></pre>
+
+    <p><strong>Why it matters:</strong> This is a circular buffer system with three stages. The Fisher-Yates shuffle is the only correct O(n) shuffling algorithm. Understanding this cycle is essential because every card you add changes the probability of drawing every other card.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Deck / Hand / Discard Visualizer</div>
+      <p class="demo-hint">Click "Draw" to draw cards from the deck to your hand. Click a card in your hand to play it (sends to discard). Click "Shuffle" to return the discard pile to the deck. Counts update live.</p>
+      <canvas id="demo-deck" width="760" height="360"></canvas>
+    </div>
+
+    <h4>2. Card Effect System Using the Command Pattern</h4>
+    <p>Each card is a <strong>command object</strong> with an <code>execute(gameState)</code> method. A "Strike" card executes <code>dealDamage(enemy, 6)</code>. A "Defend" card executes <code>gainBlock(player, 5)</code>. A "Draw Two" card executes <code>drawCard(state, 2)</code>. This means cards are data, not code branches.</p>
+
+    <pre is:raw><code>// Card defined as a command object
+class Card:
+    name        = "Strike"
+    cost        = 1
+    description = "Deal 6 damage."
+    target      = "single_enemy"
+
+    function execute(gameState, target):
+        dealDamage(gameState, target, 6)
+
+// Playing a card
+function playSelectedCard(gameState, handIndex, target):
+    card = gameState.deck.hand[handIndex]
+    if gameState.energy >= card.cost:
+        gameState.energy -= card.cost
+        card.execute(gameState, target)
+        gameState.deck.discardPile.push(
+            gameState.deck.hand.removeAt(handIndex)
+        )</code></pre>
+
+    <p><strong>Why it matters:</strong> This is the <strong>Command pattern</strong>. Each card encapsulates an action and its parameters in a self-contained object. Adding a new card means adding a new class, not modifying a switch statement.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Card Effect System</div>
+      <p class="demo-hint">You have 3 energy per turn and 4 cards with different effects. Click a card to play it against the enemy. Click "End Turn" to let the enemy act and start a new turn. Defeat the enemy to win!</p>
+      <canvas id="demo-effects" width="760" height="420"></canvas>
+    </div>
+
+    <h4>3. Turn Structure and Phase System</h4>
+    <p>Each turn follows a strict sequence of phases: <strong>Draw Phase</strong> -> <strong>Action Phase</strong> -> <strong>Enemy Action Phase</strong> -> <strong>Discard Phase</strong>. This is a state machine.</p>
+
+    <pre is:raw><code>enum TurnPhase:
+    DRAW, ACTION, ENEMY_ACTION, DISCARD, CHECK_WIN_LOSS
+
+function advancePhase(gameState):
+    switch gameState.phase:
+        case DRAW:
+            gameState.energy = MAX_ENERGY
+            drawCard(gameState.deck, CARDS_PER_DRAW)
+            gameState.phase = ACTION
+
+        case ACTION:
+            gameState.phase = ENEMY_ACTION
+
+        case ENEMY_ACTION:
+            for enemy in gameState.enemies:
+                executeIntent(enemy, gameState)
+                chooseNextIntent(enemy)
+            gameState.phase = DISCARD
+
+        case DISCARD:
+            discardHand(gameState.deck)
+            gameState.phase = CHECK_WIN_LOSS
+
+        case CHECK_WIN_LOSS:
+            if gameState.player.hp <= 0:
+                triggerGameOver()
+            else if allEnemiesDead(gameState):
+                triggerVictory()
+            else:
+                gameState.phase = DRAW
+                advancePhase(gameState)</code></pre>
+
+    <p><strong>Why it matters:</strong> This is a finite state machine with strict phase ordering. The key insight is that the Action phase is the only phase that waits for external input; all other phases are automatic transitions.</p>
+
+    <h4>4. Energy/Mana Resource System</h4>
+    <p>The player has a limited amount of energy each turn (typically 3). Each card has a cost. Playing a card deducts its cost. Energy resets at the start of each turn.</p>
+
+    <pre is:raw><code>gameState.maxEnergy = 3
+gameState.energy = gameState.maxEnergy
+
+function canPlayCard(gameState, card):
+    return gameState.energy >= card.cost</code></pre>
+
+    <p><strong>Why it matters:</strong> This is a resource budgeting system. The strategic depth comes from scarcity: if every card cost 0, there would be no decisions. Constraints create gameplay.</p>
+
+    <h4>5. Enemy Intent / Telegraph System</h4>
+    <p>Enemies declare what they will do <em>next</em> turn, and this information is visible to the player. The player uses this information to decide: do I play defensive cards to absorb the incoming damage, or go all-in on attack?</p>
+
+    <pre is:raw><code>function chooseNextIntent(enemy):
+    roll = random()
+    if roll < 0.6:
+        enemy.intent = { type: "attack", value: 12, icon: "sword" }
+    else if roll < 0.85:
+        enemy.intent = { type: "defend", value: 8, icon: "shield" }
+    else:
+        enemy.intent = { type: "buff", value: 3, effect: "strength", icon: "flame" }
+
+function executeIntent(enemy, gameState):
+    switch enemy.intent.type:
+        case "attack":
+            damage = calculateDamage(enemy.intent.value, enemy, gameState.player)
+            applyDamage(gameState.player, damage)
+        case "defend":
+            enemy.block += enemy.intent.value
+        case "buff":
+            addStatusEffect(enemy, enemy.intent.effect, enemy.intent.value)</code></pre>
+
+    <p><strong>Why it matters:</strong> This is <strong>information design</strong> &mdash; deliberately exposing internal state to an external actor so they can make informed decisions. The intent system transforms combat from a guessing game into a planning puzzle.</p>
+
+    <h4>6. UI-Driven Gameplay</h4>
+    <p>This is the first module where the <strong>UI is the gameplay</strong>, not just a HUD overlay. The player interacts with cards visually: cards fan out in the hand, hovering over a card shows its details, clicking plays it.</p>
+
+    <pre is:raw><code>function layoutHand(hand, screenWidth, handY):
+    cardWidth = 120
+    maxSpread = screenWidth * 0.6
+    totalWidth = min(hand.length * cardWidth, maxSpread)
+    spacing = totalWidth / max(hand.length - 1, 1)
+    startX = (screenWidth - totalWidth) / 2
+
+    for i, card in enumerate(hand):
+        card.x = startX + i * spacing
+        card.y = handY
+        centerIndex = (hand.length - 1) / 2
+        card.rotation = (i - centerIndex) * FAN_ANGLE_PER_CARD</code></pre>
+
+    <p><strong>Why it matters:</strong> In a deckbuilder, the player interacts through UI components &mdash; clickable cards, hover states, targeting cursors. State management, event handlers, and z-index stacking are all critical.</p>
+
+    <h4>7. Status Effects and Modifier Stacking</h4>
+    <p>Status effects like Poison, Strength, Vulnerability, and Block are <strong>stateful modifiers</strong> attached to an entity. When damage is dealt, the calculation passes through a chain of modifiers: base damage -> modified by Strength -> modified by Vulnerability -> reduced by Block.</p>
+
+    <pre is:raw><code>// Damage calculation pipeline
+function calculateDamage(baseDamage, attacker, target):
+    damage = baseDamage
+
+    if "strength" in attacker.statusEffects:
+        damage += attacker.statusEffects["strength"].value
+
+    if "vulnerable" in target.statusEffects:
+        damage = floor(damage * 1.5)
+
+    return max(damage, 0)
+
+function applyDamage(target, damage):
+    if target.block > 0:
+        absorbed = min(target.block, damage)
+        target.block -= absorbed
+        damage -= absorbed
+    target.hp -= damage</code></pre>
+
+    <p><strong>Why it matters:</strong> This is a <strong>modifier pipeline</strong>. Each modifier is independent and composable. The stacking rules are a state accumulation problem: applying the same effect multiple times must have well-defined behavior.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Status Effect Stacking</div>
+      <p class="demo-hint">Add or remove Strength (increases outgoing damage) and Vulnerable (increases incoming damage by 50%). Watch the damage calculation pipeline update in real-time as modifiers stack.</p>
+      <canvas id="demo-status" width="760" height="400"></canvas>
+    </div>
+
+    <h4>8. Reward and Deck Growth</h4>
+    <p>After winning a combat, the player is offered a choice of 3 new cards to add to their deck (or skip). The critical design insight is that <em>adding a card is not always good</em>. Every card you add dilutes your draw probability for every other card.</p>
+
+    <pre is:raw><code>function generateRewardCards(playerClass, combatDifficulty):
+    cardPool = getCardsForClass(playerClass)
+    weights = adjustWeightsByDifficulty(BASE_WEIGHTS, combatDifficulty)
+
+    rewards = []
+    for i in range(3):
+        rarity = weightedRandomChoice(["common", "uncommon", "rare"], weights)
+        card = randomChoice(cardPool.filter(c => c.rarity == rarity))
+        rewards.append(card)
+    return rewards</code></pre>
+
+    <p><strong>Why it matters:</strong> Adding a card changes the statistical distribution of every future draw. The "skip" option is the most interesting design element &mdash; sometimes the best decision is to <em>not</em> add something.</p>
+
+    <hr />
+
+    <h3>Stretch Goals</h3>
+    <ol>
+      <li><strong>Card upgrades:</strong> Allow upgrading a card at rest sites (e.g., "Strike" becomes "Strike+" dealing 9 instead of 6).</li>
+      <li><strong>Relics / passive items:</strong> Persistent items that modify rules globally.</li>
+      <li><strong>Card removal:</strong> Allow removing a card from the deck at a shop or event.</li>
+      <li><strong>Multiple enemy encounters:</strong> Fights with 2-3 enemies simultaneously.</li>
+    </ol>
+
+    <h3>MVP Spec</h3>
+    <table>
+      <thead><tr><th>Element</th><th>Requirement</th></tr></thead>
+      <tbody>
+        <tr><td>Deck</td><td>Starting deck of 10 cards with draw pile, hand, and discard pile</td></tr>
+        <tr><td>Card types</td><td>At least 5 distinct cards: attack, defend, card draw, buff, and debuff</td></tr>
+        <tr><td>Command pattern</td><td>Cards execute effects through a shared interface</td></tr>
+        <tr><td>Turn structure</td><td>Draw -> Action -> Enemy Action -> Discard phases as a state machine</td></tr>
+        <tr><td>Energy</td><td>3 energy per turn; cards cost 1-3 energy</td></tr>
+        <tr><td>Enemy intent</td><td>Enemies display their next action; at least 3 intent types</td></tr>
+        <tr><td>Enemies</td><td>At least 3 sequential combat encounters</td></tr>
+        <tr><td>UI</td><td>Cards displayed as a hand fan; click to play; hover to inspect</td></tr>
+        <tr><td>Status effects</td><td>At least 3 status effects with stacking</td></tr>
+        <tr><td>Damage pipeline</td><td>Damage modified by attacker buffs, target debuffs, and block</td></tr>
+        <tr><td>Rewards</td><td>After each combat, choose 1 of 3 cards to add (or skip)</td></tr>
+        <tr><td>Win/Lose</td><td>Player wins by defeating all encounters; loses if HP reaches 0</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliverable</h3>
+    <p>A playable single-player deckbuilder with at least 3 combat encounters, a working card effect system using the Command pattern, a turn-based phase state machine, an enemy intent system, and post-combat card rewards. Submit the project along with a brief writeup (3-5 sentences) explaining your card effect architecture and how you would extend it to support 50+ unique cards without modifying existing code.</p>
+
+    <hr />
+
+    <h2>Analogies by Background</h2>
+    <blockquote><p>These analogies map game dev concepts to patterns you already know. Find your background below.</p></blockquote>
+
+    <h3>For Backend Developers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Deck, Hand, and Discard</td><td>Message processing pipeline &mdash; draw pile is the message queue, hand is the processing buffer, discard pile is the completed queue</td></tr>
+        <tr><td>Card Effect System (Command Pattern)</td><td>Job queue workers &mdash; each job encapsulates its own execution logic; also database migrations with up/down methods</td></tr>
+        <tr><td>Turn Structure and Phase System</td><td>Order processing state machine (placed -> paid -> shipped -> delivered) or CI/CD pipeline</td></tr>
+        <tr><td>Energy/Mana Resource System</td><td>API rate limiting &mdash; N requests per time window</td></tr>
+        <tr><td>Enemy Intent / Telegraph System</td><td>Health check endpoints and observability dashboards &mdash; exposing internal state so operators can make informed decisions</td></tr>
+        <tr><td>UI-Driven Gameplay</td><td>Admin dashboard or form-heavy CRUD UI</td></tr>
+        <tr><td>Status Effects and Modifier Stacking</td><td>Express.js / Django middleware pipeline &mdash; each middleware transforms the request/response</td></tr>
+        <tr><td>Reward and Deck Growth</td><td>A/B test variant management &mdash; adding a new variant changes probabilities for all others</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Frontend Developers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Deck, Hand, and Discard</td><td>State management with multiple collections &mdash; like a Redux store with queue, active, and archive slices</td></tr>
+        <tr><td>Card Effect System (Command Pattern)</td><td>React component render props or Vue slots &mdash; each card is a self-contained component</td></tr>
+        <tr><td>Turn Structure and Phase System</td><td>Multi-step wizard or checkout flow</td></tr>
+        <tr><td>Energy/Mana Resource System</td><td>Budget-constrained UI like a drag-and-drop dashboard with limited widget slots</td></tr>
+        <tr><td>Enemy Intent / Telegraph System</td><td>Tooltip previews and hover states &mdash; showing what will happen before the user commits</td></tr>
+        <tr><td>UI-Driven Gameplay</td><td>This IS frontend development &mdash; CSS transforms, hover states, z-index, and drag-and-drop</td></tr>
+        <tr><td>Status Effects and Modifier Stacking</td><td>CSS cascade and specificity &mdash; multiple style rules stacking on an element</td></tr>
+        <tr><td>Reward and Deck Growth</td><td>Feature toggles in a UI &mdash; adding a new toggle increases the combinatorial state space</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Data / ML Engineers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Deck, Hand, and Discard</td><td>Sampling without replacement from a finite population</td></tr>
+        <tr><td>Card Effect System (Command Pattern)</td><td>Pluggable transform functions in a data pipeline</td></tr>
+        <tr><td>Turn Structure and Phase System</td><td>DAG-based pipeline orchestration (Airflow, Prefect)</td></tr>
+        <tr><td>Energy/Mana Resource System</td><td>Compute budget in optimization &mdash; limited function evaluations per iteration</td></tr>
+        <tr><td>Enemy Intent / Telegraph System</td><td>Observable state in a POMDP &mdash; partial observability</td></tr>
+        <tr><td>UI-Driven Gameplay</td><td>Interactive data visualization dashboards (Plotly, Streamlit)</td></tr>
+        <tr><td>Status Effects and Modifier Stacking</td><td>Feature transformation pipeline &mdash; base value passes through a chain of vectorized operations</td></tr>
+        <tr><td>Reward and Deck Growth</td><td>Adding features to a model &mdash; each new card changes the probability distribution of draws</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li><strong>The Command pattern makes cards data-driven.</strong> How would you implement a card that says "Deal damage equal to the number of cards in your discard pile"? What about "Copy the last card you played and play it again"? Where does the Command pattern break down?</li>
+      <li><strong>Smaller decks are often better than larger decks.</strong> This is counterintuitive &mdash; more options should be better, right? How does this map to software architecture? When has adding a feature, dependency, or service made your system <em>worse</em> overall?</li>
+      <li><strong>The damage calculation pipeline passes through multiple modifiers.</strong> What happens when you need to add a new modifier that interacts with existing ones? How do you manage ordering and priority?</li>
+      <li><strong>Enemy intent gives perfect information about the next turn but uncertainty about the turn after.</strong> How does this balance of known and unknown information create strategic depth?</li>
+    </ol>
+
+    <nav class="module-nav">
+      <a href={`${base}modules/09-racing/`}>&larr; Module 09: Racing Game</a>
+      <a href={`${base}modules/11-first-person-game/`}>Module 11: First-Person Game &rarr;</a>
+    </nav>
+  </div>
+</BaseLayout>
+
+<script>
+// ============================================================
+// DEMO 1: DECK / HAND / DISCARD VISUALIZER
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-deck');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const CARD_W = 60, CARD_H = 84;
+  const cardNames = ['Strike', 'Strike', 'Strike', 'Strike', 'Strike', 'Defend', 'Defend', 'Defend', 'Defend', 'Defend'];
+  const cardColors = { 'Strike': '#ef4444', 'Defend': '#3b82f6' };
+
+  let drawPile = cardNames.slice();
+  let hand = [];
+  let discardPile = [];
+  let hoveredCard = -1;
+  let message = 'Click "Draw" to start';
+  let msgTimer = 0;
+
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+  }
+  shuffle(drawPile);
+
+  function drawCard() {
+    if (hand.length >= 7) { message = 'Hand is full (max 7)'; msgTimer = 120; return; }
+    if (drawPile.length === 0 && discardPile.length === 0) { message = 'No cards left!'; msgTimer = 120; return; }
+    if (drawPile.length === 0) {
+      message = 'Draw pile empty! Click Shuffle first.';
+      msgTimer = 120;
+      return;
+    }
+    hand.push(drawPile.pop());
+    message = 'Drew a card'; msgTimer = 60;
+  }
+
+  function playCardAt(idx) {
+    if (idx < 0 || idx >= hand.length) return;
+    const card = hand.splice(idx, 1)[0];
+    discardPile.push(card);
+    message = 'Played ' + card; msgTimer = 60;
+  }
+
+  function shuffleDiscard() {
+    if (discardPile.length === 0) { message = 'Discard is empty'; msgTimer = 120; return; }
+    drawPile = drawPile.concat(discardPile);
+    discardPile = [];
+    shuffle(drawPile);
+    message = 'Shuffled discard into draw pile'; msgTimer = 90;
+  }
+
+  function getCanvasPos(e) {
+    const r = canvas.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height };
+  }
+
+  // Buttons
+  const btnDraw = { x: 60, y: H - 50, w: 80, h: 32, label: 'Draw' };
+  const btnShuffle = { x: W - 140, y: H - 50, w: 80, h: 32, label: 'Shuffle' };
+
+  canvas.addEventListener('click', function(e) {
+    const p = getCanvasPos(e);
+    // Check button clicks
+    if (p.x >= btnDraw.x && p.x <= btnDraw.x + btnDraw.w && p.y >= btnDraw.y && p.y <= btnDraw.y + btnDraw.h) {
+      drawCard();
+      return;
+    }
+    if (p.x >= btnShuffle.x && p.x <= btnShuffle.x + btnShuffle.w && p.y >= btnShuffle.y && p.y <= btnShuffle.y + btnShuffle.h) {
+      shuffleDiscard();
+      return;
+    }
+    // Check hand card clicks
+    const handY = 160;
+    const maxSpread = 420;
+    const totalW = Math.min(hand.length * (CARD_W + 8), maxSpread);
+    const spacing = hand.length > 1 ? totalW / (hand.length - 1) : 0;
+    const startX = (W - totalW) / 2;
+    for (let i = hand.length - 1; i >= 0; i--) {
+      const cx = startX + i * spacing;
+      const cy = handY;
+      if (p.x >= cx && p.x <= cx + CARD_W && p.y >= cy && p.y <= cy + CARD_H) {
+        playCardAt(i);
+        return;
+      }
+    }
+  });
+
+  canvas.addEventListener('mousemove', function(e) {
+    const p = getCanvasPos(e);
+    hoveredCard = -1;
+    const handY = 160;
+    const maxSpread = 420;
+    const totalW = Math.min(hand.length * (CARD_W + 8), maxSpread);
+    const spacing = hand.length > 1 ? totalW / (hand.length - 1) : 0;
+    const startX = (W - totalW) / 2;
+    for (let i = hand.length - 1; i >= 0; i--) {
+      const cx = startX + i * spacing;
+      if (p.x >= cx && p.x <= cx + CARD_W && p.y >= handY && p.y <= handY + CARD_H) {
+        hoveredCard = i;
+        break;
+      }
+    }
+  });
+
+  function drawCardRect(x, y, name, highlighted) {
+    ctx.fillStyle = highlighted ? '#2a2a30' : '#1c1c20';
+    ctx.strokeStyle = cardColors[name] || '#71717a';
+    ctx.lineWidth = highlighted ? 2 : 1;
+    ctx.beginPath();
+    ctx.roundRect(x, y, CARD_W, CARD_H, 6);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = cardColors[name] || '#a1a1aa';
+    ctx.font = '600 10px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(name, x + CARD_W / 2, y + CARD_H / 2 + 4);
+  }
+
+  function drawPileStack(x, y, pile, label, color) {
+    // Stack visual
+    const count = pile.length;
+    const stackOffset = Math.min(count, 6);
+    for (let i = 0; i < stackOffset; i++) {
+      ctx.fillStyle = '#18181b';
+      ctx.strokeStyle = '#3f3f46';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(x - i * 2, y - i * 2, CARD_W, CARD_H, 6);
+      ctx.fill();
+      ctx.stroke();
+    }
+    // Top card
+    if (count > 0) {
+      ctx.fillStyle = '#1c1c20';
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(x, y, CARD_W, CARD_H, 6);
+      ctx.fill();
+      ctx.stroke();
+    }
+    // Label
+    ctx.fillStyle = color;
+    ctx.font = '600 12px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, x + CARD_W / 2, y - 14);
+    ctx.fillStyle = '#a1a1aa';
+    ctx.font = '11px "JetBrains Mono", monospace';
+    ctx.fillText(count + ' cards', x + CARD_W / 2, y + CARD_H + 18);
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Section labels
+    ctx.fillStyle = '#71717a';
+    ctx.font = '600 14px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('HAND', W / 2, 148);
+
+    // Draw pile (left)
+    drawPileStack(40, 40, drawPile, 'DRAW PILE', '#22c55e');
+
+    // Discard pile (right)
+    drawPileStack(W - 100, 40, discardPile, 'DISCARD', '#ef4444');
+
+    // Arrows
+    ctx.strokeStyle = '#3f3f46';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 4]);
+    // Draw pile -> hand
+    ctx.beginPath();
+    ctx.moveTo(110, 80);
+    ctx.lineTo(200, 180);
+    ctx.stroke();
+    // Hand -> discard
+    ctx.beginPath();
+    ctx.moveTo(W - 200, 180);
+    ctx.lineTo(W - 110, 80);
+    ctx.stroke();
+    // Discard -> draw (bottom)
+    ctx.beginPath();
+    ctx.moveTo(W - 100, 130);
+    ctx.quadraticCurveTo(W / 2, H - 10, 100, 130);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Hand cards
+    const handY = 160;
+    const maxSpread = 420;
+    const totalW = Math.min(hand.length * (CARD_W + 8), maxSpread);
+    const spacing = hand.length > 1 ? totalW / (hand.length - 1) : 0;
+    const startX = (W - totalW) / 2;
+    for (let i = 0; i < hand.length; i++) {
+      const cx = startX + i * spacing;
+      const isHov = (i === hoveredCard);
+      drawCardRect(cx, isHov ? handY - 12 : handY, hand[i], isHov);
+      if (isHov) {
+        ctx.fillStyle = '#f59e0b';
+        ctx.font = '10px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('click to play', cx + CARD_W / 2, handY + CARD_H + 14);
+      }
+    }
+
+    if (hand.length === 0) {
+      ctx.fillStyle = '#3f3f46';
+      ctx.font = '12px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('(hand is empty)', W / 2, handY + CARD_H / 2);
+    }
+
+    // Buttons
+    function drawBtn(btn, color) {
+      ctx.fillStyle = '#1c1c20';
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(btn.x, btn.y, btn.w, btn.h, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = color;
+      ctx.font = '600 12px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(btn.label, btn.x + btn.w / 2, btn.y + btn.h / 2);
+    }
+    drawBtn(btnDraw, '#22c55e');
+    drawBtn(btnShuffle, '#a855f7');
+
+    // Message
+    if (msgTimer > 0) {
+      msgTimer--;
+      ctx.fillStyle = '#f59e0b';
+      ctx.font = '12px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(message, W / 2, H - 36);
+    }
+
+    requestAnimationFrame(render);
+  }
+  requestAnimationFrame(render);
+})();
+
+
+// ============================================================
+// DEMO 2: CARD EFFECT SYSTEM
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-effects');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const cards = [
+    { name: 'Strike', cost: 1, desc: 'Deal 6 Damage', color: '#ef4444', effect: 'damage', value: 6 },
+    { name: 'Defend', cost: 1, desc: 'Gain 5 Block', color: '#3b82f6', effect: 'block', value: 5 },
+    { name: 'Bash', cost: 2, desc: 'Deal 8 + Vuln', color: '#f59e0b', effect: 'bash', value: 8 },
+    { name: 'Offering', cost: 0, desc: 'Draw 2 Cards', color: '#a855f7', effect: 'draw', value: 2 }
+  ];
+
+  let hand = [];
+  let energy = 3;
+  const maxEnergy = 3;
+  let playerHP = 50, playerMaxHP = 50, playerBlock = 0;
+  let enemyHP = 40, enemyMaxHP = 40, enemyBlock = 0;
+  let enemyVuln = 0;
+  let enemyIntent = null;
+  let phase = 'player'; // player, enemy, win, lose
+  let message = '';
+  let msgTimer = 0;
+  let turn = 0;
+
+  function shuffledDeck() {
+    const deck = [0, 0, 0, 1, 1, 1, 2, 3];
+    for (let i = deck.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+    return deck;
+  }
+
+  let drawPile = shuffledDeck();
+
+  function drawCards(n) {
+    for (let i = 0; i < n && hand.length < 7; i++) {
+      if (drawPile.length === 0) drawPile = shuffledDeck();
+      hand.push(drawPile.pop());
+    }
+  }
+
+  function chooseIntent() {
+    const r = Math.random();
+    if (r < 0.5) enemyIntent = { type: 'attack', value: 8 + turn * 2, label: 'Attack ' + (8 + turn * 2) };
+    else if (r < 0.8) enemyIntent = { type: 'attack', value: 12 + turn, label: 'Heavy ' + (12 + turn) };
+    else enemyIntent = { type: 'defend', value: 6, label: 'Defend 6' };
+  }
+
+  function startTurn() {
+    turn++;
+    energy = maxEnergy;
+    playerBlock = 0;
+    drawCards(4);
+    if (!enemyIntent) chooseIntent();
+    phase = 'player';
+  }
+
+  function playCard(idx) {
+    if (phase !== 'player') return;
+    const cardIdx = hand[idx];
+    const card = cards[cardIdx];
+    if (energy < card.cost) { message = 'Not enough energy!'; msgTimer = 60; return; }
+    energy -= card.cost;
+    hand.splice(idx, 1);
+
+    if (card.effect === 'damage') {
+      let dmg = card.value;
+      if (enemyVuln > 0) dmg = Math.floor(dmg * 1.5);
+      const absorbed = Math.min(enemyBlock, dmg);
+      enemyBlock -= absorbed;
+      enemyHP -= (dmg - absorbed);
+      message = 'Dealt ' + dmg + ' damage!'; msgTimer = 60;
+    } else if (card.effect === 'block') {
+      playerBlock += card.value;
+      message = 'Gained ' + card.value + ' block'; msgTimer = 60;
+    } else if (card.effect === 'bash') {
+      let dmg = card.value;
+      if (enemyVuln > 0) dmg = Math.floor(dmg * 1.5);
+      const absorbed = Math.min(enemyBlock, dmg);
+      enemyBlock -= absorbed;
+      enemyHP -= (dmg - absorbed);
+      enemyVuln += 2;
+      message = 'Bash! ' + dmg + ' dmg + Vulnerable'; msgTimer = 60;
+    } else if (card.effect === 'draw') {
+      drawCards(card.value);
+      message = 'Drew ' + card.value + ' cards'; msgTimer = 60;
+    }
+
+    if (enemyHP <= 0) { phase = 'win'; message = 'Victory!'; msgTimer = 999; }
+  }
+
+  function endTurn() {
+    if (phase !== 'player') return;
+    hand = [];
+    phase = 'enemy';
+
+    // Enemy acts
+    setTimeout(function() {
+      if (enemyIntent.type === 'attack') {
+        let dmg = enemyIntent.value;
+        const absorbed = Math.min(playerBlock, dmg);
+        playerBlock -= absorbed;
+        playerHP -= (dmg - absorbed);
+        message = 'Enemy dealt ' + dmg + ' damage!';
+      } else if (enemyIntent.type === 'defend') {
+        enemyBlock += enemyIntent.value;
+        message = 'Enemy gained ' + enemyIntent.value + ' block';
+      }
+      msgTimer = 90;
+      if (enemyVuln > 0) enemyVuln--;
+
+      if (playerHP <= 0) { phase = 'lose'; message = 'Defeat!'; msgTimer = 999; return; }
+      chooseIntent();
+      startTurn();
+    }, 600);
+  }
+
+  // Init
+  chooseIntent();
+  startTurn();
+
+  function getCanvasPos(e) {
+    const r = canvas.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height };
+  }
+
+  const btnEnd = { x: W / 2 - 50, y: H - 50, w: 100, h: 32 };
+
+  canvas.addEventListener('click', function(e) {
+    const p = getCanvasPos(e);
+
+    if (phase === 'player') {
+      // End turn button
+      if (p.x >= btnEnd.x && p.x <= btnEnd.x + btnEnd.w && p.y >= btnEnd.y && p.y <= btnEnd.y + btnEnd.h) {
+        endTurn();
+        return;
+      }
+      // Card clicks
+      const cardW = 100, cardH = 130;
+      const totalW = Math.min(hand.length * (cardW + 10), 500);
+      const spacing = hand.length > 1 ? totalW / (hand.length - 1) : 0;
+      const startX = (W - totalW) / 2;
+      const cardY = 260;
+      for (let i = hand.length - 1; i >= 0; i--) {
+        const cx = startX + i * spacing;
+        if (p.x >= cx && p.x <= cx + cardW && p.y >= cardY && p.y <= cardY + cardH) {
+          playCard(i);
+          return;
+        }
+      }
+    }
+  });
+
+  function drawHPBar(x, y, w, h, hp, maxHP, block, color) {
+    ctx.fillStyle = '#18181b';
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, 4);
+    ctx.fill();
+    const pct = Math.max(0, hp / maxHP);
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.roundRect(x, y, w * pct, h, 4);
+    ctx.fill();
+    ctx.fillStyle = '#e4e4e7';
+    ctx.font = '600 11px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(Math.max(0, hp) + ' / ' + maxHP, x + w / 2, y + h / 2 + 4);
+    if (block > 0) {
+      ctx.fillStyle = '#60a5fa';
+      ctx.fillText('[Block: ' + block + ']', x + w / 2, y - 8);
+    }
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Player info (left)
+    ctx.fillStyle = '#a1a1aa';
+    ctx.font = '600 14px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Player', 140, 30);
+    drawHPBar(60, 50, 160, 20, playerHP, playerMaxHP, playerBlock, '#22c55e');
+
+    // Energy display
+    ctx.fillStyle = '#f59e0b';
+    ctx.font = '700 28px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(energy + '/' + maxEnergy, 140, 110);
+    ctx.fillStyle = '#71717a';
+    ctx.font = '11px Inter, sans-serif';
+    ctx.fillText('Energy', 140, 126);
+
+    // Enemy info (right)
+    ctx.fillStyle = '#ef4444';
+    ctx.font = '600 14px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Goblin', W - 140, 30);
+    drawHPBar(W - 220, 50, 160, 20, enemyHP, enemyMaxHP, enemyBlock, '#ef4444');
+
+    // Enemy sprite placeholder
+    ctx.fillStyle = '#2a1a1a';
+    ctx.beginPath();
+    ctx.roundRect(W - 190, 90, 100, 100, 8);
+    ctx.fill();
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = '#ef4444';
+    ctx.font = '32px serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('\uD83D\uDC7A', W - 140, 155);
+
+    // Enemy intent
+    if (enemyIntent && phase === 'player') {
+      ctx.fillStyle = enemyIntent.type === 'attack' ? '#ef4444' : '#3b82f6';
+      ctx.font = '600 12px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('Intent: ' + enemyIntent.label, W - 140, 210);
+    }
+
+    // Vulnerable indicator
+    if (enemyVuln > 0) {
+      ctx.fillStyle = '#f59e0b';
+      ctx.font = '11px "JetBrains Mono", monospace';
+      ctx.fillText('Vulnerable (' + enemyVuln + ' turns)', W - 140, 228);
+    }
+
+    // Hand cards
+    if (phase === 'player' || phase === 'enemy') {
+      const cardW = 100, cardH = 130;
+      const totalW = Math.min(hand.length * (cardW + 10), 500);
+      const spacing = hand.length > 1 ? totalW / (hand.length - 1) : 0;
+      const startX = (W - totalW) / 2;
+      const cardY = 260;
+      for (let i = 0; i < hand.length; i++) {
+        const card = cards[hand[i]];
+        const cx = startX + i * spacing;
+        ctx.fillStyle = '#1c1c20';
+        ctx.strokeStyle = card.color;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(cx, cardY, cardW, cardH, 6);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = card.color;
+        ctx.font = '600 12px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(card.name, cx + cardW / 2, cardY + 30);
+
+        ctx.fillStyle = '#a1a1aa';
+        ctx.font = '10px Inter, sans-serif';
+        ctx.fillText(card.desc, cx + cardW / 2, cardY + 55);
+
+        ctx.fillStyle = '#f59e0b';
+        ctx.font = '700 16px "JetBrains Mono", monospace';
+        ctx.fillText(card.cost, cx + 14, cardY + 18);
+
+        ctx.fillStyle = '#71717a';
+        ctx.font = '9px Inter, sans-serif';
+        ctx.fillText('click to play', cx + cardW / 2, cardY + cardH - 12);
+      }
+    }
+
+    // End Turn button
+    if (phase === 'player') {
+      ctx.fillStyle = '#1c1c20';
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(btnEnd.x, btnEnd.y, btnEnd.w, btnEnd.h, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#f59e0b';
+      ctx.font = '600 12px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('End Turn', btnEnd.x + btnEnd.w / 2, btnEnd.y + btnEnd.h / 2);
+      ctx.textBaseline = 'alphabetic';
+    }
+
+    // Phase indicator
+    if (phase === 'enemy') {
+      ctx.fillStyle = '#ef4444';
+      ctx.font = '600 14px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Enemy turn...', W / 2, 244);
+    }
+
+    // Message
+    if (msgTimer > 0) {
+      msgTimer--;
+      ctx.fillStyle = '#f59e0b';
+      ctx.font = '12px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(message, W / 2, 244);
+    }
+
+    // Win/lose overlay
+    if (phase === 'win' || phase === 'lose') {
+      ctx.fillStyle = 'rgba(10, 10, 11, 0.75)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = phase === 'win' ? '#22c55e' : '#ef4444';
+      ctx.font = '700 36px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(message, W / 2, H / 2);
+    }
+
+    requestAnimationFrame(render);
+  }
+  requestAnimationFrame(render);
+})();
+
+
+// ============================================================
+// DEMO 3: STATUS EFFECT STACKING
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-status');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  let strength = 0;
+  let vulnerable = 0;
+  const baseDamage = 6;
+
+  function getCanvasPos(e) {
+    const r = canvas.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height };
+  }
+
+  const buttons = [
+    { x: 40, y: 60, w: 110, h: 32, label: '+1 Strength', action: function() { strength = Math.min(strength + 1, 10); } },
+    { x: 40, y: 100, w: 110, h: 32, label: '-1 Strength', action: function() { strength = Math.max(strength - 1, 0); } },
+    { x: 40, y: 160, w: 130, h: 32, label: '+1 Vulnerable', action: function() { vulnerable = Math.min(vulnerable + 1, 5); } },
+    { x: 40, y: 200, w: 130, h: 32, label: '-1 Vulnerable', action: function() { vulnerable = Math.max(vulnerable - 1, 0); } },
+    { x: 40, y: 280, w: 110, h: 32, label: 'Reset All', action: function() { strength = 0; vulnerable = 0; } }
+  ];
+
+  canvas.addEventListener('click', function(e) {
+    const p = getCanvasPos(e);
+    for (const b of buttons) {
+      if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) {
+        b.action();
+        return;
+      }
+    }
+  });
+
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Title
+    ctx.fillStyle = '#e4e4e7';
+    ctx.font = '600 16px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('Damage Calculation Pipeline', 40, 34);
+
+    // Buttons
+    for (const b of buttons) {
+      const isStr = b.label.includes('Strength');
+      const isVuln = b.label.includes('Vulnerable');
+      const isReset = b.label.includes('Reset');
+      const col = isStr ? '#22c55e' : isVuln ? '#f59e0b' : '#71717a';
+      ctx.fillStyle = '#1c1c20';
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(b.x, b.y, b.w, b.h, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = col;
+      ctx.font = '600 11px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(b.label, b.x + b.w / 2, b.y + b.h / 2);
+    }
+    ctx.textBaseline = 'alphabetic';
+
+    // Pipeline visualization
+    const pipeX = 260;
+    const pipeW = 460;
+    const stageW = 130;
+    const stageH = 60;
+    const stageY = 80;
+    const gap = 20;
+
+    // Stage 1: Base damage
+    const s1x = pipeX;
+    ctx.fillStyle = '#1c1c20';
+    ctx.strokeStyle = '#71717a';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(s1x, stageY, stageW, stageH, 6);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#a1a1aa';
+    ctx.font = '11px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Base Damage', s1x + stageW / 2, stageY + 20);
+    ctx.fillStyle = '#e4e4e7';
+    ctx.font = '700 20px "JetBrains Mono", monospace';
+    ctx.fillText(baseDamage, s1x + stageW / 2, stageY + 46);
+
+    // Arrow 1
+    ctx.strokeStyle = '#3f3f46';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(s1x + stageW, stageY + stageH / 2);
+    ctx.lineTo(s1x + stageW + gap, stageY + stageH / 2);
+    ctx.stroke();
+    ctx.fillStyle = '#3f3f46';
+    ctx.beginPath();
+    ctx.moveTo(s1x + stageW + gap, stageY + stageH / 2);
+    ctx.lineTo(s1x + stageW + gap - 6, stageY + stageH / 2 - 4);
+    ctx.lineTo(s1x + stageW + gap - 6, stageY + stageH / 2 + 4);
+    ctx.fill();
+
+    // Stage 2: + Strength
+    const afterStr = baseDamage + strength;
+    const s2x = s1x + stageW + gap;
+    ctx.fillStyle = strength > 0 ? '#1a2a1a' : '#1c1c20';
+    ctx.strokeStyle = strength > 0 ? '#22c55e' : '#3f3f46';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(s2x, stageY, stageW, stageH, 6);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = strength > 0 ? '#22c55e' : '#71717a';
+    ctx.font = '11px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('+ Strength (' + strength + ')', s2x + stageW / 2, stageY + 20);
+    ctx.fillStyle = '#e4e4e7';
+    ctx.font = '700 20px "JetBrains Mono", monospace';
+    ctx.fillText(afterStr, s2x + stageW / 2, stageY + 46);
+
+    // Arrow 2
+    ctx.strokeStyle = '#3f3f46';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(s2x + stageW, stageY + stageH / 2);
+    ctx.lineTo(s2x + stageW + gap, stageY + stageH / 2);
+    ctx.stroke();
+    ctx.fillStyle = '#3f3f46';
+    ctx.beginPath();
+    ctx.moveTo(s2x + stageW + gap, stageY + stageH / 2);
+    ctx.lineTo(s2x + stageW + gap - 6, stageY + stageH / 2 - 4);
+    ctx.lineTo(s2x + stageW + gap - 6, stageY + stageH / 2 + 4);
+    ctx.fill();
+
+    // Stage 3: x Vulnerable
+    const afterVuln = vulnerable > 0 ? Math.floor(afterStr * 1.5) : afterStr;
+    const s3x = s2x + stageW + gap;
+    ctx.fillStyle = vulnerable > 0 ? '#2a1a0a' : '#1c1c20';
+    ctx.strokeStyle = vulnerable > 0 ? '#f59e0b' : '#3f3f46';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(s3x, stageY, stageW, stageH, 6);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = vulnerable > 0 ? '#f59e0b' : '#71717a';
+    ctx.font = '11px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('x1.5 if Vuln (' + vulnerable + ')', s3x + stageW / 2, stageY + 20);
+    ctx.fillStyle = '#e4e4e7';
+    ctx.font = '700 20px "JetBrains Mono", monospace';
+    ctx.fillText(afterVuln, s3x + stageW / 2, stageY + 46);
+
+    // Final result
+    ctx.fillStyle = '#f59e0b';
+    ctx.font = '700 28px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('Final Damage: ' + afterVuln, pipeX + pipeW / 2, stageY + stageH + 60);
+
+    // Formula breakdown
+    ctx.fillStyle = '#a1a1aa';
+    ctx.font = '13px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    let formula = baseDamage + ' (base)';
+    if (strength > 0) formula += ' + ' + strength + ' (str)';
+    formula += ' = ' + afterStr;
+    if (vulnerable > 0) formula += ' x 1.5 (vuln) = ' + afterVuln;
+    ctx.fillText(formula, pipeX + pipeW / 2, stageY + stageH + 90);
+
+    // Status effect display
+    const statusY = 260;
+    ctx.fillStyle = '#e4e4e7';
+    ctx.font = '600 14px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('Active Status Effects:', pipeX, statusY);
+
+    if (strength === 0 && vulnerable === 0) {
+      ctx.fillStyle = '#71717a';
+      ctx.font = '12px Inter, sans-serif';
+      ctx.fillText('None - click buttons to add modifiers', pipeX, statusY + 28);
+    } else {
+      let sy = statusY + 28;
+      if (strength > 0) {
+        ctx.fillStyle = '#22c55e';
+        ctx.font = '600 13px "JetBrains Mono", monospace';
+        for (let i = 0; i < strength; i++) {
+          ctx.fillText('[STR +1]', pipeX + i * 80, sy);
+        }
+        sy += 28;
+      }
+      if (vulnerable > 0) {
+        ctx.fillStyle = '#f59e0b';
+        ctx.font = '600 13px "JetBrains Mono", monospace';
+        for (let i = 0; i < vulnerable; i++) {
+          ctx.fillText('[VULN]', pipeX + i * 70, sy);
+        }
+      }
+    }
+
+    // Explanation
+    ctx.fillStyle = '#71717a';
+    ctx.font = '11px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Strength adds flat damage. Vulnerable multiplies total by 1.5x. Modifiers stack additively.', W / 2, H - 16);
+
+    requestAnimationFrame(render);
+  }
+  requestAnimationFrame(render);
+})();
+</script>

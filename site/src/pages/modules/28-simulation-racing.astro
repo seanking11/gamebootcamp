@@ -1,0 +1,725 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 28: Simulation Racing">
+  <div class="container page-content">
+
+    <!-- Module Header -->
+    <div class="module-header">
+      <div class="module-number">Module 28</div>
+      <h1>Simulation Racing</h1>
+      <p class="module-theme">Grip is finite &mdash; every decision spends it | The Physics of Fast</p>
+    </div>
+
+    <blockquote>
+      "Slow is smooth, smooth is fast. The fastest drivers are the ones who waste the least grip."
+    </blockquote>
+
+    <!-- ============================================================ -->
+    <!-- WEEK 1: HISTORY & DESIGN THEORY                              -->
+    <!-- ============================================================ -->
+
+    <h2>Week 1: History &amp; Design Theory</h2>
+
+    <h3>The Origin</h3>
+    <p>
+      Simulation racing games have pursued the same goal since the beginning: make the player feel what it is like to drive a real car at the limit. The genre's roots trace to <em>Indianapolis 500: The Simulation</em> (1989) by Papyrus Design Group, which modeled tire wear, fuel consumption, and car setup for the first time in a consumer game. But it was <em>Gran Turismo</em> (1997) that brought simulation racing to a mass audience. Creator Kazunori Yamauchi obsessed over accuracy: every car was laser-scanned, every engine modeled from manufacturer data, every tire curve tuned to match real-world behavior. The result sold over 10 million copies and proved that simulation did not have to mean inaccessible.
+    </p>
+    <p>
+      What separates simulation racing from arcade racing is not complexity for its own sake &mdash; it is the emergent depth that comes from modeling real physics. When tire grip is finite and shared between turning and acceleration, the player must manage that grip budget through every corner. Speed comes from understanding the physics, respecting the limits, and finding the thin line between control and disaster.
+    </p>
+
+    <h3>How the Genre Evolved</h3>
+    <p>
+      <strong>Gran Turismo (Polyphony Digital, 1997)</strong> &mdash; Defined consumer simulation racing. GT combined a realistic tire model with a massive car collection and RPG-style progression. Players earned money, bought cars, upgraded them, and worked through license tests teaching real driving techniques: heel-toe downshifting, trail braking, the racing line. Its lasting contribution was demonstrating that simulation could be aspirational.
+    </p>
+    <p>
+      <strong>iRacing (iRacing.com Motorsport Simulations, 2008)</strong> &mdash; Moved simulation racing online with a subscription model and safety rating system that punished reckless driving. iRacing laser-scans real tracks to millimeter accuracy. Its contribution was proving that the social and competitive structure matters as much as the physics.
+    </p>
+    <p>
+      <strong>Assetto Corsa (Kunos Simulazioni, 2014)</strong> &mdash; An Italian studio's love letter to driving physics. Its tire model is based on the Pacejka "Magic Formula" used by real tire engineers. Its open modding community has added thousands of cars and tracks. It showed that a small team with deep physics expertise could compete with massive studios.
+    </p>
+
+    <h3>What Makes It "Great"</h3>
+    <p>
+      A great simulation racing game makes you feel the tires. Not through rumble feedback or screen shake &mdash; through the car's behavior. When you enter a corner too fast, the front tires gradually lose grip, the steering goes light, and the car drifts wide. When you brake hard, the weight shifts forward, and if you are turning at the same time, the rear might step out. Every one of these behaviors emerges naturally from a good tire model. The best simulation racers do not need to script dramatic moments because the physics generates them.
+    </p>
+
+    <h3>The Essential Mechanic</h3>
+    <p>
+      <strong>Managing tire grip</strong> &mdash; the fundamental physical constraint that every driving decision revolves around.
+    </p>
+
+    <hr />
+
+    <!-- ============================================================ -->
+    <!-- WEEK 2: BUILD THE MVP                                        -->
+    <!-- ============================================================ -->
+
+    <h2>Week 2: Build the MVP</h2>
+
+    <h3>What You're Building</h3>
+    <p>
+      A top-down simulation racing game where a single car drives around a track. The car uses a tire grip model where grip is finite and shared between steering and acceleration. The player must manage braking zones, find the racing line, and feel the difference between surfaces. The game includes a telemetry display showing speed, throttle, brake, and steering data in real time.
+    </p>
+
+    <h3>Core Concepts</h3>
+
+    <!-- ==================== CONCEPT 1: TIRE GRIP MODEL ==================== -->
+
+    <h4>1. Tire Grip Model</h4>
+    <p>
+      Each tire has a finite amount of grip, determined by its load and the surface it is on. Grip is shared between longitudinal forces (acceleration/braking) and lateral forces (turning). This is modeled as a "grip circle" (also called a friction circle or traction circle): the combined force from acceleration and turning cannot exceed the tire's maximum grip.
+    </p>
+    <pre is:raw><code>MAX_GRIP_COEFFICIENT = 1.0
+
+class Tire:
+    load: float              // weight on this tire (Newtons)
+    grip_coefficient: float  // surface-dependent: 1.0 asphalt, 0.4 gravel
+    slip_angle: float
+    slip_ratio: float
+
+function calculate_tire_forces(tire, throttle_force, steering_angle):
+    max_grip = tire.load * tire.grip_coefficient
+
+    longitudinal = throttle_force
+    lateral = max_grip * sin(clamp(tire.slip_angle * 3.0, -PI/2, PI/2))
+
+    // grip circle: combined force cannot exceed max grip
+    combined = sqrt(longitudinal^2 + lateral^2)
+    if combined &gt; max_grip:
+        scale = max_grip / combined
+        longitudinal *= scale
+        lateral *= scale
+
+    return {longitudinal, lateral}</code></pre>
+    <p>
+      <strong>Why it matters:</strong> The tire grip model is the single most important system in a simulation racer. Everything the player feels &mdash; understeer, oversteer, traction loss &mdash; emerges from this one model. The grip circle is the physical truth that real racing drivers live by: you cannot accelerate and turn at full force simultaneously because the tire has a finite grip budget.
+    </p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Tire Grip Circle</div>
+      <p class="demo-hint">Use the Throttle/Brake slider to apply longitudinal force, and the Steering slider to apply lateral force. The dot shows your current grip usage inside the circle. Exceed the circle and you lose traction (it turns red).</p>
+      <canvas id="demo-grip-circle" width="760" height="450"></canvas>
+      <div class="demo-controls">
+        <label>Throttle/Brake: <input type="range" id="grip-throttle" min="-100" max="100" value="0" /></label>
+        <span class="value-display" id="grip-throttle-val">0%</span>
+        <label style="margin-left:1.5rem;">Steering: <input type="range" id="grip-steering" min="-100" max="100" value="0" /></label>
+        <span class="value-display" id="grip-steering-val">0%</span>
+      </div>
+    </div>
+
+    <!-- ==================== CONCEPT 2: SUSPENSION SIMULATION ==================== -->
+
+    <h4>2. Suspension Simulation</h4>
+    <p>
+      When the car brakes, weight shifts forward, increasing grip on the front tires and decreasing it on the rear. When accelerating, weight shifts backward. When turning, weight shifts to the outside tires. This weight transfer directly affects the grip available to each tire.
+    </p>
+    <pre is:raw><code>class CarPhysics:
+    mass: float = 1200           // kg
+    wheelbase: float = 2.5       // meters
+    track_width: float = 1.8     // meters
+    center_of_gravity_height: float = 0.5
+
+function calculate_weight_transfer(car, accel, lateral_accel):
+    long_transfer = (car.mass * accel * car.cg_height) / car.wheelbase
+    lat_transfer = (car.mass * lateral_accel * car.cg_height) / car.track_width
+
+    tires = {
+        front_left:  base_weight + long_transfer - lat_transfer,
+        front_right: base_weight + long_transfer + lat_transfer,
+        rear_left:   base_weight - long_transfer - lat_transfer,
+        rear_right:  base_weight - long_transfer + lat_transfer
+    }</code></pre>
+    <p>
+      <strong>Why it matters:</strong> Weight transfer is why simulation racing feels different from arcade racing. In an arcade racer, all four tires have the same grip all the time. In a simulation, braking shifts weight forward &mdash; which is why a car can spin if you brake and turn simultaneously. Trail braking works because you are gradually transferring weight from the front back to the rear.
+    </p>
+
+    <!-- ==================== CONCEPT 3: RACING LINE ==================== -->
+
+    <h4>3. Braking Zones and Racing Line</h4>
+    <p>
+      The racing line is the path through a corner that minimizes time: brake in a straight line before the corner, turn in at the apex, and accelerate out. Braking zones are the sections of track where the driver must decelerate before entering a turn.
+    </p>
+    <pre is:raw><code>// The racing line through a corner follows three phases:
+// 1. BRAKE: straight-line braking before the turn
+// 2. TURN-IN: release brakes, turn the wheel
+// 3. APEX &amp; EXIT: hit the inside, then accelerate out
+
+function calculate_brake_distance(entry_speed, exit_speed, max_decel):
+    // v^2 = u^2 + 2as  =&gt;  s = (u^2 - v^2) / (2a)
+    return (entry_speed^2 - exit_speed^2) / (2 * max_decel)</code></pre>
+    <p>
+      <strong>Why it matters:</strong> The racing line is where physics theory meets driving practice. Braking zones give the player specific, improvable skills: "I braked too late and ran wide" is actionable feedback.
+    </p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Racing Line Comparison</div>
+      <p class="demo-hint">Watch two cars navigate an overhead track. The green car follows the optimal racing line (late apex, smooth arc). The red car takes a naive line (hugging the inside). Speed is shown at key points. Click "Restart Race" to replay.</p>
+      <canvas id="demo-racing-line" width="760" height="500"></canvas>
+      <div class="demo-controls">
+        <button id="race-restart-btn">Restart Race</button>
+        <span class="value-display" id="race-green-speed">Optimal: 0 km/h</span>
+        <span class="value-display" id="race-red-speed">Naive: 0 km/h</span>
+      </div>
+    </div>
+
+    <!-- ==================== CONCEPT 4: CAR SETUP ==================== -->
+
+    <h4>4. Car Setup / Tuning</h4>
+    <p>
+      The car has adjustable parameters that change its handling characteristics. Increasing front suspension stiffness reduces body roll but makes the front less compliant. Lowering tire pressure increases the contact patch but reduces responsiveness. Each adjustment has trade-offs.
+    </p>
+    <pre is:raw><code>class CarSetup:
+    front_suspension_stiffness: float = 50000  // N/m
+    rear_suspension_stiffness: float = 45000
+    front_tire_pressure: float = 2.0           // bar
+    rear_tire_pressure: float = 2.1
+    brake_bias: float = 0.6                    // 60% front, 40% rear
+
+function pressure_to_grip(pressure):
+    optimal = 2.0
+    deviation = abs(pressure - optimal)
+    return 1.0 - (deviation * 0.3)  // each 0.1 bar off costs 3%</code></pre>
+    <p>
+      <strong>Why it matters:</strong> Car setup is the meta-puzzle of simulation racing. The track, weather, and driver's style all influence the optimal setup. Even three or four adjustable parameters give the player meaningful tuning decisions.
+    </p>
+
+    <!-- ==================== CONCEPT 5: TELEMETRY ==================== -->
+
+    <h4>5. Telemetry System</h4>
+    <p>
+      The game records driving data &mdash; speed, throttle, brake, steering, tire temperatures &mdash; over time and displays it as graphs. Telemetry is how real racing drivers and engineers analyze performance.
+    </p>
+    <pre is:raw><code>function draw_telemetry_overlay(samples, current_lap_distance):
+    draw_graph(data=samples.map(s =&gt; {x: s.track_position, y: s.speed}),
+               color=WHITE, label="Speed (km/h)")
+    draw_graph(data=samples.map(s =&gt; {x: s.track_position, y: s.throttle}),
+               color=GREEN, label="Throttle")
+    draw_graph(data=samples.map(s =&gt; {x: s.track_position, y: s.brake}),
+               color=RED, label="Brake")</code></pre>
+    <p>
+      <strong>Why it matters:</strong> Telemetry transforms simulation racing from a game of feel into data-driven improvement. Comparing a slow lap to a fast lap reveals exactly where time is gained or lost.
+    </p>
+
+    <!-- ==================== CONCEPT 6: SURFACE MODEL ==================== -->
+
+    <h4>6. Surface Model</h4>
+    <p>
+      Different surfaces provide different grip levels. Asphalt is high grip, gravel is low, grass is very low. The transition between surfaces should be smooth, not binary, because in real driving you often have two tires on track and two on the curb.
+    </p>
+    <pre is:raw><code>surface_properties = {
+    "asphalt": {grip: 1.0, rolling_resistance: 0.02},
+    "curb":    {grip: 0.85, rolling_resistance: 0.03},
+    "gravel":  {grip: 0.4, rolling_resistance: 0.10},
+    "grass":   {grip: 0.3, rolling_resistance: 0.12}
+}</code></pre>
+    <p>
+      <strong>Why it matters:</strong> Surfaces add strategic depth. Running wide onto the grass is not just "out of bounds" &mdash; it is a physical consequence with physics-based punishment. The per-tire surface model means having half your car on gravel creates asymmetric forces.
+    </p>
+
+    <!-- ==================== CONCEPT 7: DAMAGE MODEL ==================== -->
+
+    <h4>7. Damage Model</h4>
+    <p>
+      Collisions and off-track excursions can damage the car, affecting performance. A hard wall impact might reduce top speed, cause the car to pull to one side, or reduce braking efficiency. Damage creates consequences for mistakes beyond lost time.
+    </p>
+    <pre is:raw><code>class DamageState:
+    engine_health: float = 1.0
+    suspension_damage: dict = {per-wheel damage}
+    aero_damage: float = 0.0
+
+function apply_damage_effects(car):
+    car.max_power = car.base_max_power * car.damage.engine_health
+    car.downforce_multiplier = 1.0 - car.damage.aero_damage</code></pre>
+    <p>
+      <strong>Why it matters:</strong> Without damage, the fastest strategy is often to slam into walls (the "wall brake" exploit). With damage, every collision has lasting consequences, teaching the player that consistency matters more than raw speed.
+    </p>
+
+    <hr />
+
+    <!-- ==================== STRETCH GOALS ==================== -->
+
+    <h3>Stretch Goals</h3>
+    <ul>
+      <li><strong>AI opponents</strong> &mdash; Add AI cars that follow the racing line at varying speeds.</li>
+      <li><strong>Weather system</strong> &mdash; Implement wet conditions that reduce grip across all surfaces.</li>
+      <li><strong>Tire wear</strong> &mdash; Tires gradually lose grip over many laps.</li>
+      <li><strong>Replay system</strong> &mdash; Record full lap data and play it back from multiple camera angles.</li>
+    </ul>
+
+    <h3>MVP Spec</h3>
+    <table>
+      <thead>
+        <tr><th>Element</th><th>Scope</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>View</td><td>Top-down 2D or simple low-poly 3D</td></tr>
+        <tr><td>Tire physics</td><td>Grip circle model: finite grip shared between steering and acceleration</td></tr>
+        <tr><td>Suspension</td><td>Weight transfer under braking, acceleration, and turning</td></tr>
+        <tr><td>Surfaces</td><td>3 types: asphalt (high grip), curb (medium), grass (low)</td></tr>
+        <tr><td>Track</td><td>1 track with 4-6 corners</td></tr>
+        <tr><td>Telemetry</td><td>Real-time speed, throttle, brake display</td></tr>
+        <tr><td>Damage</td><td>Basic collision damage affecting engine power and wheel alignment</td></tr>
+        <tr><td>Timing</td><td>Lap timer with sector splits, best lap tracking</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliverable</h3>
+    <p>
+      A playable simulation racing game where a single car drives around a track using a tire grip model with weight transfer. The player must manage braking zones and the racing line to set fast lap times. The player should be able to feel the difference between driving within the grip limit and exceeding it.
+    </p>
+
+    <hr />
+
+    <!-- ==================== DISCUSSION QUESTIONS ==================== -->
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li><strong>Realism vs. Fun:</strong> Perfectly realistic tire physics can be frustrating. Where do you draw the line between accuracy and playability? Start realistic and add assists, or start forgiving and opt into realism?</li>
+      <li><strong>The Telemetry Paradox:</strong> Telemetry is powerful for improvement, but most players will never look at a graph. How do you design telemetry that casual players will actually use?</li>
+      <li><strong>Teaching Through Physics:</strong> The physics engine is the teacher. How would you help players connect the physical sensation (car sliding) to the underlying cause (exceeding the grip circle) without breaking immersion?</li>
+      <li><strong>The Setup Rabbit Hole:</strong> Car setup tuning can consume hours. How do you expose enough options for meaningful customization without overwhelming the player?</li>
+    </ol>
+
+    <!-- Module Navigation -->
+    <div class="module-nav">
+      <a href={`${base}modules/`}>&larr; All Modules</a>
+      <a href={`${base}modules/29-management-tycoon`}>Next Module &rarr;</a>
+    </div>
+
+  </div>
+</BaseLayout>
+
+<script>
+// ============================================================
+// DEMO 1: TIRE GRIP CIRCLE
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-grip-circle');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const throttleSlider = document.getElementById('grip-throttle');
+  const steeringSlider = document.getElementById('grip-steering');
+  const throttleVal = document.getElementById('grip-throttle-val');
+  const steeringVal = document.getElementById('grip-steering-val');
+
+  const centerX = W / 2;
+  const centerY = H / 2;
+  const maxRadius = 160;
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    const throttle = parseInt(throttleSlider.value) / 100;
+    const steering = parseInt(steeringSlider.value) / 100;
+
+    throttleVal.textContent = (throttle > 0 ? '+' : '') + Math.round(throttle * 100) + '%';
+    steeringVal.textContent = (steering > 0 ? '+' : '') + Math.round(steering * 100) + '%';
+
+    const gripX = steering * maxRadius;
+    const gripY = -throttle * maxRadius;
+    const gripMag = Math.sqrt(gripX * gripX + gripY * gripY);
+    const exceeded = gripMag > maxRadius;
+
+    // Draw grid lines
+    ctx.strokeStyle = '#1e1e22';
+    ctx.lineWidth = 1;
+    for (let r = 40; r <= maxRadius; r += 40) {
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, r, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.moveTo(centerX - maxRadius - 20, centerY);
+    ctx.lineTo(centerX + maxRadius + 20, centerY);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY - maxRadius - 20);
+    ctx.lineTo(centerX, centerY + maxRadius + 20);
+    ctx.stroke();
+
+    // Draw max grip circle
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, maxRadius, 0, Math.PI * 2);
+    ctx.strokeStyle = exceeded ? '#ef4444' : '#22c55e';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // Label for circle
+    ctx.fillStyle = exceeded ? '#ef4444' : '#22c55e';
+    ctx.font = '600 12px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('MAX GRIP', centerX, centerY - maxRadius - 10);
+
+    // Axis labels
+    ctx.fillStyle = '#71717a';
+    ctx.font = '500 11px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Throttle', centerX, centerY - maxRadius - 30);
+    ctx.fillText('Brake', centerX, centerY + maxRadius + 35);
+    ctx.fillText('Left', centerX - maxRadius - 30, centerY + 4);
+    ctx.fillText('Right', centerX + maxRadius + 30, centerY + 4);
+
+    // Draw grip usage vector (line from center to dot)
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY);
+    ctx.lineTo(centerX + gripX, centerY + gripY);
+    ctx.strokeStyle = exceeded ? '#ef444499' : '#3b82f699';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Draw dot at grip usage point
+    const dotX = centerX + gripX;
+    const dotY = centerY + gripY;
+
+    // If exceeded, draw the clamped version too
+    if (exceeded) {
+      const scale = maxRadius / gripMag;
+      const clampedX = centerX + gripX * scale;
+      const clampedY = centerY + gripY * scale;
+
+      // Dashed line from clamped to actual
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(clampedX, clampedY);
+      ctx.lineTo(dotX, dotY);
+      ctx.strokeStyle = '#ef444466';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Draw clamped dot (where force actually is)
+      ctx.beginPath();
+      ctx.arc(clampedX, clampedY, 6, 0, Math.PI * 2);
+      ctx.fillStyle = '#f59e0b';
+      ctx.fill();
+    }
+
+    // Glow
+    ctx.beginPath();
+    ctx.arc(dotX, dotY, 16, 0, Math.PI * 2);
+    ctx.fillStyle = exceeded ? 'rgba(239,68,68,0.15)' : 'rgba(59,130,246,0.15)';
+    ctx.fill();
+
+    // Main dot
+    ctx.beginPath();
+    ctx.arc(dotX, dotY, 8, 0, Math.PI * 2);
+    ctx.fillStyle = exceeded ? '#ef4444' : '#3b82f6';
+    ctx.fill();
+
+    // Status text
+    const usage = Math.round((gripMag / maxRadius) * 100);
+    ctx.fillStyle = exceeded ? '#ef4444' : '#a1a1aa';
+    ctx.font = '600 14px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('Grip Usage: ' + usage + '%', 20, 30);
+
+    if (exceeded) {
+      ctx.fillStyle = '#ef4444';
+      ctx.font = '700 16px Inter, sans-serif';
+      ctx.fillText('TRACTION LOST!', 20, 55);
+
+      // Flash effect around the circle
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, maxRadius + 4, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(239,68,68,' + (0.2 + Math.sin(Date.now() / 150) * 0.15) + ')';
+      ctx.lineWidth = 6;
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = '#22c55e';
+      ctx.font = '600 13px Inter, sans-serif';
+      ctx.fillText('Within Grip Limit', 20, 55);
+    }
+
+    // Component breakdown
+    ctx.fillStyle = '#71717a';
+    ctx.font = '500 11px "JetBrains Mono", monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText('Longitudinal: ' + Math.abs(Math.round(throttle * 100)) + '%', W - 20, 30);
+    ctx.fillText('Lateral: ' + Math.abs(Math.round(steering * 100)) + '%', W - 20, 48);
+    ctx.fillText('Combined: ' + usage + '%', W - 20, 66);
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+
+// ============================================================
+// DEMO 2: RACING LINE COMPARISON
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-racing-line');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const restartBtn = document.getElementById('race-restart-btn');
+  const greenSpeedEl = document.getElementById('race-green-speed');
+  const redSpeedEl = document.getElementById('race-red-speed');
+
+  // Define an oval track with corners
+  const trackCenterX = W / 2;
+  const trackCenterY = H / 2 + 10;
+  const trackRadiusX = 310;
+  const trackRadiusY = 190;
+  const trackWidth = 70;
+
+  // Track path points (outer oval)
+  function getTrackPoint(t, radiusX, radiusY) {
+    const angle = t * Math.PI * 2;
+    return {
+      x: trackCenterX + Math.cos(angle) * radiusX,
+      y: trackCenterY + Math.sin(angle) * radiusY
+    };
+  }
+
+  // Optimal racing line: late apex on corners, uses full track width
+  function getOptimalPoint(t) {
+    const angle = t * Math.PI * 2;
+    // Vary the radius to create a racing line
+    // Wider on straights, tighter at apexes
+    const cornerFactor = Math.cos(angle * 2); // Two corners per lap
+    const rx = trackRadiusX + cornerFactor * 18;
+    const ry = trackRadiusY + cornerFactor * 12;
+    // Shift the phase slightly for late apex effect
+    const shiftedAngle = angle + 0.08 * Math.sin(angle * 2);
+    return {
+      x: trackCenterX + Math.cos(shiftedAngle) * rx,
+      y: trackCenterY + Math.sin(shiftedAngle) * ry
+    };
+  }
+
+  // Naive line: hugs the inside
+  function getNaivePoint(t) {
+    const angle = t * Math.PI * 2;
+    const innerRX = trackRadiusX - trackWidth * 0.35;
+    const innerRY = trackRadiusY - trackWidth * 0.35;
+    return {
+      x: trackCenterX + Math.cos(angle) * innerRX,
+      y: trackCenterY + Math.sin(angle) * innerRY
+    };
+  }
+
+  // Speed model: optimal line carries more speed through corners
+  function getOptimalSpeed(t) {
+    const angle = t * Math.PI * 2;
+    const cornerInfluence = Math.abs(Math.sin(angle * 2));
+    // Higher min speed through corners because of better line
+    return 120 + (1 - cornerInfluence) * 160;
+  }
+
+  function getNaiveSpeed(t) {
+    const angle = t * Math.PI * 2;
+    const cornerInfluence = Math.abs(Math.sin(angle * 2));
+    // Much slower through corners due to tighter radius
+    return 80 + (1 - cornerInfluence) * 140;
+  }
+
+  let greenT = 0;
+  let redT = 0;
+  let raceRunning = true;
+  let greenFinished = false;
+  let redFinished = false;
+  let greenLapTime = 0;
+  let redLapTime = 0;
+  let raceTime = 0;
+
+  function restart() {
+    greenT = 0;
+    redT = 0;
+    raceRunning = true;
+    greenFinished = false;
+    redFinished = false;
+    greenLapTime = 0;
+    redLapTime = 0;
+    raceTime = 0;
+  }
+
+  restartBtn.addEventListener('click', restart);
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Draw track (outer and inner edge)
+    ctx.beginPath();
+    for (let i = 0; i <= 200; i++) {
+      const t = i / 200;
+      const p = getTrackPoint(t, trackRadiusX + trackWidth / 2, trackRadiusY + trackWidth / 2);
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = '#1a1a20';
+    ctx.fill();
+    ctx.strokeStyle = '#3f3f46';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Inner edge
+    ctx.beginPath();
+    for (let i = 0; i <= 200; i++) {
+      const t = i / 200;
+      const p = getTrackPoint(t, trackRadiusX - trackWidth / 2, trackRadiusY - trackWidth / 2);
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = '#111114';
+    ctx.fill();
+    ctx.strokeStyle = '#3f3f46';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Draw grass (inner)
+    ctx.fillStyle = '#14261a';
+    ctx.fill();
+
+    // Start/finish line
+    const sfP = getTrackPoint(0, trackRadiusX, trackRadiusY);
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(sfP.x, sfP.y - trackWidth / 2);
+    ctx.lineTo(sfP.x, sfP.y + trackWidth / 2);
+    ctx.stroke();
+
+    // Draw optimal racing line (full path)
+    ctx.beginPath();
+    for (let i = 0; i <= 200; i++) {
+      const t = i / 200;
+      const p = getOptimalPoint(t);
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = 'rgba(34,197,94,0.3)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Draw naive line (full path)
+    ctx.beginPath();
+    for (let i = 0; i <= 200; i++) {
+      const t = i / 200;
+      const p = getNaivePoint(t);
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = 'rgba(239,68,68,0.3)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Update positions
+    if (raceRunning) {
+      raceTime += 1 / 60;
+
+      if (!greenFinished) {
+        const greenSpeed = getOptimalSpeed(greenT);
+        greenT += (greenSpeed / 40000);
+        if (greenT >= 1) {
+          greenFinished = true;
+          greenLapTime = raceTime;
+          greenT = 1;
+        }
+        greenSpeedEl.textContent = 'Optimal: ' + Math.round(greenSpeed) + ' km/h';
+      }
+
+      if (!redFinished) {
+        const redSpeed = getNaiveSpeed(redT);
+        redT += (redSpeed / 40000);
+        if (redT >= 1) {
+          redFinished = true;
+          redLapTime = raceTime;
+          redT = 1;
+        }
+        redSpeedEl.textContent = 'Naive: ' + Math.round(redSpeed) + ' km/h';
+      }
+
+      if (greenFinished && redFinished) {
+        raceRunning = false;
+      }
+    }
+
+    // Draw speed indicators at corners
+    const cornerPositions = [0.125, 0.375, 0.625, 0.875];
+    for (const cp of cornerPositions) {
+      const op = getOptimalPoint(cp);
+      const np = getNaivePoint(cp);
+      const os = Math.round(getOptimalSpeed(cp));
+      const ns = Math.round(getNaiveSpeed(cp));
+
+      ctx.font = '600 10px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#22c55e';
+      ctx.fillText(os + '', op.x, op.y - 14);
+      ctx.fillStyle = '#ef4444';
+      ctx.fillText(ns + '', np.x, np.y + 20);
+    }
+
+    // Draw cars
+    const greenPos = getOptimalPoint(Math.min(greenT, 0.999));
+    const redPos = getNaivePoint(Math.min(redT, 0.999));
+
+    // Green car (optimal)
+    ctx.beginPath();
+    ctx.arc(greenPos.x, greenPos.y, 8, 0, Math.PI * 2);
+    ctx.fillStyle = '#22c55e';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(greenPos.x, greenPos.y, 12, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(34,197,94,0.2)';
+    ctx.fill();
+
+    // Red car (naive)
+    ctx.beginPath();
+    ctx.arc(redPos.x, redPos.y, 8, 0, Math.PI * 2);
+    ctx.fillStyle = '#ef4444';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(redPos.x, redPos.y, 12, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(239,68,68,0.2)';
+    ctx.fill();
+
+    // Legend
+    ctx.font = '600 12px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#22c55e';
+    ctx.fillRect(20, 18, 12, 12);
+    ctx.fillText('Optimal Racing Line', 38, 28);
+    ctx.fillStyle = '#ef4444';
+    ctx.fillRect(20, 38, 12, 12);
+    ctx.fillText('Naive Inside Line', 38, 48);
+
+    // Lap times
+    if (greenFinished) {
+      ctx.fillStyle = '#22c55e';
+      ctx.font = '600 12px "JetBrains Mono", monospace';
+      ctx.fillText('Optimal Lap: ' + greenLapTime.toFixed(2) + 's', 20, H - 30);
+    }
+    if (redFinished) {
+      ctx.fillStyle = '#ef4444';
+      ctx.fillText('Naive Lap: ' + redLapTime.toFixed(2) + 's', 20, H - 12);
+    }
+    if (greenFinished && redFinished) {
+      const diff = (redLapTime - greenLapTime).toFixed(2);
+      ctx.fillStyle = '#f59e0b';
+      ctx.font = '700 14px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Optimal line is ' + diff + 's faster!', W / 2, H - 12);
+    }
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+</script>
