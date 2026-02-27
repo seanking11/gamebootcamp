@@ -38,6 +38,34 @@ const base = import.meta.env.BASE_URL;
   <footer style="text-align:center; padding:3rem 1.5rem; color:var(--text-dim); font-size:0.8rem; border-top:1px solid var(--border); margin-top:4rem;">
     Game Dev Bootcamp — Built for developers who want to understand games.
   </footer>
+<script is:inline>
+// Prevent page scroll when pressing game keys while a demo canvas is in view
+(function() {
+  const GAME_KEYS = new Set([
+    'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+    'KeyW', 'KeyA', 'KeyS', 'KeyD',
+    'KeyI', 'KeyJ', 'KeyK', 'KeyL',
+    'KeyZ', 'KeyP', 'KeyF', 'KeyN'
+  ]);
+
+  function isCanvasInViewport() {
+    const canvases = document.querySelectorAll('.demo-container canvas');
+    for (const canvas of canvases) {
+      const rect = canvas.getBoundingClientRect();
+      if (rect.top < window.innerHeight && rect.bottom > 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  document.addEventListener('keydown', function(e) {
+    if (GAME_KEYS.has(e.code) && isCanvasInViewport()) {
+      e.preventDefault();
+    }
+  });
+})();
+</script>
 </body>
 </html>
 
