@@ -1,0 +1,857 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 21: Action RPG">
+  <div class="container page-content">
+    <div class="module-header">
+      <div class="module-number">Module 21</div>
+      <h1>Action RPG</h1>
+      <p class="module-theme">Real-time combat meets character progression &mdash; you died, but your gear survived.</p>
+    </div>
+
+    <blockquote>"The only way to do great work is to love what you do." &mdash; Steve Jobs. "You Died." &mdash; Dark Souls.</blockquote>
+
+    <hr />
+
+    <h2>Prerequisites</h2>
+    <table>
+      <thead><tr><th>Module</th><th>What You Used From It</th></tr></thead>
+      <tbody>
+        <tr><td>Module 03 - Top-Down Shooter (or Module 08 - Fighting Game)</td><td>Real-time input handling, collision detection, frame-rate-independent movement, hit detection</td></tr>
+        <tr><td>Module 07 - Roguelike</td><td>Item/inventory systems, procedural generation concepts, entity management</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h2>Week 1: History &amp; Design Theory</h2>
+
+    <h3>The Origin</h3>
+    <p>The action RPG was born from a desire to keep the progression systems of turn-based RPGs &mdash; levels, loot, stats &mdash; while replacing menu selection with real-time, skill-based combat. Early entries like Hydlide (1984) and The Legend of Zelda (1986) proved that exploration and combat could happen on the same screen without pausing for menus. The genre truly crystallized when developers realized the magic formula: combine the dopamine of finding better gear with the satisfaction of skillful play, so that the player's character AND the player themselves grow more powerful over time.</p>
+
+    <h3>How the Genre Evolved</h3>
+    <p><strong>Diablo (Blizzard, 1997):</strong> Blizzard North's dungeon crawler made loot the star of the show. Procedurally generated dungeons, randomized item properties, and tiered rarity (common through unique) created an addictive loop: kill monsters, find better gear, kill harder monsters. Diablo proved that loot tables &mdash; the weighted probability distributions behind item drops &mdash; were as important as level design.</p>
+
+    <p><strong>Dark Souls (FromSoftware, 2011):</strong> FromSoftware inverted the power fantasy. Instead of showering the player with loot, Dark Souls made every encounter dangerous and every victory earned. Its combat system &mdash; built on stamina management, dodge timing (invincibility frames), and reading enemy telegraph animations &mdash; demanded that player skill matter more than stats.</p>
+
+    <p><strong>Elden Ring (FromSoftware, 2022):</strong> The synthesis. Elden Ring merged Dark Souls' precise combat with an open world full of optional bosses, hidden dungeons, and build variety. Its character build system showed that meaningful build diversity and challenging real-time combat could coexist.</p>
+
+    <h3>What Makes an Action RPG "Great"</h3>
+    <p>A great action RPG makes the player feel <strong>two kinds of growth simultaneously</strong>. Statistical growth comes from levels, gear, and build choices. Skill growth comes from the player learning enemy patterns, mastering dodge timing, managing stamina, and making split-second decisions. The best games ensure that neither growth alone is sufficient: a perfectly built character piloted by a careless player will still die, and a skillful player with terrible gear will hit a wall.</p>
+
+    <h3>The Essential Mechanic</h3>
+    <p><strong>Real-time combat where stats, gear, and player skill both matter.</strong></p>
+
+    <hr />
+
+    <h2>Week 2: Build the MVP</h2>
+
+    <h3>What You're Building</h3>
+    <p>A top-down (or side-view) action game where the player character has stats (HP, attack, defense, stamina), fights enemies in real-time, collects loot drops with randomized properties, and can allocate stat points on level-up. The player should face 3-4 enemy types across 2-3 small zones, with at least one mini-boss that requires learning its attack patterns.</p>
+
+    <h3>Core Concepts (Must Implement)</h3>
+
+    <h4>1. Loot / Drop Table System</h4>
+    <p>When an enemy dies, it rolls against a weighted probability table to determine what it drops. Items have rarity tiers, and rarer items have better stats.</p>
+    <pre is:raw><code>rarity_tiers = {
+    "common":    { color: "white",  stat_range: [1, 3],  weight: 60 },
+    "uncommon":  { color: "green",  stat_range: [3, 6],  weight: 25 },
+    "rare":      { color: "blue",   stat_range: [6, 10], weight: 10 },
+    "legendary": { color: "orange", stat_range: [10, 15], weight: 5 }
+}
+
+drop_tables = {
+    "skeleton": [
+        { item_type: "sword",  drop_chance: 30 },
+        { item_type: "shield", drop_chance: 15 },
+        { item_type: "potion", drop_chance: 50 },
+        { item_type: "nothing", drop_chance: 5 }
+    ]
+}
+
+function roll_drop(enemy_type):
+    table = drop_tables[enemy_type]
+    roll = random(0, 100)
+    cumulative = 0
+    for entry in table:
+        cumulative += entry.drop_chance
+        if roll &lt; cumulative:
+            if entry.item_type == "nothing": return null
+            rarity = roll_rarity()
+            return generate_item(entry.item_type, rarity)
+
+function roll_rarity():
+    roll = random(0, 100)
+    cumulative = 0
+    for tier_name, tier_data in rarity_tiers:
+        cumulative += tier_data.weight
+        if roll &lt; cumulative:
+            return tier_name</code></pre>
+    <p><strong>Why it matters:</strong> The drop table is the core reward system. It controls the player's power curve and creates the "just one more" loop that keeps players engaged.</p>
+
+    <!-- Demo 1: Loot Drop Table Visualizer -->
+    <div class="demo-container">
+      <div class="demo-label">Demo: Loot Drop Table Visualizer</div>
+      <p class="demo-hint">Click "Drop Loot" to roll the drop table. Each drop shows the item and rarity. The bar chart on the right tracks actual vs. expected distribution over many drops. Click rapidly to see the distribution converge!</p>
+      <canvas id="demo-loot" width="760" height="420"></canvas>
+    </div>
+
+    <h4>2. Stat System with Equipment</h4>
+    <p>The player has base stats that are modified by equipped gear. Every piece of equipment adds to one or more stats.</p>
+    <pre is:raw><code>player = {
+    base_stats: { hp_max: 100, attack: 10, defense: 8, speed: 5, stamina_max: 100 },
+    equipment: { weapon: null, armor: null, accessory: null },
+    level: 1, xp: 0
+}
+
+function get_effective_stat(stat_name):
+    base = player.base_stats[stat_name]
+    gear_bonus = 0
+    for slot, item in player.equipment:
+        if item and stat_name in item.stat_bonuses:
+            gear_bonus += item.stat_bonuses[stat_name]
+    return base + gear_bonus</code></pre>
+    <p><strong>Why it matters:</strong> The stat system is what makes loot meaningful. Equipment creates a constant stream of micro-decisions: is +3 attack better than +5 defense?</p>
+
+    <h4>3. Stamina / Resource Management in Combat</h4>
+    <p>Attacks, dodges, and blocks cost stamina. When stamina is depleted, the player is vulnerable.</p>
+    <pre is:raw><code>STAMINA_REGEN_RATE = 20     # per second
+ATTACK_STAMINA_COST = 25
+DODGE_STAMINA_COST = 30
+BLOCK_STAMINA_COST = 15     # per second while blocking
+
+function update_stamina(dt):
+    if player.state == "blocking":
+        player.stamina -= BLOCK_STAMINA_COST * dt
+        if player.stamina &lt;= 0:
+            player.stamina = 0
+            break_block()
+    elif player.state == "idle" or player.state == "moving":
+        player.stamina = min(player.stamina + STAMINA_REGEN_RATE * dt,
+                             get_effective_stat("stamina_max"))
+
+function try_attack():
+    if player.stamina >= ATTACK_STAMINA_COST:
+        player.stamina -= ATTACK_STAMINA_COST
+        start_attack_animation()
+        return true
+    else:
+        show_feedback("Not enough stamina!")
+        return false</code></pre>
+    <p><strong>Why it matters:</strong> Stamina prevents optimal play from being "attack as fast as possible." It forces the player to create rhythms &mdash; attack, attack, back off, regenerate.</p>
+
+    <h4>4. Dodge / Invincibility Frames (I-Frames)</h4>
+    <p>During a dodge animation, there is a brief window where the player cannot be hit. This rewards precise timing.</p>
+    <pre is:raw><code>DODGE_DURATION = 0.4         # seconds
+IFRAME_START = 0.05          # i-frames begin 50ms into dodge
+IFRAME_END = 0.25            # i-frames end 250ms into dodge
+DODGE_SPEED = 300            # pixels/second during dodge
+
+function start_dodge(direction):
+    player.state = "dodging"
+    player.dodge_timer = 0
+    player.dodge_direction = direction
+
+function update_dodge(dt):
+    if player.state != "dodging": return
+    player.dodge_timer += dt
+    player.position += player.dodge_direction * DODGE_SPEED * dt
+    player.invulnerable = (player.dodge_timer >= IFRAME_START and
+                           player.dodge_timer &lt;= IFRAME_END)
+    if player.dodge_timer >= DODGE_DURATION:
+        player.state = "idle"
+        player.invulnerable = false
+
+function try_damage_player(damage, source):
+    if player.invulnerable:
+        return 0   # Dodged!
+    actual = calculate_damage(damage, get_effective_stat("defense"))
+    player.hp -= actual
+    return actual</code></pre>
+    <p><strong>Why it matters:</strong> I-frames are the purest expression of skill-based defense in action RPGs. A player who masters dodge timing can fight enemies far above their stat level.</p>
+
+    <!-- Demo 2: I-Frames Dodge Demo -->
+    <div class="demo-container">
+      <div class="demo-label">Demo: I-Frames Dodge Timing</div>
+      <p class="demo-hint">A sweeping attack moves across the arena. Press SPACE to dodge. During the i-frame window (shown in green on the timeline), the attack passes through harmlessly. Mistiming means damage! The timeline below shows the dodge frame window.</p>
+      <canvas id="demo-iframes" width="760" height="440"></canvas>
+    </div>
+
+    <h4>5. Enemy Telegraphs and Attack Windows</h4>
+    <p>Enemies signal their attacks with visible wind-up animations before the damage lands.</p>
+    <pre is:raw><code>enemy_attacks = {
+    "overhead_smash": {
+        telegraph_duration: 0.8,    # Wind-up: DODGE NOW
+        active_duration: 0.2,       # Damage frames
+        recovery_duration: 0.6,     # Vulnerable: ATTACK NOW
+        damage: 30,
+        hitbox: { width: 40, height: 60, offset_y: -30 }
+    }
+}
+
+function update_enemy_attack(enemy, dt):
+    enemy.attack_timer += dt
+    attack = enemy_attacks[enemy.current_attack]
+
+    if enemy.attack_phase == "telegraph":
+        show_telegraph_indicator(enemy)
+        if enemy.attack_timer >= attack.telegraph_duration:
+            enemy.attack_phase = "active"
+            enemy.attack_timer = 0
+    elif enemy.attack_phase == "active":
+        if not player.invulnerable and overlaps(attack.hitbox, player.hitbox):
+            try_damage_player(attack.damage, enemy)
+        if enemy.attack_timer >= attack.active_duration:
+            enemy.attack_phase = "recovery"
+            enemy.attack_timer = 0
+    elif enemy.attack_phase == "recovery":
+        enemy.can_be_staggered = true
+        if enemy.attack_timer >= attack.recovery_duration:
+            enemy.attack_phase = "idle"</code></pre>
+    <p><strong>Why it matters:</strong> Telegraphs are the language of action RPG combat. They transform fights from reaction-speed tests into pattern-recognition puzzles.</p>
+
+    <h4>6. Area / Zone Transitions</h4>
+    <pre is:raw><code>zones = {
+    "village": {
+        enemies: [],
+        exits: [{ position: [15, 0], target_zone: "forest", entry_point: [1, 10] }],
+    },
+    "forest": {
+        enemies: ["skeleton", "wolf"],
+        exits: [
+            { position: [0, 10], target_zone: "village", entry_point: [14, 0] },
+            { position: [15, 5], target_zone: "dungeon", entry_point: [1, 5] }
+        ],
+    }
+}</code></pre>
+    <p><strong>Why it matters:</strong> Zone transitions create the feeling of a larger world from small, manageable pieces.</p>
+
+    <h4>7. Character Build / Skill System</h4>
+    <pre is:raw><code>STAT_POINTS_PER_LEVEL = 3
+
+build_stats = {
+    "strength":  { description: "Increases attack damage", affects: "attack", per_point: 2 },
+    "dexterity": { description: "Increases speed and stamina", affects: ["speed", "stamina_max"],
+                   per_point: [1, 5] },
+    "vitality":  { description: "Increases HP", affects: "hp_max", per_point: 10 },
+    "luck":      { description: "Increases crit and drop rates", affects: "luck", per_point: 1 }
+}
+
+# Example builds after 10 levels (30 points):
+# "Glass Cannon": 20 STR, 5 DEX, 0 VIT, 5 LCK — hits hard, dies fast
+# "Tank": 5 STR, 5 DEX, 20 VIT, 0 LCK — survives everything, slow kills</code></pre>
+    <p><strong>Why it matters:</strong> Build allocation gives the player ownership over their character's identity. Two players can fight the same boss with completely different strategies.</p>
+
+    <hr />
+
+    <h3>Stretch Goals</h3>
+    <ul>
+      <li><strong>Weapon types with different movesets:</strong> Swords swing fast, hammers swing slow but stagger enemies.</li>
+      <li><strong>Status effects on gear:</strong> A "Burning Sword" that applies damage-over-time.</li>
+      <li><strong>Boss with multiple phases:</strong> At 50% HP, the boss changes attack patterns.</li>
+      <li><strong>NPC shop:</strong> Spend gold to buy potions, basic gear, or stat resets.</li>
+    </ul>
+
+    <h3>MVP Spec</h3>
+    <table>
+      <thead><tr><th>Element</th><th>Minimum Viable Version</th></tr></thead>
+      <tbody>
+        <tr><td>Player</td><td>Character with HP, stamina, attack, defense, speed stats</td></tr>
+        <tr><td>Equipment</td><td>Weapon and armor slots; equipping items modifies stats</td></tr>
+        <tr><td>Combat</td><td>Real-time attack, dodge (with i-frames), and block</td></tr>
+        <tr><td>Enemies</td><td>3-4 types with different telegraph patterns and drop tables</td></tr>
+        <tr><td>Loot</td><td>Random drops with at least 3 rarity tiers</td></tr>
+        <tr><td>Zones</td><td>2-3 connected areas with zone transition</td></tr>
+        <tr><td>Leveling</td><td>XP from kills, stat point allocation on level-up</td></tr>
+        <tr><td>Boss</td><td>1 mini-boss with distinct attack patterns and guaranteed rare drop</td></tr>
+        <tr><td>HUD</td><td>HP bar, stamina bar, equipped item display</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliverable</h3>
+    <p>A playable action RPG where the player moves through 2-3 zones, fights enemies in real-time using attacks, dodges, and blocks, collects randomized loot, equips gear that changes their stats, levels up and allocates stat points, and defeats a mini-boss. The player should feel both kinds of growth: statistical (better gear, higher stats) and personal (learning enemy patterns, mastering dodge timing).</p>
+
+    <hr />
+
+    <h2>Analogies by Background</h2>
+    <blockquote><p>These analogies map game dev concepts to patterns you already know.</p></blockquote>
+
+    <h3>For Backend Developers</h3>
+    <table>
+      <thead><tr><th>Core Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Loot / Drop Tables</td><td>Like weighted load balancing &mdash; requests are distributed across servers according to configured weights</td></tr>
+        <tr><td>Stat System with Equipment</td><td>Like environment variable overrides &mdash; base configuration is merged with deployment-specific overrides</td></tr>
+        <tr><td>Stamina Management</td><td>Like rate limiting with a token bucket &mdash; each action consumes tokens, tokens regenerate over time</td></tr>
+        <tr><td>Dodge / I-Frames</td><td>Like a circuit breaker in "open" state &mdash; during the brief window, all incoming requests are rejected</td></tr>
+        <tr><td>Enemy Telegraphs</td><td>Like health check probes with predictable timing</td></tr>
+        <tr><td>Zone Transitions</td><td>Like microservice boundaries &mdash; each zone is an independent service with its own data</td></tr>
+        <tr><td>Character Build System</td><td>Like compile-time feature flags &mdash; choices made at build time determine runtime behavior</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Frontend Developers</h3>
+    <table>
+      <thead><tr><th>Core Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Loot / Drop Tables</td><td>Like A/B test variant allocation &mdash; users are assigned to variants based on configured weights</td></tr>
+        <tr><td>Stat System with Equipment</td><td>Like CSS cascade &mdash; base styles are overridden by more specific rules</td></tr>
+        <tr><td>Stamina Management</td><td>Like debouncing &mdash; rapid inputs are throttled</td></tr>
+        <tr><td>Dodge / I-Frames</td><td>Like <code>pointer-events: none</code> applied temporarily</td></tr>
+        <tr><td>Enemy Telegraphs</td><td>Like CSS transition delays &mdash; the visual change begins, a delay passes, then the final state resolves</td></tr>
+        <tr><td>Zone Transitions</td><td>Like client-side route changes &mdash; the component tree is replaced but global state persists</td></tr>
+        <tr><td>Character Build System</td><td>Like theming choices at app initialization</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Data / ML Engineers</h3>
+    <table>
+      <thead><tr><th>Core Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Loot / Drop Tables</td><td>Like sampling from a categorical distribution &mdash; each category has a probability weight</td></tr>
+        <tr><td>Stat System with Equipment</td><td>Like feature vectors with additive components</td></tr>
+        <tr><td>Stamina Management</td><td>Like GPU memory budgeting &mdash; each operation consumes memory, stalling when depleted</td></tr>
+        <tr><td>Dodge / I-Frames</td><td>Like dropout during training &mdash; for a subset of frames, incoming signals are ignored</td></tr>
+        <tr><td>Enemy Telegraphs</td><td>Like data pipeline latency &mdash; a known delay between data arriving and processing completing</td></tr>
+        <tr><td>Zone Transitions</td><td>Like switching between dataset partitions</td></tr>
+        <tr><td>Character Build System</td><td>Like hyperparameter tuning &mdash; allocating stat points is choosing hyperparameters</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li>Dark Souls is famous for being "hard but fair." How do i-frames and enemy telegraphs create a sense of fairness that pure stat-based difficulty does not?</li>
+      <li>Diablo's loot system is often compared to slot machines. At what point does a random reward system cross from "engaging" to "exploitative"?</li>
+      <li>In most action RPGs, the player can eventually out-level any challenge. Should difficulty scale with the player? What are the emotional tradeoffs?</li>
+      <li>Stamina systems force players to not act. Why is "forced inaction" a valuable design tool?</li>
+    </ol>
+
+    <nav class="module-nav">
+      <a href={`${base}modules/20-turn-based-rpg/`}>&larr; Module 20: Turn-Based RPG</a>
+      <a href={`${base}modules/22-rts/`}>Module 22: Real-Time Strategy &rarr;</a>
+    </nav>
+  </div>
+
+  <script>
+    // Demo 1: Loot Drop Table Visualizer
+    (function() {
+      const canvas = document.getElementById('demo-loot');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width, H = canvas.height;
+
+      const rarities = [
+        { name: 'Common', weight: 60, color: '#aaaaaa' },
+        { name: 'Uncommon', weight: 25, color: '#44bb44' },
+        { name: 'Rare', weight: 10, color: '#4488ff' },
+        { name: 'Legendary', weight: 5, color: '#ff8800' },
+      ];
+      const totalWeight = rarities.reduce(function(s, r) { return s + r.weight; }, 0);
+
+      const itemTypes = ['Sword', 'Shield', 'Helm', 'Boots', 'Ring', 'Potion'];
+
+      const drops = [];
+      const counts = {};
+      rarities.forEach(function(r) { counts[r.name] = 0; });
+      let totalDrops = 0;
+      let lastDrop = null;
+      let flashTimer = 0;
+
+      function rollRarity() {
+        let roll = Math.random() * totalWeight;
+        let cum = 0;
+        for (const r of rarities) {
+          cum += r.weight;
+          if (roll < cum) return r;
+        }
+        return rarities[0];
+      }
+
+      function rollDrop() {
+        const rarity = rollRarity();
+        const item = itemTypes[Math.floor(Math.random() * itemTypes.length)];
+        const bonus = rarity === rarities[3] ? 10 + Math.floor(Math.random() * 6) :
+                      rarity === rarities[2] ? 6 + Math.floor(Math.random() * 5) :
+                      rarity === rarities[1] ? 3 + Math.floor(Math.random() * 4) :
+                      1 + Math.floor(Math.random() * 3);
+        return { item: item, rarity: rarity, bonus: bonus };
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, W, H);
+        ctx.fillStyle = '#111822';
+        ctx.fillRect(0, 0, W, H);
+
+        // Drop table
+        ctx.fillStyle = '#667788';
+        ctx.font = 'bold 14px monospace';
+        ctx.fillText('Drop Table', 15, 25);
+
+        ctx.fillStyle = '#0d1520';
+        ctx.fillRect(10, 35, 250, 130);
+        ctx.strokeStyle = '#2a3a4a';
+        ctx.strokeRect(10, 35, 250, 130);
+
+        ctx.font = '12px monospace';
+        for (let i = 0; i < rarities.length; i++) {
+          const r = rarities[i];
+          const y = 55 + i * 28;
+          ctx.fillStyle = r.color;
+          ctx.fillRect(20, y - 10, 14, 14);
+          ctx.fillStyle = '#ccddee';
+          ctx.fillText(r.name, 42, y + 1);
+          ctx.fillStyle = '#889';
+          ctx.fillText(r.weight + '%', 160, y + 1);
+
+          // Weight bar
+          ctx.fillStyle = 'rgba(255,255,255,0.05)';
+          ctx.fillRect(200, y - 8, 50, 12);
+          ctx.fillStyle = r.color;
+          ctx.fillRect(200, y - 8, 50 * (r.weight / totalWeight), 12);
+        }
+
+        // Drop button
+        const bx = 10, by = 180, bw = 160, bh = 40;
+        ctx.fillStyle = '#2a4a3a';
+        ctx.fillRect(bx, by, bw, bh);
+        ctx.strokeStyle = '#44bb66';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(bx, by, bw, bh);
+        ctx.fillStyle = '#88ffaa';
+        ctx.font = 'bold 15px monospace';
+        ctx.fillText('Drop Loot!', bx + 20, by + 27);
+
+        // Total drops
+        ctx.fillStyle = '#667788';
+        ctx.font = '12px monospace';
+        ctx.fillText('Total drops: ' + totalDrops, 190, 200);
+
+        // Last drop display
+        if (lastDrop) {
+          const ldx = 10, ldy = 240;
+          ctx.fillStyle = '#0d1520';
+          ctx.fillRect(ldx, ldy, 250, 50);
+          const flashAlpha = flashTimer > 0 ? flashTimer / 20 : 0;
+          if (flashAlpha > 0) {
+            ctx.fillStyle = 'rgba(' + (lastDrop.rarity === rarities[3] ? '255,136,0' : lastDrop.rarity === rarities[2] ? '68,136,255' : '100,200,100') + ',' + (flashAlpha * 0.15) + ')';
+            ctx.fillRect(ldx, ldy, 250, 50);
+          }
+          ctx.strokeStyle = lastDrop.rarity.color;
+          ctx.lineWidth = 2;
+          ctx.strokeRect(ldx, ldy, 250, 50);
+          ctx.fillStyle = lastDrop.rarity.color;
+          ctx.font = 'bold 14px monospace';
+          ctx.fillText(lastDrop.rarity.name + ' ' + lastDrop.item, ldx + 10, ldy + 22);
+          ctx.fillStyle = '#ccddee';
+          ctx.font = '12px monospace';
+          ctx.fillText('+' + lastDrop.bonus + ' bonus stats', ldx + 10, ldy + 40);
+        }
+
+        // Recent drops list
+        ctx.fillStyle = '#667788';
+        ctx.font = '11px monospace';
+        ctx.fillText('Recent drops:', 10, 310);
+        const recent = drops.slice(-8);
+        for (let i = 0; i < recent.length; i++) {
+          const d = recent[i];
+          ctx.fillStyle = d.rarity.color;
+          ctx.font = '10px monospace';
+          ctx.fillText(d.rarity.name + ' ' + d.item + ' (+' + d.bonus + ')', 15, 326 + i * 14);
+        }
+
+        // Distribution chart (right side)
+        const cx = 290, cw = 460, ch = H - 20;
+        ctx.fillStyle = '#0d1520';
+        ctx.fillRect(cx, 10, cw, ch);
+        ctx.strokeStyle = '#2a3a4a';
+        ctx.strokeRect(cx, 10, cw, ch);
+
+        ctx.fillStyle = '#667788';
+        ctx.font = 'bold 13px monospace';
+        ctx.fillText('Distribution: Expected vs Actual', cx + 10, 30);
+
+        if (totalDrops > 0) {
+          const barZone = { x: cx + 20, y: 50, w: cw - 40, h: ch - 70 };
+          const barGroupW = barZone.w / rarities.length;
+
+          for (let i = 0; i < rarities.length; i++) {
+            const r = rarities[i];
+            const expected = r.weight / totalWeight;
+            const actual = counts[r.name] / totalDrops;
+            const maxVal = Math.max(expected, actual, 0.01);
+
+            const gx = barZone.x + i * barGroupW + 10;
+            const barW = (barGroupW - 30) / 2;
+
+            // Expected bar
+            const eH = (expected / 0.8) * (barZone.h - 30);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.fillRect(gx, barZone.y + barZone.h - 30 - eH, barW, eH);
+            ctx.strokeStyle = '#556677';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(gx, barZone.y + barZone.h - 30 - eH, barW, eH);
+
+            // Actual bar
+            const aH = (actual / 0.8) * (barZone.h - 30);
+            ctx.fillStyle = r.color;
+            ctx.globalAlpha = 0.7;
+            ctx.fillRect(gx + barW + 4, barZone.y + barZone.h - 30 - aH, barW, aH);
+            ctx.globalAlpha = 1;
+            ctx.strokeStyle = r.color;
+            ctx.strokeRect(gx + barW + 4, barZone.y + barZone.h - 30 - aH, barW, aH);
+
+            // Labels
+            ctx.fillStyle = r.color;
+            ctx.font = '10px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(r.name, gx + barGroupW / 2 - 5, barZone.y + barZone.h - 10);
+
+            // Percentages
+            ctx.fillStyle = '#889';
+            ctx.font = '9px monospace';
+            ctx.fillText((expected * 100).toFixed(0) + '%', gx + barW / 2, barZone.y + barZone.h - 34 - eH);
+            ctx.fillStyle = r.color;
+            ctx.fillText((actual * 100).toFixed(1) + '%', gx + barW + 4 + barW / 2, barZone.y + barZone.h - 34 - aH);
+            ctx.textAlign = 'left';
+          }
+
+          // Legend
+          ctx.fillStyle = 'rgba(255,255,255,0.15)';
+          ctx.fillRect(cx + cw - 130, 45, 12, 12);
+          ctx.fillStyle = '#889';
+          ctx.font = '10px monospace';
+          ctx.fillText('Expected', cx + cw - 114, 55);
+
+          ctx.fillStyle = '#4488ff';
+          ctx.fillRect(cx + cw - 130, 62, 12, 12);
+          ctx.fillStyle = '#889';
+          ctx.fillText('Actual', cx + cw - 114, 72);
+        } else {
+          ctx.fillStyle = '#445566';
+          ctx.font = '13px monospace';
+          ctx.fillText('Click "Drop Loot" to see the', cx + 50, 150);
+          ctx.fillText('distribution build over time!', cx + 50, 170);
+        }
+      }
+
+      function tick() {
+        if (flashTimer > 0) {
+          flashTimer--;
+          draw();
+          requestAnimationFrame(tick);
+        }
+      }
+
+      canvas.addEventListener('click', function(e) {
+        const rect = canvas.getBoundingClientRect();
+        const mx = (e.clientX - rect.left) * (W / rect.width);
+        const my = (e.clientY - rect.top) * (H / rect.height);
+
+        if (mx >= 10 && mx <= 170 && my >= 180 && my <= 220) {
+          const drop = rollDrop();
+          drops.push(drop);
+          counts[drop.rarity.name]++;
+          totalDrops++;
+          lastDrop = drop;
+          flashTimer = 20;
+          draw();
+          requestAnimationFrame(tick);
+        }
+      });
+
+      draw();
+    })();
+
+    // Demo 2: I-Frames Dodge Demo
+    (function() {
+      const canvas = document.getElementById('demo-iframes');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width, H = canvas.height;
+
+      const ARENA_H = 300;
+      const TL_Y = 320;
+      const TL_H = 100;
+
+      const player = { x: 380, y: 200, r: 15, state: 'idle', dodgeTimer: 0, invul: false, hp: 5, maxHp: 5, hits: 0, dodges: 0 };
+
+      const DODGE_DURATION = 0.4;
+      const IFRAME_START = 0.05;
+      const IFRAME_END = 0.25;
+      const DODGE_DIST = 120;
+
+      const attack = { x: -80, speed: 400, width: 60, height: ARENA_H - 40, active: true, timer: 0 };
+      let attackCooldown = 0;
+      let damageFlash = 0;
+      let dodgeSuccessFlash = 0;
+      let message = '';
+      let messageTimer = 0;
+      let lastTime = performance.now();
+
+      function resetAttack() {
+        attack.x = -80;
+        attack.active = true;
+        attack.timer = 0;
+        attackCooldown = 1.5;
+      }
+
+      function update(now) {
+        const dt = (now - lastTime) / 1000;
+        lastTime = now;
+
+        // Attack movement
+        if (attack.active) {
+          attack.x += attack.speed * dt;
+          attack.timer += dt;
+
+          // Check collision with player
+          if (attack.x + attack.width > player.x - player.r && attack.x < player.x + player.r) {
+            if (!player.invul) {
+              if (player.state !== 'hit') {
+                player.hp--;
+                player.hits++;
+                damageFlash = 15;
+                message = 'HIT! Wrong timing!';
+                messageTimer = 60;
+                player.state = 'hit';
+                setTimeout(function() { player.state = 'idle'; }, 300);
+                if (player.hp <= 0) {
+                  player.hp = player.maxHp;
+                  player.hits = 0;
+                  player.dodges = 0;
+                  message = 'Reset! Try again.';
+                  messageTimer = 90;
+                }
+              }
+            } else {
+              if (dodgeSuccessFlash === 0) {
+                player.dodges++;
+                dodgeSuccessFlash = 20;
+                message = 'DODGED! Perfect timing!';
+                messageTimer = 60;
+              }
+            }
+          }
+
+          if (attack.x > W + 80) {
+            attack.active = false;
+            resetAttack();
+          }
+        } else {
+          attackCooldown -= dt;
+          if (attackCooldown <= 0) {
+            attack.active = true;
+            attack.x = -80;
+          }
+        }
+
+        // Dodge update
+        if (player.state === 'dodging') {
+          player.dodgeTimer += dt;
+          player.invul = player.dodgeTimer >= IFRAME_START && player.dodgeTimer <= IFRAME_END;
+
+          // Move player during dodge
+          player.y -= (DODGE_DIST / DODGE_DURATION) * dt * 0.5;
+          if (player.y < player.r + 20) player.y = player.r + 20;
+
+          if (player.dodgeTimer >= DODGE_DURATION) {
+            player.state = 'idle';
+            player.invul = false;
+            player.dodgeTimer = 0;
+          }
+        } else {
+          // Return to center
+          if (player.y < 200) player.y += 100 * dt;
+        }
+
+        if (damageFlash > 0) damageFlash--;
+        if (dodgeSuccessFlash > 0) dodgeSuccessFlash--;
+        if (messageTimer > 0) messageTimer--;
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, W, H);
+
+        // Arena
+        ctx.fillStyle = damageFlash > 0 ? '#2a1515' : '#111822';
+        ctx.fillRect(0, 0, W, ARENA_H);
+        ctx.strokeStyle = '#2a3a4a';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(2, 2, W - 4, ARENA_H - 4);
+
+        // Attack sweep
+        if (attack.active) {
+          const gradient = ctx.createLinearGradient(attack.x, 0, attack.x + attack.width, 0);
+          gradient.addColorStop(0, 'rgba(255, 50, 30, 0.0)');
+          gradient.addColorStop(0.3, 'rgba(255, 50, 30, 0.3)');
+          gradient.addColorStop(0.7, 'rgba(255, 50, 30, 0.3)');
+          gradient.addColorStop(1, 'rgba(255, 50, 30, 0.0)');
+          ctx.fillStyle = gradient;
+          ctx.fillRect(attack.x, 20, attack.width, ARENA_H - 40);
+
+          // Attack core line
+          ctx.strokeStyle = '#ff4433';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(attack.x + attack.width / 2, 20);
+          ctx.lineTo(attack.x + attack.width / 2, ARENA_H - 20);
+          ctx.stroke();
+
+          // Warning text
+          ctx.fillStyle = '#ff6644';
+          ctx.font = 'bold 12px monospace';
+          ctx.fillText('ATTACK', attack.x + 2, 16);
+        }
+
+        // Player
+        ctx.fillStyle = player.invul ? 'rgba(68, 255, 136, 0.5)' :
+                        player.state === 'hit' ? '#ff4444' :
+                        player.state === 'dodging' ? '#44aaff' : '#4488ff';
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (player.invul) {
+          // I-frame glow
+          ctx.strokeStyle = '#44ff88';
+          ctx.lineWidth = 3;
+          ctx.setLineDash([3, 3]);
+          ctx.beginPath();
+          ctx.arc(player.x, player.y, player.r + 6, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+
+        if (dodgeSuccessFlash > 0) {
+          ctx.strokeStyle = 'rgba(68, 255, 136, ' + (dodgeSuccessFlash / 20) + ')';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(player.x, player.y, player.r + 10 + (20 - dodgeSuccessFlash), 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 12px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('P', player.x, player.y + 4);
+        ctx.textAlign = 'left';
+
+        // HP display
+        ctx.fillStyle = '#667788';
+        ctx.font = '12px monospace';
+        ctx.fillText('HP: ', 15, 22);
+        for (let i = 0; i < player.maxHp; i++) {
+          ctx.fillStyle = i < player.hp ? '#44dd66' : '#333';
+          ctx.fillRect(45 + i * 20, 12, 16, 14);
+        }
+
+        // Stats
+        ctx.fillStyle = '#889';
+        ctx.font = '11px monospace';
+        ctx.fillText('Dodges: ' + player.dodges + '  Hits: ' + player.hits, W - 200, 22);
+
+        // Message
+        if (messageTimer > 0) {
+          ctx.fillStyle = message.includes('DODGED') ? '#44ff88' : message.includes('HIT') ? '#ff4444' : '#ffcc44';
+          ctx.font = 'bold 16px monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText(message, W / 2, ARENA_H - 20);
+          ctx.textAlign = 'left';
+        }
+
+        // Controls hint
+        ctx.fillStyle = '#556677';
+        ctx.font = '11px monospace';
+        ctx.fillText('Press SPACE to dodge!', W / 2 - 70, ARENA_H - 5);
+
+        // Timeline
+        ctx.fillStyle = '#0d1520';
+        ctx.fillRect(0, TL_Y, W, TL_H);
+        ctx.strokeStyle = '#2a3a4a';
+        ctx.beginPath(); ctx.moveTo(0, TL_Y); ctx.lineTo(W, TL_Y); ctx.stroke();
+
+        ctx.fillStyle = '#667788';
+        ctx.font = 'bold 12px monospace';
+        ctx.fillText('Dodge Timeline', 15, TL_Y + 18);
+
+        const tlx = 30, tly = TL_Y + 30, tlw = W - 60, tlh = 30;
+
+        // Full dodge bar
+        ctx.fillStyle = '#1a2a33';
+        ctx.fillRect(tlx, tly, tlw, tlh);
+
+        // I-frame window
+        const iStart = tlx + (IFRAME_START / DODGE_DURATION) * tlw;
+        const iEnd = tlx + (IFRAME_END / DODGE_DURATION) * tlw;
+        ctx.fillStyle = 'rgba(68, 255, 136, 0.3)';
+        ctx.fillRect(iStart, tly, iEnd - iStart, tlh);
+        ctx.strokeStyle = '#44ff88';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(iStart, tly, iEnd - iStart, tlh);
+
+        // Vulnerable window
+        ctx.fillStyle = 'rgba(255, 68, 68, 0.1)';
+        ctx.fillRect(tlx, tly, iStart - tlx, tlh);
+        ctx.fillRect(iEnd, tly, tlx + tlw - iEnd, tlh);
+
+        // Labels
+        ctx.font = '10px monospace';
+        ctx.fillStyle = '#ff6644';
+        ctx.fillText('vulnerable', tlx + 2, tly - 4);
+        ctx.fillStyle = '#44ff88';
+        ctx.fillText('I-FRAMES (invulnerable)', iStart + 4, tly - 4);
+        ctx.fillStyle = '#ff6644';
+        ctx.fillText('vulnerable', iEnd + 4, tly - 4);
+
+        // Current dodge position
+        if (player.state === 'dodging') {
+          const progress = player.dodgeTimer / DODGE_DURATION;
+          const px = tlx + progress * tlw;
+          ctx.fillStyle = player.invul ? '#44ff88' : '#ff4444';
+          ctx.beginPath();
+          ctx.moveTo(px, tly - 5);
+          ctx.lineTo(px - 6, tly - 15);
+          ctx.lineTo(px + 6, tly - 15);
+          ctx.closePath();
+          ctx.fill();
+          ctx.fillRect(px - 1, tly, 2, tlh);
+        }
+
+        // Time labels
+        ctx.fillStyle = '#556677';
+        ctx.font = '9px monospace';
+        ctx.fillText('0ms', tlx, tly + tlh + 12);
+        ctx.fillText(Math.round(IFRAME_START * 1000) + 'ms', iStart, tly + tlh + 12);
+        ctx.fillText(Math.round(IFRAME_END * 1000) + 'ms', iEnd, tly + tlh + 12);
+        ctx.fillText(Math.round(DODGE_DURATION * 1000) + 'ms', tlx + tlw - 25, tly + tlh + 12);
+
+        // Frame window info
+        ctx.fillStyle = '#88bbcc';
+        ctx.font = '11px monospace';
+        ctx.fillText('I-frame window: ' + Math.round((IFRAME_END - IFRAME_START) * 1000) + 'ms out of ' + Math.round(DODGE_DURATION * 1000) + 'ms dodge (' + Math.round((IFRAME_END - IFRAME_START) / DODGE_DURATION * 100) + '%)', tlx, TL_Y + TL_H - 8);
+      }
+
+      function loop(now) {
+        update(now);
+        draw();
+        requestAnimationFrame(loop);
+      }
+
+      window.addEventListener('keydown', function(e) {
+        if (e.code === 'Space' && player.state === 'idle') {
+          e.preventDefault();
+          player.state = 'dodging';
+          player.dodgeTimer = 0;
+          player.invul = false;
+          dodgeSuccessFlash = 0;
+        }
+      });
+
+      requestAnimationFrame(loop);
+    })();
+  </script>
+</BaseLayout>
