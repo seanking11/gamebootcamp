@@ -1,0 +1,554 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+
+const paths = [
+  {
+    id: 1,
+    name: 'Foundation (Start Here)',
+    description: 'The original bootcamp sequence. Covers the core of game development in 4 genres that build on each other.',
+    bestFor: 'First-timers. Do this path first, then branch into any other.',
+    time: '~5 modules, 10 weeks at 1 module per 2 weeks',
+    color: 'var(--green)',
+    modules: [
+      { num: '01', title: 'Pong', note: 'Game loop, input, collision, state', required: true },
+      { num: '02', title: 'Platformer', note: 'Gravity, tilemaps, game feel', required: true },
+      { num: '03', title: 'Top-Down Shooter', note: 'Entity management, AI, pooling', required: true },
+      { num: '04', title: 'Endless Runner', note: 'Procedural generation, difficulty curves', required: true },
+      { num: '13', title: 'Capstone', note: 'Build your own', required: true },
+    ],
+  },
+  {
+    id: 2,
+    name: 'The Full 2D Journey',
+    description: 'Every 2D genre in the course, sequenced so each builds on the last.',
+    bestFor: 'Going deep on 2D game development. A comprehensive education.',
+    time: '~11 modules, 22 weeks',
+    color: 'var(--blue)',
+    modules: [
+      { num: '01', title: 'Pong', note: 'Fundamentals', required: true },
+      { num: '02', title: 'Platformer', note: 'Physics, spatial design', required: true },
+      { num: '03', title: 'Top-Down Shooter', note: 'Entities at scale, AI', required: true },
+      { num: '04', title: 'Endless Runner', note: 'Procedural generation', required: true },
+      { num: '05', title: 'Puzzle (Tetris)', note: 'Grid as gameplay', required: true },
+      { num: '06', title: 'Tower Defense', note: 'Pathfinding, economy', required: true },
+      { num: '07', title: 'Roguelike', note: 'Dungeons, turn-based', required: true },
+      { num: '08', title: 'Fighting Game', note: 'Hitboxes, frame data', required: true },
+      { num: '09', title: 'Racing', note: 'Steering physics', required: true },
+      { num: '10', title: 'Deckbuilder', note: 'Card systems, turns', required: true },
+      { num: '13', title: 'Capstone', note: 'Build your own', required: true },
+    ],
+  },
+  {
+    id: 3,
+    name: 'Into the Third Dimension',
+    description: 'From 2D fundamentals to 3D game development.',
+    bestFor: 'Developers who want to understand 3D game mechanics.',
+    time: '~7-8 modules, 14-16 weeks',
+    color: 'var(--purple)',
+    modules: [
+      { num: '01', title: 'Pong', note: 'Fundamentals', required: true },
+      { num: '02', title: 'Platformer', note: 'Physics, character control', required: true },
+      { num: '03', title: 'Top-Down Shooter', note: 'Entities, projectiles', required: true },
+      { num: '11', title: 'First-Person Game', note: '3D basics, FPS', required: true },
+      { num: '12', title: '3D Platformer', note: '3D camera, movement', required: true },
+      { num: '16', title: 'Third-Person Shooter', note: 'Cover, animation blending', required: true },
+      { num: '19', title: 'Walking Simulator', note: 'Environmental storytelling in 3D', required: false },
+      { num: '13', title: 'Capstone', note: 'Build your own', required: true },
+    ],
+  },
+  {
+    id: 4,
+    name: 'Combat Deep Dive',
+    description: 'Every flavor of combat, from the simplest to the most complex.',
+    bestFor: 'Understanding how fighting, shooting, and action systems work.',
+    time: '~7 modules, 14 weeks',
+    color: 'var(--red)',
+    modules: [
+      { num: '01', title: 'Pong', note: 'Collision, response', required: true },
+      { num: '03', title: 'Top-Down Shooter', note: 'Projectiles, health, AI', required: true },
+      { num: '08', title: 'Fighting Game', note: 'Hitboxes, frame data, combos', required: true },
+      { num: '15', title: 'Run and Gun', note: 'Boss design, co-op', required: true },
+      { num: '21', title: 'Action RPG', note: 'Loot, stats, stamina, i-frames', required: true },
+      { num: '33', title: 'Survival Horror', note: 'Scarcity, tension, stalker AI', required: true },
+      { num: '13', title: 'Capstone', note: 'Build your own', required: true },
+    ],
+  },
+  {
+    id: 5,
+    name: 'Strategy & Systems',
+    description: 'Build games where the player thinks and plans rather than reacts.',
+    bestFor: 'Developers who love optimization, economy design, and systemic thinking.',
+    time: '~6-7 modules, 12-14 weeks',
+    color: 'var(--blue)',
+    modules: [
+      { num: '01', title: 'Pong', note: 'Fundamentals', required: true },
+      { num: '06', title: 'Tower Defense', note: 'Pathfinding, economy, placement', required: true },
+      { num: '23', title: 'Turn-Based Strategy', note: 'Grid tactics, probability, cover', required: true },
+      { num: '22', title: 'RTS', note: 'Unit command, fog of war, real-time economy', required: true },
+      { num: '24', title: 'Auto-Battler', note: 'Drafting, synergies, automated combat', required: true },
+      { num: '25', title: '4X Strategy', note: 'Hex grids, tech trees, empire scale', required: false },
+      { num: '13', title: 'Capstone', note: 'Build your own', required: true },
+    ],
+  },
+  {
+    id: 6,
+    name: 'Narrative & Story',
+    description: 'Games where the story IS the gameplay.',
+    bestFor: 'Developers interested in interactive fiction, dialog systems, and environmental storytelling.',
+    time: '~6 modules, 12 weeks',
+    color: 'var(--accent)',
+    modules: [
+      { num: '01', title: 'Pong', note: 'Fundamentals', required: true },
+      { num: '18', title: 'Visual Novel', note: 'Branching narrative, text rendering', required: true },
+      { num: '17', title: 'Point-and-Click', note: 'Inventory puzzles, dialog trees', required: true },
+      { num: '19', title: 'Walking Simulator', note: 'Environmental storytelling', required: true },
+      { num: '20', title: 'Turn-Based RPG', note: 'Party management, stat systems', required: true },
+      { num: '13', title: 'Capstone', note: 'Build your own', required: true },
+    ],
+  },
+  {
+    id: 7,
+    name: 'Puzzle & Logic',
+    description: 'Games built on spatial reasoning, rules, and physics.',
+    bestFor: 'Developers who enjoy elegant systems and constraint-based thinking.',
+    time: '~6 modules, 12 weeks',
+    color: 'var(--green)',
+    modules: [
+      { num: '01', title: 'Pong', note: 'Fundamentals', required: true },
+      { num: '05', title: 'Puzzle (Tetris)', note: 'Grid as gameplay, cascades', required: true },
+      { num: '26', title: 'Sokoban', note: 'Push mechanics, undo, dead-state detection', required: true },
+      { num: '02', title: 'Platformer', note: 'Physics basics', required: true },
+      { num: '27', title: 'Physics Puzzle', note: 'Physics engine, trajectories, destruction', required: true },
+      { num: '13', title: 'Capstone', note: 'Build your own', required: true },
+    ],
+  },
+  {
+    id: 8,
+    name: 'Roguelike & Procedural',
+    description: 'Games that generate themselves -- infinite replayability through systems.',
+    bestFor: 'Developers fascinated by procedural generation, randomness, and emergent design.',
+    time: '~7 modules, 14 weeks',
+    color: 'var(--purple)',
+    modules: [
+      { num: '01', title: 'Pong', note: 'Fundamentals', required: true },
+      { num: '02', title: 'Platformer', note: 'Tilemaps, physics', required: true },
+      { num: '04', title: 'Endless Runner', note: 'Procedural gen, difficulty curves', required: true },
+      { num: '07', title: 'Roguelike', note: 'Dungeon gen, turn-based, permadeath', required: true },
+      { num: '10', title: 'Deckbuilder', note: 'Card-based roguelike systems', required: true },
+      { num: '38', title: 'Sandbox', note: 'Infinite worlds, noise-based generation', required: true },
+      { num: '13', title: 'Capstone', note: 'Build your own', required: true },
+    ],
+  },
+  {
+    id: 9,
+    name: 'Simulation & Management',
+    description: 'Build systems that simulate worlds, economies, and ecosystems.',
+    bestFor: 'Backend developers who love systems design -- this is where your skills transfer most directly.',
+    time: '~6-7 modules, 12-14 weeks',
+    color: 'var(--blue)',
+    modules: [
+      { num: '01', title: 'Pong', note: 'Fundamentals', required: true },
+      { num: '06', title: 'Tower Defense', note: 'Economy, placement, waves', required: true },
+      { num: '29', title: 'Management/Tycoon', note: 'Simulation loops, satisfaction, finance', required: true },
+      { num: '30', title: 'Farming/Life Sim', note: 'Calendar, growth timers, relationships', required: true },
+      { num: '31', title: 'Survival/Crafting', note: 'Gather-craft-survive, world persistence', required: true },
+      { num: '34', title: 'Idle/Incremental', note: 'Exponential growth, offline progress', required: false },
+      { num: '13', title: 'Capstone', note: 'Build your own', required: true },
+    ],
+  },
+  {
+    id: 10,
+    name: 'Casual & Mobile',
+    description: 'Small, accessible games with instant appeal and deep replayability.',
+    bestFor: 'Understanding the design of games that billions of people play.',
+    time: '~6 modules, 12 weeks',
+    color: 'var(--accent)',
+    modules: [
+      { num: '01', title: 'Pong', note: 'Fundamentals', required: true },
+      { num: '04', title: 'Endless Runner', note: 'One-button design, difficulty curves', required: true },
+      { num: '05', title: 'Puzzle (Tetris)', note: 'Grid puzzles, cascades', required: true },
+      { num: '34', title: 'Idle/Incremental', note: 'Exponential growth, offline progress', required: true },
+      { num: '32', title: 'Rhythm Game', note: 'Audio sync, timing windows', required: true },
+      { num: '13', title: 'Capstone', note: 'Build your own', required: true },
+    ],
+  },
+  {
+    id: 11,
+    name: 'Party & Social',
+    description: 'Multiplayer games built for the living room, the phone, or the stream.',
+    bestFor: 'Developers interested in social dynamics, multiplayer input, and games that bring people together.',
+    time: '~5 modules, 10 weeks',
+    color: 'var(--accent)',
+    modules: [
+      { num: '01', title: 'Pong', note: 'Fundamentals (already 2-player!)', required: true },
+      { num: '35', title: 'Party Game', note: 'Mini-game framework, multiplayer input', required: true },
+      { num: '36', title: 'Trivia', note: 'Question databases, timers, scoring', required: true },
+      { num: '37', title: 'Social Deduction', note: 'Hidden roles, voting, information asymmetry', required: true },
+      { num: '13', title: 'Capstone', note: 'Build your own', required: true },
+    ],
+  },
+  {
+    id: 12,
+    name: 'RPG Spectrum',
+    description: 'From turn-based to action, the full range of role-playing game design.',
+    bestFor: 'Understanding stat systems, progression, loot, and the math behind RPGs.',
+    time: '~7 modules, 14 weeks',
+    color: 'var(--red)',
+    modules: [
+      { num: '01', title: 'Pong', note: 'Fundamentals', required: true },
+      { num: '03', title: 'Top-Down Shooter', note: 'Entities, health, AI', required: true },
+      { num: '07', title: 'Roguelike', note: 'Dungeons, inventory, turns', required: true },
+      { num: '20', title: 'Turn-Based RPG', note: 'Stats, parties, elemental systems', required: true },
+      { num: '21', title: 'Action RPG', note: 'Loot, real-time combat, builds', required: true },
+      { num: '10', title: 'Deckbuilder', note: 'Card-based combat systems', required: true },
+      { num: '13', title: 'Capstone', note: 'Build your own', required: true },
+    ],
+  },
+];
+
+const slugMap: Record<string, string> = {
+  '01': '01-pong', '02': '02-platformer', '03': '03-top-down-shooter',
+  '04': '04-endless-runner', '05': '05-puzzle', '06': '06-tower-defense',
+  '07': '07-roguelike', '08': '08-fighting-game', '09': '09-racing',
+  '10': '10-deckbuilder', '11': '11-first-person-game', '12': '12-3d-platformer',
+  '13': '13-capstone', '14': '14-metroidvania', '15': '15-run-and-gun',
+  '16': '16-third-person-shooter', '17': '17-point-and-click', '18': '18-visual-novel',
+  '19': '19-walking-simulator', '20': '20-turn-based-rpg', '21': '21-action-rpg',
+  '22': '22-rts', '23': '23-turn-based-strategy', '24': '24-auto-battler',
+  '25': '25-4x-strategy', '26': '26-sokoban', '27': '27-physics-puzzle',
+  '28': '28-simulation-racing', '29': '29-management-tycoon', '30': '30-farming-life-sim',
+  '31': '31-survival-crafting', '32': '32-rhythm-game', '33': '33-survival-horror',
+  '34': '34-idle-incremental', '35': '35-party-game', '36': '36-trivia',
+  '37': '37-social-deduction', '38': '38-sandbox',
+};
+
+function moduleHref(num: string): string {
+  const slug = slugMap[num];
+  return slug ? `${base}modules/${slug}/` : `${base}modules/`;
+}
+
+const quickRef = [
+  { interest: 'The absolute basics', start: '01 - Pong', then: '02 - Platformer' },
+  { interest: 'Physics and movement', start: '02 - Platformer', then: '09 - Racing, 27 - Physics Puzzle' },
+  { interest: 'Combat systems', start: '03 - Shooter', then: '08 - Fighting, 21 - Action RPG' },
+  { interest: 'Procedural generation', start: '04 - Runner', then: '07 - Roguelike, 38 - Sandbox' },
+  { interest: 'Grid-based games', start: '05 - Puzzle', then: '26 - Sokoban, 23 - TBS' },
+  { interest: 'Economy and systems', start: '06 - Tower Defense', then: '29 - Tycoon, 22 - RTS' },
+  { interest: 'Story and narrative', start: '18 - Visual Novel', then: '17 - Point-and-Click, 19 - Walking Sim' },
+  { interest: 'Multiplayer and social', start: '35 - Party Game', then: '36 - Trivia, 37 - Social Deduction' },
+  { interest: '3D game development', start: '11 - FPS', then: '12 - 3D Platformer, 16 - TPS' },
+  { interest: 'Card and board games', start: '10 - Deckbuilder', then: '24 - Auto-Battler' },
+  { interest: 'Horror and tension', start: '33 - Survival Horror', then: '31 - Survival/Crafting' },
+  { interest: 'Idle and casual', start: '34 - Idle/Incremental', then: '04 - Runner, 32 - Rhythm' },
+];
+
+const prereqs = [
+  { module: '01 - Pong', requires: 'None' },
+  { module: '02 - Platformer', requires: '01' },
+  { module: '03 - Shooter', requires: '01' },
+  { module: '04 - Runner', requires: '01, 02' },
+  { module: '05 - Puzzle', requires: '01' },
+  { module: '06 - Tower Defense', requires: '01, 03' },
+  { module: '07 - Roguelike', requires: '02, 04' },
+  { module: '08 - Fighting', requires: '01, 03' },
+  { module: '09 - Racing', requires: '01, 02' },
+  { module: '10 - Deckbuilder', requires: '01' },
+  { module: '11 - FPS', requires: '01, 03' },
+  { module: '12 - 3D Platformer', requires: '02, 11' },
+  { module: '13 - Capstone', requires: 'Any path' },
+  { module: '14 - Metroidvania', requires: '02, 07' },
+  { module: '15 - Run and Gun', requires: '02, 03' },
+  { module: '16 - TPS', requires: '11, 03' },
+  { module: '17 - Point-and-Click', requires: '01' },
+  { module: '18 - Visual Novel', requires: '01' },
+  { module: '19 - Walking Simulator', requires: '01' },
+  { module: '20 - Turn-Based RPG', requires: '07, 10' },
+  { module: '21 - Action RPG', requires: '03 or 08, 07' },
+  { module: '22 - RTS', requires: '06, 03' },
+  { module: '23 - Turn-Based Strategy', requires: '07, 06' },
+  { module: '24 - Auto-Battler', requires: '06, 10' },
+  { module: '25 - 4X Strategy', requires: '22 or 23, 06' },
+  { module: '26 - Sokoban', requires: '05, 07' },
+  { module: '27 - Physics Puzzle', requires: '02' },
+  { module: '28 - Sim Racing', requires: '09, 02' },
+  { module: '29 - Tycoon', requires: '06, 05' },
+  { module: '30 - Farming/Life Sim', requires: '07, 05' },
+  { module: '31 - Survival/Crafting', requires: '07, 03' },
+  { module: '32 - Rhythm', requires: '01' },
+  { module: '33 - Survival Horror', requires: '07, 03' },
+  { module: '34 - Idle/Incremental', requires: '01' },
+  { module: '35 - Party Game', requires: '01' },
+  { module: '36 - Trivia', requires: '01' },
+  { module: '37 - Social Deduction', requires: '01, 35' },
+  { module: '38 - Sandbox', requires: '31 or 05, 07' },
+];
+---
+
+<BaseLayout title="Learning Paths">
+  <div class="container page-content">
+    <h1>Learning Paths</h1>
+    <p>Modules are the building blocks. Learning paths are curated sequences through them. Pick a path that matches your goal, or build your own.</p>
+    <p>Every path ends with the <a href={moduleHref('13')}>Capstone (Module 13)</a> -- build something original using what you learned.</p>
+
+    <section class="how-paths-work">
+      <h2>How Paths Work</h2>
+      <ul>
+        <li>Each path lists modules in recommended order</li>
+        <li><strong>Bold</strong> modules are required for the path; <em>italic</em> modules are optional enrichment</li>
+        <li>Time estimate assumes 2-4 hours per module</li>
+        <li>You can mix paths -- do the Foundation path, then switch to Combat or Strategy</li>
+        <li>Prerequisites are always respected (if a module needs Module 2, the path includes Module 2 first)</li>
+      </ul>
+    </section>
+
+    <hr />
+
+    {paths.map((path) => (
+      <section class="path-card" style={`border-left: 3px solid ${path.color};`}>
+        <h3>
+          <span class="path-number">Path {path.id}</span>
+          {path.name}
+        </h3>
+        <blockquote>{path.description}</blockquote>
+        <p class="path-best-for"><strong>Best for:</strong> {path.bestFor}</p>
+        <ol class="path-module-list">
+          {path.modules.map((m, i) => (
+            <li class={m.required ? 'module-required' : 'module-optional'}>
+              <a href={moduleHref(m.num)} class="module-link">
+                <span class="module-num">Module {m.num}</span>
+                <span class={m.required ? 'module-name' : 'module-name optional'}>{m.title}</span>
+              </a>
+              <span class="module-note">{m.note}</span>
+            </li>
+          ))}
+        </ol>
+        <p class="path-meta">
+          <span class="meta-modules">{path.modules.length} modules</span>
+          <span class="meta-divider"></span>
+          <span class="meta-time">{path.time}</span>
+        </p>
+      </section>
+    ))}
+
+    <hr />
+
+    <section>
+      <h2>Build Your Own Path</h2>
+      <p>Pick any modules that interest you, respecting prerequisites. Use this quick reference:</p>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>If you want to learn about...</th>
+              <th>Start with</th>
+              <th>Then try</th>
+            </tr>
+          </thead>
+          <tbody>
+            {quickRef.map((row) => (
+              <tr>
+                <td>{row.interest}</td>
+                <td>{row.start}</td>
+                <td>{row.then}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Prerequisite Map</h2>
+      <p>Every module's prerequisites at a glance:</p>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Module</th>
+              <th>Requires</th>
+            </tr>
+          </thead>
+          <tbody>
+            {prereqs.map((row) => (
+              <tr>
+                <td>{row.module}</td>
+                <td><code>{row.requires}</code></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</BaseLayout>
+
+<style>
+  .path-card {
+    margin-bottom: 2rem;
+  }
+
+  .path-card h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+  }
+
+  .path-number {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--accent-glow);
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+
+  .path-best-for {
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+  }
+
+  .path-module-list {
+    list-style: none;
+    padding: 0;
+    margin: 1rem 0;
+    counter-reset: step;
+  }
+
+  .path-module-list li {
+    counter-increment: step;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 0.75rem;
+    margin-bottom: 0;
+    border-radius: var(--radius);
+    transition: background 0.15s;
+    flex-wrap: wrap;
+  }
+
+  .path-module-list li:hover {
+    background: var(--bg-surface-hover);
+  }
+
+  .path-module-list li::before {
+    content: counter(step);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-dim);
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    width: 1.6rem;
+    height: 1.6rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .module-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+  }
+
+  .module-num {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--accent);
+  }
+
+  .module-name {
+    font-weight: 600;
+    color: var(--text);
+    font-size: 0.95rem;
+  }
+
+  .module-name.optional {
+    font-weight: 400;
+    font-style: italic;
+    color: var(--text-muted);
+  }
+
+  .module-note {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-left: auto;
+  }
+
+  .module-required .module-link:hover .module-name {
+    color: var(--accent);
+  }
+
+  .module-optional .module-link:hover .module-name {
+    color: var(--accent);
+    font-style: italic;
+  }
+
+  .path-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    margin-top: 0.75rem;
+    margin-bottom: 0;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .meta-modules {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    color: var(--accent);
+    font-size: 0.8rem;
+  }
+
+  .meta-divider::after {
+    content: '|';
+    color: var(--border-bright);
+  }
+
+  .meta-time {
+    font-size: 0.8rem;
+  }
+
+  .how-paths-work ul {
+    margin-top: 0.5rem;
+  }
+
+  .how-paths-work li {
+    font-size: 0.95rem;
+  }
+
+  .table-wrapper {
+    overflow-x: auto;
+    margin: 1rem 0 2rem;
+  }
+
+  @media (max-width: 640px) {
+    .path-module-list li {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.25rem;
+      padding-left: 0.5rem;
+    }
+
+    .module-note {
+      margin-left: 2.35rem;
+    }
+
+    .path-card h3 {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.35rem;
+    }
+  }
+</style>

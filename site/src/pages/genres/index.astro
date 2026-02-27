@@ -1,0 +1,796 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+
+const slugMap: Record<string, string> = {
+  '1': '01-pong', '2': '02-platformer', '3': '03-top-down-shooter',
+  '4': '04-endless-runner', '5': '05-puzzle', '6': '06-tower-defense',
+  '7': '07-roguelike', '8': '08-fighting-game', '9': '09-racing',
+  '10': '10-deckbuilder', '11': '11-first-person-game', '12': '12-3d-platformer',
+  '14': '14-metroidvania', '15': '15-run-and-gun', '16': '16-third-person-shooter',
+  '17': '17-point-and-click', '18': '18-visual-novel', '19': '19-walking-simulator',
+  '20': '20-turn-based-rpg', '21': '21-action-rpg', '22': '22-rts',
+  '23': '23-turn-based-strategy', '24': '24-auto-battler', '25': '25-4x-strategy',
+  '26': '26-sokoban', '27': '27-physics-puzzle', '28': '28-simulation-racing',
+  '29': '29-management-tycoon', '30': '30-farming-life-sim', '31': '31-survival-crafting',
+  '32': '32-rhythm-game', '33': '33-survival-horror', '34': '34-idle-incremental',
+  '35': '35-party-game', '36': '36-trivia', '37': '37-social-deduction',
+  '38': '38-sandbox',
+};
+
+function moduleHref(num: string): string {
+  const slug = slugMap[num];
+  return slug ? `${base}modules/${slug}/` : `${base}modules/`;
+}
+
+const quickRef = [
+  { genre: 'Ball-and-Paddle', mechanic: 'Deflection', module: '1' },
+  { genre: 'Platformer', mechanic: 'Jump with gravity arc', module: '2' },
+  { genre: 'Top-Down Shooter', mechanic: 'Navigate under fire', module: '3' },
+  { genre: 'Endless Runner', mechanic: 'Survive escalating speed', module: '4' },
+  { genre: 'Falling Block Puzzle', mechanic: 'Spatial arrangement under time pressure', module: '5' },
+  { genre: 'Tower Defense', mechanic: 'Optimizing placement', module: '6' },
+  { genre: 'Roguelike', mechanic: 'Procedural exploration with permadeath', module: '7' },
+  { genre: 'Fighting Game', mechanic: 'Frame-tight read-and-react', module: '8' },
+  { genre: 'Racing', mechanic: 'Momentum through curves', module: '9' },
+  { genre: 'Deckbuilder', mechanic: 'Curating an engine from random draws', module: '10' },
+  { genre: 'First-Person Game (FPS)', mechanic: 'Aim and shoot in 3D first-person', module: '11' },
+  { genre: '3D Platformer', mechanic: 'Jump and land while managing a camera', module: '12' },
+  { genre: 'Metroidvania', mechanic: 'Ability-gated exploration', module: '14' },
+  { genre: 'Run and Gun', mechanic: 'Move and shoot through authored levels', module: '15' },
+  { genre: 'Third-Person Shooter', mechanic: 'Shooting with spatial body awareness', module: '16' },
+  { genre: 'Point-and-Click', mechanic: 'Inventory puzzles + dialog', module: '17' },
+  { genre: 'Visual Novel', mechanic: 'Branching narrative choices', module: '18' },
+  { genre: 'Walking Simulator', mechanic: 'Environmental storytelling', module: '19' },
+  { genre: 'Turn-Based RPG', mechanic: 'Menu combat with stats and parties', module: '20' },
+  { genre: 'Action RPG', mechanic: 'Real-time combat + loot + stats', module: '21' },
+  { genre: 'RTS', mechanic: 'Multi-unit command + economy', module: '22' },
+  { genre: 'Turn-Based Strategy', mechanic: 'Positional tactics in turns', module: '23' },
+  { genre: 'Auto-Battler', mechanic: 'Draft and position, watch combat', module: '24' },
+  { genre: '4X Strategy', mechanic: 'Empire management across systems', module: '25' },
+  { genre: 'Sokoban', mechanic: 'Push blocks, spatial reasoning', module: '26' },
+  { genre: 'Physics Puzzle', mechanic: 'Set up conditions, let physics resolve', module: '27' },
+  { genre: 'Simulation Racing', mechanic: 'Tire grip and racing lines', module: '28' },
+  { genre: 'Management/Tycoon', mechanic: 'Balance interconnected systems', module: '29' },
+  { genre: 'Farming/Life Sim', mechanic: 'Time management per day', module: '30' },
+  { genre: 'Survival/Crafting', mechanic: 'Gather, craft, survive loop', module: '31' },
+  { genre: 'Rhythm', mechanic: 'Input synchronized to music', module: '32' },
+  { genre: 'Survival Horror', mechanic: 'Scarcity creates tension', module: '33' },
+  { genre: 'Idle/Incremental', mechanic: 'Exponential growth management', module: '34' },
+  { genre: 'Party Game', mechanic: 'Varied mini-games, social play', module: '35' },
+  { genre: 'Trivia', mechanic: 'Q&A under time pressure', module: '36' },
+  { genre: 'Social Deduction', mechanic: 'Deception and detection', module: '37' },
+  { genre: 'Sandbox', mechanic: 'Player-directed creation', module: '38' },
+];
+
+interface Genre {
+  name: string;
+  definingTrait: string;
+  coreMechanic: string;
+  landmarkGames: string;
+  keyConcepts: string;
+  module: string | null;
+  moduleNote: string;
+}
+
+interface GenreCategory {
+  name: string;
+  color: string;
+  genres: Genre[];
+}
+
+const categories: GenreCategory[] = [
+  {
+    name: 'Action Genres',
+    color: 'var(--red)',
+    genres: [
+      {
+        name: 'Platformer',
+        definingTrait: 'Player navigates by jumping between platforms in a gravity-bound space',
+        coreMechanic: 'The jump -- a committal, arc-shaped movement action',
+        landmarkGames: 'Super Mario Bros. (1985), Celeste (2018), Hollow Knight (2017)',
+        keyConcepts: 'Gravity simulation, character controllers, game feel (coyote time, input buffering), level design as pacing',
+        module: '2',
+        moduleNote: 'Module 2',
+      },
+      {
+        name: 'Metroidvania',
+        definingTrait: 'Interconnected world where progress is gated by abilities acquired during exploration',
+        coreMechanic: 'Ability-gated exploration -- you see areas you can\'t reach yet, then return with new powers',
+        landmarkGames: 'Super Metroid (1994), Castlevania: SotN (1997), Hollow Knight (2017)',
+        keyConcepts: 'World map as a graph data structure, ability gating and backtracking, save/checkpoint systems, non-linear progression',
+        module: '14',
+        moduleNote: 'Module 14',
+      },
+      {
+        name: 'Beat \'em Up / Hack and Slash',
+        definingTrait: 'Player fights through waves of melee enemies, usually scrolling left to right',
+        coreMechanic: 'Close-range combat with combos against multiple enemies',
+        landmarkGames: 'Streets of Rage 2 (1992), Devil May Cry (2001), Hades (2020)',
+        keyConcepts: 'Combo systems, crowd management, hitbox/hurtbox, animation priority, enemy stagger/hitstun',
+        module: '8',
+        moduleNote: 'Partially -- Module 8 (Fighting Game)',
+      },
+      {
+        name: 'Run and Gun',
+        definingTrait: 'Side-scrolling action focused on shooting while moving through linear levels',
+        coreMechanic: 'Simultaneous movement and shooting with directional aiming',
+        landmarkGames: 'Contra (1987), Metal Slug (1996), Cuphead (2017)',
+        keyConcepts: 'Projectile systems, multi-directional aiming, level design with enemy placement, pattern-based boss design',
+        module: '15',
+        moduleNote: 'Module 15',
+      },
+    ],
+  },
+  {
+    name: 'Shooter Genres',
+    color: 'var(--red)',
+    genres: [
+      {
+        name: 'Top-Down Shooter / Twin-Stick',
+        definingTrait: 'Overhead view, player shoots in any direction while navigating threats',
+        coreMechanic: 'Decoupled movement and aiming -- navigate space while directing fire',
+        landmarkGames: 'Robotron 2084 (1982), Geometry Wars (2005), Enter the Gungeon (2016)',
+        keyConcepts: 'Object pooling, vector math (aiming), entity management at scale, spawn systems',
+        module: '3',
+        moduleNote: 'Module 3',
+      },
+      {
+        name: 'Shoot \'em Up (Shmup) / Bullet Hell',
+        definingTrait: 'Screen fills with enemy projectiles; player weaves through patterns',
+        coreMechanic: 'Navigation through bullet patterns -- reading negative space',
+        landmarkGames: 'Space Invaders (1978), DoDonPachi (1997), Ikaruga (2001)',
+        keyConcepts: 'Bullet pattern design (geometric formations), hitbox precision, scoring depth (graze systems, chains)',
+        module: '3',
+        moduleNote: 'Partially -- Module 3 covers fundamentals',
+      },
+      {
+        name: 'First-Person Shooter (FPS)',
+        definingTrait: 'Player sees through the character\'s eyes, shoots with crosshair',
+        coreMechanic: 'Aim and shoot in 3D space from first-person perspective',
+        landmarkGames: 'Doom (1993), Half-Life (1998), Call of Duty 4 (2007)',
+        keyConcepts: '3D rendering pipeline, raycasting, 3D collision, weapon systems, level geometry, netcode',
+        module: '11',
+        moduleNote: 'Module 11',
+      },
+      {
+        name: 'Third-Person Shooter (TPS)',
+        definingTrait: 'Camera behind/over the player character, cover-based or action shooting',
+        coreMechanic: 'Shooting with spatial awareness of your character\'s body in the world',
+        landmarkGames: 'Resident Evil 4 (2005), Gears of War (2006), Splatoon (2015)',
+        keyConcepts: '3D camera systems (orbit cam), cover systems, over-the-shoulder aiming, animation blending',
+        module: '16',
+        moduleNote: 'Modules 12, 16',
+      },
+    ],
+  },
+  {
+    name: 'Adventure Genres',
+    color: 'var(--accent)',
+    genres: [
+      {
+        name: 'Point-and-Click Adventure',
+        definingTrait: 'Solve puzzles by examining and combining objects in a narrative world',
+        coreMechanic: 'Inventory puzzle solving -- use item A on object B to progress',
+        landmarkGames: 'The Secret of Monkey Island (1990), Myst (1993), Disco Elysium (2019)',
+        keyConcepts: 'Inventory systems, dialog trees, puzzle dependency graphs, narrative scripting, hotspot interaction',
+        module: '17',
+        moduleNote: 'Module 17',
+      },
+      {
+        name: 'Visual Novel',
+        definingTrait: 'Narrative-driven with branching choices, minimal traditional gameplay',
+        coreMechanic: 'Choosing dialog options that branch the story',
+        landmarkGames: 'Phoenix Wright (2001), Doki Doki Literature Club (2017), 13 Sentinels (2019)',
+        keyConcepts: 'Branching narrative as a directed graph, dialog systems, text rendering/typewriter effects, flag-based story tracking',
+        module: '18',
+        moduleNote: 'Module 18',
+      },
+      {
+        name: 'Walking Simulator / Exploration',
+        definingTrait: 'Exploration-focused with environmental storytelling, minimal mechanics',
+        coreMechanic: 'Moving through a space and discovering narrative through the environment',
+        landmarkGames: 'Gone Home (2013), Firewatch (2016), What Remains of Edith Finch (2017)',
+        keyConcepts: 'Environmental storytelling, trigger zones for narrative beats, atmospheric audio design, pacing through level design',
+        module: '19',
+        moduleNote: 'Module 19',
+      },
+    ],
+  },
+  {
+    name: 'RPG Genres',
+    color: 'var(--purple)',
+    genres: [
+      {
+        name: 'Turn-Based RPG (JRPG)',
+        definingTrait: 'Combat is turn-based with menus; progression through stats and leveling',
+        coreMechanic: 'Selecting actions from menus in a turn-based combat system',
+        landmarkGames: 'Final Fantasy VI (1994), Chrono Trigger (1995), Persona 5 (2016)',
+        keyConcepts: 'Turn order/initiative systems, stat-based damage formulas, experience/leveling curves, party management',
+        module: '20',
+        moduleNote: 'Module 20',
+      },
+      {
+        name: 'Action RPG',
+        definingTrait: 'Real-time combat with RPG progression (stats, leveling, loot)',
+        coreMechanic: 'Real-time combat where stats and gear affect outcomes',
+        landmarkGames: 'Diablo (1997), Dark Souls (2011), Elden Ring (2022)',
+        keyConcepts: 'Loot/drop tables (weighted random), stat systems, real-time combat with RPG modifiers, area design',
+        module: '21',
+        moduleNote: 'Module 21',
+      },
+      {
+        name: 'Roguelike / Roguelite',
+        definingTrait: 'Procedurally generated levels, permadeath, high replayability',
+        coreMechanic: 'Navigating procedural spaces where death resets progress (fully or partially)',
+        landmarkGames: 'Rogue (1980), Spelunky (2012), Hades (2020)',
+        keyConcepts: 'Procedural dungeon generation (BSP, room+corridor), permadeath design, meta-progression, item/ability synergies',
+        module: '7',
+        moduleNote: 'Module 7',
+      },
+    ],
+  },
+  {
+    name: 'Strategy Genres',
+    color: 'var(--blue)',
+    genres: [
+      {
+        name: 'Real-Time Strategy (RTS)',
+        definingTrait: 'Command units and manage resources in real-time against opponents',
+        coreMechanic: 'Multi-unit selection, movement commands, and resource allocation simultaneously',
+        landmarkGames: 'StarCraft (1998), Age of Empires II (1999), Company of Heroes (2006)',
+        keyConcepts: 'Unit selection/command systems, pathfinding (A* at scale), resource economy, fog of war, minimap, tech trees',
+        module: '22',
+        moduleNote: 'Module 22',
+      },
+      {
+        name: 'Turn-Based Strategy (TBS)',
+        definingTrait: 'Players take turns moving units on a grid or map',
+        coreMechanic: 'Positioning units and executing actions within a turn budget',
+        landmarkGames: 'Civilization (1991), Fire Emblem (1990), XCOM: Enemy Unknown (2012)',
+        keyConcepts: 'Grid-based movement range calculation, action point systems, line-of-sight, hit probability, turn structure',
+        module: '23',
+        moduleNote: 'Module 23',
+      },
+      {
+        name: 'Tower Defense',
+        definingTrait: 'Place defensive structures to stop waves of enemies traversing a path',
+        coreMechanic: 'Optimizing tower placement to maximize coverage and damage',
+        landmarkGames: 'Desktop Tower Defense (2007), Plants vs. Zombies (2009), Bloons TD 6 (2018)',
+        keyConcepts: 'A* pathfinding, placement systems, economy/resource management, targeting AI, upgrade trees',
+        module: '6',
+        moduleNote: 'Module 6',
+      },
+      {
+        name: 'Auto-Battler',
+        definingTrait: 'Draft and position units that fight automatically; strategy is in preparation, not execution',
+        coreMechanic: 'Drafting units and arranging them on a board before combat resolves on its own',
+        landmarkGames: 'Dota Auto Chess (2019), Teamfight Tactics (2019), Super Auto Pets (2021)',
+        keyConcepts: 'Draft/shop economy, synergy systems (tribal bonuses), positioning on a grid, automated combat resolution',
+        module: '24',
+        moduleNote: 'Module 24',
+      },
+      {
+        name: '4X Strategy',
+        definingTrait: 'Explore, Expand, Exploit, Exterminate -- large-scale empire building',
+        coreMechanic: 'Managing an empire across multiple interconnected systems',
+        landmarkGames: 'Civilization IV (2005), Stellaris (2016), Humankind (2021)',
+        keyConcepts: 'Hex/tile map generation, tech trees, diplomacy AI, multi-system simulation, fog of war at scale',
+        module: '25',
+        moduleNote: 'Module 25',
+      },
+    ],
+  },
+  {
+    name: 'Puzzle Genres',
+    color: 'var(--green)',
+    genres: [
+      {
+        name: 'Falling Block Puzzle (Tetris-like)',
+        definingTrait: 'Pieces fall into a grid; player arranges them before they lock',
+        coreMechanic: 'Spatial arrangement under time pressure',
+        landmarkGames: 'Tetris (1984), Dr. Mario (1990), Puyo Puyo (1991)',
+        keyConcepts: 'Grid as gameplay state, piece rotation math, gravity/cascade, lock delay, scoring depth',
+        module: '5',
+        moduleNote: 'Module 5',
+      },
+      {
+        name: 'Match-3',
+        definingTrait: 'Swap adjacent tiles to create groups of 3+ matching elements',
+        coreMechanic: 'Pattern recognition and chain reactions in a grid',
+        landmarkGames: 'Bejeweled (2001), Candy Crush Saga (2012), Puzzle Quest (2007)',
+        keyConcepts: 'Grid matching algorithms, cascade/chain scoring, board shuffle detection, hybridization with other genres',
+        module: '5',
+        moduleNote: 'Partially -- Module 5 covers grid-based puzzle fundamentals',
+      },
+      {
+        name: 'Sokoban / Push-Block',
+        definingTrait: 'Push objects into target positions on a grid',
+        coreMechanic: 'Spatial reasoning -- objects only push, never pull',
+        landmarkGames: 'Sokoban (1982), Stephen\'s Sausage Roll (2016), Baba Is You (2019)',
+        keyConcepts: 'Grid simulation, undo system (stack-based), puzzle validation, rule systems',
+        module: '26',
+        moduleNote: 'Module 26',
+      },
+      {
+        name: 'Physics Puzzle',
+        definingTrait: 'Solutions emerge from physics simulation interactions',
+        coreMechanic: 'Set up conditions and let physics resolve the outcome',
+        landmarkGames: 'Angry Birds (2009), World of Goo (2008), Human: Fall Flat (2016)',
+        keyConcepts: 'Physics engine integration, trajectory prediction, destructible objects, emergent solutions from simulation',
+        module: '27',
+        moduleNote: 'Module 27',
+      },
+    ],
+  },
+  {
+    name: 'Racing Genres',
+    color: 'var(--accent)',
+    genres: [
+      {
+        name: 'Arcade Racing',
+        definingTrait: 'Speed and spectacle over realistic physics',
+        coreMechanic: 'Controlling momentum through turns at high speed',
+        landmarkGames: 'OutRun (1986), Burnout 3 (2004), Forza Horizon 5 (2021)',
+        keyConcepts: 'Simplified steering model, drift mechanics, boost systems, track design',
+        module: '9',
+        moduleNote: 'Module 9',
+      },
+      {
+        name: 'Kart Racing',
+        definingTrait: 'Racing with power-up items that create chaos and catch-up opportunities',
+        coreMechanic: 'Racing + item management -- items create drama and rubber-banding',
+        landmarkGames: 'Super Mario Kart (1992), Crash Team Racing (1999), Mario Kart 8 (2014)',
+        keyConcepts: 'Item systems tied to position, rubber-banding, track hazards, drift-boost mechanics',
+        module: '9',
+        moduleNote: 'Partially -- Module 9 covers racing fundamentals',
+      },
+      {
+        name: 'Simulation Racing',
+        definingTrait: 'Realistic vehicle physics and driving model',
+        coreMechanic: 'Managing tire grip, braking zones, and racing lines',
+        landmarkGames: 'Gran Turismo (1997), iRacing (2008), Assetto Corsa (2014)',
+        keyConcepts: 'Tire friction models, suspension simulation, telemetry systems, car tuning/setup',
+        module: '28',
+        moduleNote: 'Module 28',
+      },
+    ],
+  },
+  {
+    name: 'Simulation Genres',
+    color: 'var(--blue)',
+    genres: [
+      {
+        name: 'Management / Tycoon',
+        definingTrait: 'Build and optimize a system (business, city, theme park)',
+        coreMechanic: 'Resource allocation and system balancing across interconnected economies',
+        landmarkGames: 'SimCity (1989), RollerCoaster Tycoon (1999), Two Point Hospital (2018)',
+        keyConcepts: 'Economic simulation loops, satisfaction/demand modeling, UI for complex systems, time acceleration',
+        module: '29',
+        moduleNote: 'Module 29',
+      },
+      {
+        name: 'Farming / Life Sim',
+        definingTrait: 'Day/night cycle with crop/relationship management over in-game seasons',
+        coreMechanic: 'Time management -- choosing how to spend limited in-game hours each day',
+        landmarkGames: 'Harvest Moon (1996), Stardew Valley (2016), Animal Crossing (2001)',
+        keyConcepts: 'Calendar/time systems, growth timers, NPC relationship tracking, inventory/crafting, save systems',
+        module: '30',
+        moduleNote: 'Module 30',
+      },
+      {
+        name: 'Survival / Crafting',
+        definingTrait: 'Gather resources, craft tools, survive against environment and/or enemies',
+        coreMechanic: 'Resource gathering and crafting loop -- turn raw materials into tools that enable gathering better materials',
+        landmarkGames: 'Minecraft (2011), Don\'t Starve (2013), Valheim (2021)',
+        keyConcepts: 'Crafting recipe systems, inventory management, hunger/health resource drain, world persistence',
+        module: '31',
+        moduleNote: 'Module 31',
+      },
+    ],
+  },
+  {
+    name: 'Card & Board Game Genres',
+    color: 'var(--accent)',
+    genres: [
+      {
+        name: 'Deckbuilder',
+        definingTrait: 'Start with a weak deck, acquire cards during play to build a powerful engine',
+        coreMechanic: 'Curating a deck that generates emergent strategy through random draw order',
+        landmarkGames: 'Dominion (2008), Slay the Spire (2019), Balatro (2024)',
+        keyConcepts: 'Deck/hand/discard data structures, card effect system (command pattern), turn phases, energy economy',
+        module: '10',
+        moduleNote: 'Module 10',
+      },
+      {
+        name: 'Digital Card Game (TCG/CCG)',
+        definingTrait: 'Two players play cards from pre-built decks in competitive matches',
+        coreMechanic: 'Playing cards with costs and effects to reduce opponent\'s health to zero',
+        landmarkGames: 'Magic: The Gathering (1993), Hearthstone (2014), Marvel Snap (2022)',
+        keyConcepts: 'Mana curve design, card rarity/balance, collection systems, netcode for turn-based multiplayer',
+        module: '10',
+        moduleNote: 'Partially -- Module 10 covers core card game mechanics',
+      },
+    ],
+  },
+  {
+    name: 'Rhythm Genres',
+    color: 'var(--green)',
+    genres: [
+      {
+        name: 'Rhythm / Music Game',
+        definingTrait: 'Player inputs are synchronized to music; timing and accuracy are scored',
+        coreMechanic: 'Hitting inputs in time with musical beats within a timing window',
+        landmarkGames: 'PaRappa the Rapper (1996), Guitar Hero (2005), Beat Saber (2018)',
+        keyConcepts: 'Audio synchronization, timing window system, note highway/chart format, BPM-based event scheduling',
+        module: '32',
+        moduleNote: 'Module 32',
+      },
+    ],
+  },
+  {
+    name: 'Horror Genres',
+    color: 'var(--red)',
+    genres: [
+      {
+        name: 'Survival Horror',
+        definingTrait: 'Limited resources and vulnerability create tension and fear',
+        coreMechanic: 'Resource scarcity -- never having enough ammo/health to feel safe',
+        landmarkGames: 'Resident Evil (1996), Silent Hill 2 (2001), Amnesia: The Dark Descent (2010)',
+        keyConcepts: 'Inventory scarcity design, AI that hunts the player, sound design for tension, camera as a fear tool',
+        module: '33',
+        moduleNote: 'Module 33',
+      },
+    ],
+  },
+  {
+    name: 'Casual & Mobile Genres',
+    color: 'var(--accent)',
+    genres: [
+      {
+        name: 'Endless Runner',
+        definingTrait: 'Auto-scrolling obstacle course; player input is reaction-based, game ends on failure',
+        coreMechanic: 'Single-input survival against escalating speed/difficulty',
+        landmarkGames: 'Canabalt (2009), Temple Run (2011), Flappy Bird (2013)',
+        keyConcepts: 'Procedural generation, difficulty curves, world streaming, persistence (high scores), single-input design',
+        module: '4',
+        moduleNote: 'Module 4',
+      },
+      {
+        name: 'Idle / Incremental',
+        definingTrait: 'Numbers go up, even when you\'re not playing',
+        coreMechanic: 'Purchasing upgrades that increase the rate of resource generation',
+        landmarkGames: 'Cookie Clicker (2013), Adventure Capitalist (2015), Melvor Idle (2021)',
+        keyConcepts: 'Exponential growth modeling, prestige/reset loops, offline progress calculation, big number formatting',
+        module: '34',
+        moduleNote: 'Module 34',
+      },
+      {
+        name: 'Hyper-Casual',
+        definingTrait: 'One-touch mechanic, instant comprehension, session length under 1 minute',
+        coreMechanic: 'Varies -- but always a single input mapped to one satisfying action',
+        landmarkGames: 'Flappy Bird (2013), Crossy Road (2014), Helix Jump (2018)',
+        keyConcepts: 'Extreme design economy, onboarding in 0 seconds, ad monetization integration, retention through difficulty',
+        module: '4',
+        moduleNote: 'Partially -- Module 4 covers the design philosophy',
+      },
+    ],
+  },
+  {
+    name: 'Social & Party Genres',
+    color: 'var(--accent)',
+    genres: [
+      {
+        name: 'Party Game',
+        definingTrait: 'Multiple players competing in varied mini-games, accessible to non-gamers',
+        coreMechanic: 'Varies per mini-game -- the meta-mechanic is variety and social interaction',
+        landmarkGames: 'Mario Party (1998), Jackbox Party Pack (2014), Among Us (2018)',
+        keyConcepts: 'Mini-game framework architecture, input handling for many players, scoring/ranking systems, lobby management',
+        module: '35',
+        moduleNote: 'Module 35',
+      },
+      {
+        name: 'Trivia',
+        definingTrait: 'Questions and answers with scoring',
+        coreMechanic: 'Answering questions correctly under time pressure',
+        landmarkGames: 'You Don\'t Know Jack (1995), Buzz! (2005), Jackbox (2014)',
+        keyConcepts: 'Question database design, timer systems, scoring with streaks/multipliers, content pipeline for questions',
+        module: '36',
+        moduleNote: 'Module 36',
+      },
+      {
+        name: 'Social Deduction',
+        definingTrait: 'Players have hidden roles; deception and deduction drive gameplay',
+        coreMechanic: 'Lying and detecting lies -- game mechanics create structured social interaction',
+        landmarkGames: 'Mafia/Werewolf (1986), Town of Salem (2014), Among Us (2018)',
+        keyConcepts: 'Hidden information systems, role assignment, voting systems, phase-based gameplay, emergent social dynamics',
+        module: '37',
+        moduleNote: 'Module 37',
+      },
+    ],
+  },
+  {
+    name: 'Sandbox & Open World',
+    color: 'var(--green)',
+    genres: [
+      {
+        name: 'Sandbox',
+        definingTrait: 'Player-directed goals in a systemic world; create your own fun',
+        coreMechanic: 'Building and experimentation within a simulation',
+        landmarkGames: 'Minecraft (2011), Garry\'s Mod (2004), Terraria (2011)',
+        keyConcepts: 'Voxel/block-based worlds, save/load large world state, player-created content, emergent gameplay',
+        module: '38',
+        moduleNote: 'Module 38',
+      },
+    ],
+  },
+];
+
+const blends = [
+  { game: 'Hades', formula: 'Roguelike + Action RPG + Beat \'em Up + Narrative' },
+  { game: 'Slay the Spire', formula: 'Deckbuilder + Roguelike' },
+  { game: 'Puzzle Quest', formula: 'Match-3 + RPG' },
+  { game: 'Into the Breach', formula: 'Turn-Based Strategy + Roguelike + Puzzle' },
+  { game: 'Mario Kart', formula: 'Racing + Party Game (items)' },
+  { game: 'Vampire Survivors', formula: 'Bullet Hell (inverted) + Roguelite + Idle' },
+  { game: 'Balatro', formula: 'Deckbuilder + Poker + Roguelike' },
+];
+---
+
+<BaseLayout title="Genre Encyclopedia">
+  <div class="container page-content">
+    <h1>Game Genre Encyclopedia</h1>
+    <p>A reference guide to game genres -- what defines them, what makes them tick, and what you'd learn by building one. This covers far more genres than the bootcamp modules. Use it to understand the landscape and find inspiration for your capstone project.</p>
+
+    <section>
+      <h2>How to Read This Guide</h2>
+      <ul>
+        <li><strong>Defining Trait</strong> -- the single characteristic that puts a game in this genre</li>
+        <li><strong>Core Mechanic</strong> -- the fundamental player action</li>
+        <li><strong>Landmark Games</strong> -- 2-3 games that defined or perfected the genre</li>
+        <li><strong>Key Design Concepts</strong> -- what building this genre teaches you</li>
+        <li><strong>Has Module?</strong> -- whether this bootcamp has a dedicated module for it</li>
+      </ul>
+    </section>
+
+    <hr />
+
+    <section>
+      <div class="section-header">
+        <h2>Quick Reference: Genre to Module</h2>
+        <span class="section-count">{quickRef.length} genres</span>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Genre</th>
+              <th>Primary Mechanic</th>
+              <th>Module</th>
+            </tr>
+          </thead>
+          <tbody>
+            {quickRef.map((row) => (
+              <tr>
+                <td><strong>{row.genre}</strong></td>
+                <td>{row.mechanic}</td>
+                <td><a href={moduleHref(row.module)}>Module {row.module}</a></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <hr />
+
+    {categories.map((cat) => (
+      <section class="genre-category">
+        <div class="section-header">
+          <h2>{cat.name}</h2>
+          <span class="section-count">{cat.genres.length} {cat.genres.length === 1 ? 'genre' : 'genres'}</span>
+        </div>
+        <div class="genre-grid">
+          {cat.genres.map((genre) => (
+            <div class="genre-card" style={`border-top: 3px solid ${cat.color};`}>
+              <h3 class="genre-name">
+                {genre.module ? (
+                  <a href={moduleHref(genre.module)}>{genre.name}</a>
+                ) : (
+                  genre.name
+                )}
+              </h3>
+              <div class="genre-details">
+                <div class="genre-detail">
+                  <span class="detail-label">Defining Trait</span>
+                  <span class="detail-value">{genre.definingTrait}</span>
+                </div>
+                <div class="genre-detail">
+                  <span class="detail-label">Core Mechanic</span>
+                  <span class="detail-value">{genre.coreMechanic}</span>
+                </div>
+                <div class="genre-detail">
+                  <span class="detail-label">Landmark Games</span>
+                  <span class="detail-value landmark">{genre.landmarkGames}</span>
+                </div>
+                <div class="genre-detail">
+                  <span class="detail-label">Module</span>
+                  <span class="detail-value">
+                    {genre.module ? (
+                      <a href={moduleHref(genre.module)} class="module-badge">{genre.moduleNote}</a>
+                    ) : (
+                      <span class="no-module">{genre.moduleNote}</span>
+                    )}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    ))}
+
+    <hr />
+
+    <section class="genre-blending">
+      <h2>Genre Blending</h2>
+      <p>Most modern games blend genres. Recognizing the <em>mechanics</em> behind each genre helps you understand what's being combined:</p>
+      <div class="blend-grid">
+        {blends.map((blend) => (
+          <div class="blend-card">
+            <span class="blend-game">{blend.game}</span>
+            <span class="blend-formula">{blend.formula}</span>
+          </div>
+        ))}
+      </div>
+      <p>The <a href={moduleHref('13')}>capstone module (Module 13)</a> is your chance to try a blend of your own.</p>
+    </section>
+  </div>
+</BaseLayout>
+
+<style>
+  .table-wrapper {
+    overflow-x: auto;
+    margin: 1rem 0 2rem;
+  }
+
+  .genre-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0 2rem;
+  }
+
+  .genre-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem;
+    transition: border-color 0.2s, transform 0.15s;
+  }
+
+  .genre-card:hover {
+    border-color: var(--border-bright);
+    transform: translateY(-1px);
+  }
+
+  .genre-name {
+    margin-top: 0;
+    margin-bottom: 0.75rem;
+    font-size: 1.1rem;
+  }
+
+  .genre-name a {
+    color: var(--text);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+
+  .genre-name a:hover {
+    color: var(--accent);
+  }
+
+  .genre-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .genre-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .detail-label {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+  }
+
+  .detail-value {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    line-height: 1.45;
+  }
+
+  .detail-value.landmark {
+    font-style: italic;
+    color: var(--text-dim);
+  }
+
+  .module-badge {
+    display: inline-block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--accent-glow);
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    text-decoration: none;
+    transition: background 0.2s;
+  }
+
+  .module-badge:hover {
+    background: rgba(245, 158, 11, 0.25);
+    color: var(--accent);
+  }
+
+  .no-module {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    font-style: italic;
+  }
+
+  .genre-category {
+    margin-bottom: 1rem;
+  }
+
+  .blend-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 0.75rem;
+    margin: 1.5rem 0;
+  }
+
+  .blend-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    transition: border-color 0.2s;
+  }
+
+  .blend-card:hover {
+    border-color: var(--border-bright);
+  }
+
+  .blend-game {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--text);
+  }
+
+  .blend-formula {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+
+  @media (max-width: 640px) {
+    .genre-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .blend-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

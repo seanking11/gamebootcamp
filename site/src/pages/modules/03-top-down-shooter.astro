@@ -1,0 +1,207 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 03: Top-Down Shooter">
+  <div class="container page-content">
+    <div class="module-header">
+      <div class="module-number">Module 03</div>
+      <h1>Top-Down Shooter</h1>
+      <p class="module-theme">Entity management, enemy AI, and managing chaos</p>
+    </div>
+
+    <blockquote>
+      <p>"The screen fills with bullets and enemies, but skilled players see the negative space &mdash; the safe paths between projectiles."</p>
+    </blockquote>
+
+    <hr />
+
+    <h2>Week 1: History &amp; Design Theory</h2>
+
+    <h3>The Origin</h3>
+    <p>Tomohiro Nishikado's <strong>Space Invaders (Taito, 1978)</strong> established the shoot-em-up. Its genius was accidental: the aliens moved faster as you destroyed them because the hardware could render fewer sprites more quickly. This created escalating difficulty &mdash; an emergent design principle that became foundational.</p>
+    <p>Space Invaders was so popular in Japan it caused a reported shortage of 100-yen coins.</p>
+
+    <h3>How the Genre Evolved</h3>
+    <p><strong>Galaga (Namco, 1981)</strong> added enemy attack patterns &mdash; aliens swooped in formations rather than marching uniformly, demanding pattern recognition from the player.</p>
+    <p><strong>Robotron: 2084 (Eugene Jarvis / Williams Electronics, 1982)</strong> introduced twin-stick control: one joystick to move, one to shoot. This decoupled movement from aiming and doubled the player's decision space. The control scheme persisted for decades.</p>
+    <p><strong>Geometry Wars: Retro Evolved (Bizarre Creations, 2003/2005)</strong> revived the genre for a modern audience, adding particle-heavy visual feedback and score-multiplier systems that rewarded aggressive play.</p>
+
+    <h3>What Makes Shmups "Great"</h3>
+    <p>Shmups are about <strong>readable chaos</strong>. The "bullet hell" sub-genre (pioneered by Toaplan and Cave in the 1990s) made this explicit: hundreds of slow-moving, brightly colored bullets form dense geometric patterns the player weaves through.</p>
+    <p>Enemy wave design is composition &mdash; tempo, density, and rhythm arranged to create tension and release. A great shmup has the pacing of a well-arranged piece of music.</p>
+
+    <h3>The Essential Mechanic</h3>
+    <p><strong>Navigation under fire</strong> &mdash; the player must simultaneously process threats and find safe movement paths. Shooting is the verb, but <em>not getting hit</em> is the game.</p>
+
+    <hr />
+
+    <h2>Week 2: Build the MVP</h2>
+
+    <h3>What You're Building</h3>
+    <p>A single-screen arena where you control a ship/character, enemies spawn in waves, and you shoot them down. Survive as long as possible, rack up points.</p>
+    <p>This module is where entity count explodes. Pong had 3 objects. The platformer had 1 player + static tiles. Here you might have dozens of enemies and hundreds of bullets alive at once.</p>
+
+    <h3>Core Concepts (Must Implement)</h3>
+
+    <h4>1. Object Pooling</h4>
+    <p>Pre-allocate a fixed-size array of bullet and enemy objects. Recycle them via an active/inactive flag instead of creating/destroying every frame.</p>
+    <pre is:raw><code>pool = [bullet1, bullet2, ..., bulletN]  // all pre-created
+
+acquire():
+  find first inactive bullet, set active = true, return it
+
+release(bullet):
+  set active = false, reset position</code></pre>
+    <p><strong>Why it matters:</strong> Allocation and deallocation are expensive operations. Pre-allocating and recycling objects avoids per-frame memory churn and is essential anywhere entities spawn and despawn frequently.</p>
+
+    <h4>2. Spawn System &amp; Wave Design</h4>
+    <p>A data-driven system that reads a spawn schedule and instantiates enemies:</p>
+    <pre is:raw><code>waves = [
+  { time: 0,  type: "basic",  count: 5, formation: "line" },
+  { time: 10, type: "fast",   count: 3, formation: "v" },
+  { time: 20, type: "tank",   count: 2, formation: "random" },
+]</code></pre>
+    <p>Separate <em>what to spawn</em> (data) from <em>how to spawn</em> (logic).</p>
+    <p><strong>Why it matters:</strong> Data-driven design &mdash; modifying behavior by editing data, not code. This is how professional games achieve content scalability without recompiling or redeploying.</p>
+
+    <h4>3. 2D Vector Math</h4>
+    <p>You'll need:</p>
+    <ul>
+      <li><code>atan2(dy, dx)</code> &mdash; compute aim angle from player to cursor/stick</li>
+      <li><code>normalize(vx, vy)</code> &mdash; ensure diagonal movement isn't faster than cardinal</li>
+      <li>Angle &rarr; velocity: <code>vx = cos(angle) * speed</code>, <code>vy = sin(angle) * speed</code></li>
+    </ul>
+    <p><strong>Why it matters:</strong> 2D vector math is the lingua franca of game programming. Everything here transfers to 3D with an added z-component.</p>
+
+    <h4>4. Projectile System</h4>
+    <p>Bullets are fire-and-forget entities: spawned with a position, velocity vector, damage value, and owner tag. Each frame they move along their velocity. On collision with a valid target (not their owner), they deal damage and deactivate.</p>
+    <p><strong>Why it matters:</strong> Autonomous entities with initial conditions. The owner-tag filtering introduces collision layers/masks.</p>
+
+    <h4>5. Collision Layers / Masks</h4>
+    <p>Assign entities to categories: <code>player</code>, <code>player-bullet</code>, <code>enemy</code>, <code>enemy-bullet</code>, <code>pickup</code>. Define which categories interact.</p>
+    <pre is:raw><code>player-bullet hits: enemy (yes), player (no), player-bullet (no)
+enemy-bullet hits:  player (yes), enemy (no), enemy-bullet (no)</code></pre>
+    <p><strong>Why it matters:</strong> Without collision filtering, every entity checks against every other entity, and friendly fire becomes unavoidable. Layers let you declaratively define interaction rules. Every engine uses this pattern.</p>
+
+    <h4>6. Health &amp; Damage</h4>
+    <p>Entities get an <code>hp</code> property. <code>takeDamage(amount)</code> decrements it. At <code>hp &lt;= 0</code>, trigger death (play effect, release back to pool).</p>
+    <p><strong>Why it matters:</strong> Stateful entity interactions &mdash; one entity modifying another's state through a defined interface. Foundation of every RPG stat system, tower defense, and combat model.</p>
+
+    <h4>7. Enemy AI: Behavioral Patterns</h4>
+    <p>Implement 2-3 distinct enemy behaviors as interchangeable functions:</p>
+    <ul>
+      <li><strong>Linear</strong> &mdash; moves in a straight line</li>
+      <li><strong>Sine-wave</strong> &mdash; oscillates while advancing</li>
+      <li><strong>Homing</strong> &mdash; steers toward the player with limited turn rate</li>
+    </ul>
+    <p><strong>Why it matters:</strong> The Strategy pattern applied to game AI. Enemy variety comes from <em>combining simple behaviors</em>, not writing complex ones. Scales to behavior trees and utility AI.</p>
+
+    <h4>8. Scoring with Combos</h4>
+    <p>Rapid kills increment a combo counter that multiplies point values. A decay timer resets the multiplier if you stop killing.</p>
+    <p><strong>Why it matters:</strong> Time-decaying state and feedback loops. Same pattern behind streak mechanics, idle-game generators, and engagement loops.</p>
+
+    <h3>Stretch Goals (If Time Allows)</h3>
+    <ul>
+      <li><strong>Screen shake &amp; hit-freeze</strong> &mdash; On enemy death, displace the camera randomly for ~100ms (shake) and/or pause the simulation for 2-4 frames (hit-freeze). The highest-leverage "game feel" techniques that exist.</li>
+      <li><strong>Power-ups / weapon upgrades</strong> &mdash; Dropped items that modify fire rate, spread, or damage. Runtime behavior modification through data changes rather than code branching.</li>
+      <li><strong>Particle effects</strong> &mdash; Sparks, smoke, debris on death. Another object pool use case. Visual polish from <em>systems that generate variation</em>, not hand-crafted assets.</li>
+    </ul>
+
+    <h3>MVP Spec</h3>
+    <table>
+      <thead>
+        <tr><th>Feature</th><th>Required</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Player that moves and shoots (keyboard + mouse or twin-stick)</td><td>Yes</td></tr>
+        <tr><td>Bullets from an object pool</td><td>Yes</td></tr>
+        <tr><td>Enemies that spawn in waves</td><td>Yes</td></tr>
+        <tr><td>2-3 different enemy behavior patterns</td><td>Yes</td></tr>
+        <tr><td>Collision between player-bullets and enemies</td><td>Yes</td></tr>
+        <tr><td>Health/damage system</td><td>Yes</td></tr>
+        <tr><td>Score display with combo multiplier</td><td>Yes</td></tr>
+        <tr><td>Screen shake / hit-freeze</td><td>Stretch</td></tr>
+        <tr><td>Power-ups</td><td>Stretch</td></tr>
+        <tr><td>Particle effects</td><td>Stretch</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliverable</h3>
+    <ul>
+      <li>A playable top-down shooter</li>
+      <li>Write-up: What did you learn? What was harder than expected?</li>
+    </ul>
+
+    <h2>Analogies by Background</h2>
+
+    <blockquote>
+      <p>These analogies map game dev concepts to patterns you already know. Find your background below.</p>
+    </blockquote>
+
+    <h3>For Backend Developers</h3>
+    <table>
+      <thead>
+        <tr><th>Concept</th><th>Analogy</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Object Pooling</td><td>Like a connection pool (database, thread, HTTP keep-alive) &mdash; pre-allocate resources and recycle instead of create/destroy</td></tr>
+        <tr><td>Spawn System &amp; Wave Design</td><td>Like a job scheduler or cron system &mdash; a data-driven schedule defines what to run and when</td></tr>
+        <tr><td>2D Vector Math</td><td>Like computing distances and directions between network nodes &mdash; normalize, scale, and rotate coordinate pairs</td></tr>
+        <tr><td>Projectile System</td><td>Like fire-and-forget messages in a message queue &mdash; spawned with initial data, processed independently, consumed on delivery</td></tr>
+        <tr><td>Collision Layers / Masks</td><td>Like ACLs or role-based access control &mdash; a bitmask declares which categories of entities are allowed to interact</td></tr>
+        <tr><td>Health &amp; Damage</td><td>Like a rate limiter or quota system &mdash; a numeric resource decremented by incoming requests, with a defined behavior at zero</td></tr>
+        <tr><td>Enemy AI: Behavioral Patterns</td><td>Like the Strategy pattern for request handlers &mdash; swap interchangeable behavior functions without changing the entity framework</td></tr>
+        <tr><td>Scoring with Combos</td><td>Like a time-windowed aggregation (tumbling window) &mdash; events within the window compound, and the window resets on timeout</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Frontend Developers</h3>
+    <table>
+      <thead>
+        <tr><th>Concept</th><th>Analogy</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Object Pooling</td><td>Like a virtualized list (react-window) &mdash; reuse a fixed set of DOM nodes rather than creating/destroying as items scroll</td></tr>
+        <tr><td>Spawn System &amp; Wave Design</td><td>Like a declarative animation timeline (GSAP, Framer Motion) &mdash; data defines what appears and when, the system executes it</td></tr>
+        <tr><td>2D Vector Math</td><td>Like CSS <code>transform: translate()</code> and <code>rotate()</code> &mdash; positioning and directing elements using x/y coordinates and angles</td></tr>
+        <tr><td>Projectile System</td><td>Like dispatched Redux actions &mdash; created with a payload, processed by the system, and consumed when they reach their target</td></tr>
+        <tr><td>Collision Layers / Masks</td><td>Like event propagation rules &mdash; <code>stopPropagation</code> and <code>pointer-events: none</code> control which elements can interact with which events</td></tr>
+        <tr><td>Health &amp; Damage</td><td>Like a progress bar or form validation counter &mdash; a numeric state decremented by interactions, triggering UI changes at thresholds</td></tr>
+        <tr><td>Enemy AI: Behavioral Patterns</td><td>Like swappable render strategies or higher-order components &mdash; different behavior functions plugged into the same entity interface</td></tr>
+        <tr><td>Scoring with Combos</td><td>Like a debounced input handler with an accumulator &mdash; rapid events build up a value, and a timeout resets it</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Data / ML Engineers</h3>
+    <table>
+      <thead>
+        <tr><th>Concept</th><th>Analogy</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Object Pooling</td><td>Like pre-allocating a fixed-size tensor and writing into slices &mdash; avoids repeated memory allocation during hot loops</td></tr>
+        <tr><td>Spawn System &amp; Wave Design</td><td>Like a data pipeline DAG with scheduled triggers &mdash; configuration defines what data (enemies) to produce and when</td></tr>
+        <tr><td>2D Vector Math</td><td>Like basic linear algebra on 2D vectors &mdash; normalize, dot product, <code>atan2</code> are the same ops you use in feature engineering</td></tr>
+        <tr><td>Projectile System</td><td>Like particles in a simulation &mdash; each has initial conditions (position, velocity) and evolves independently under simple rules</td></tr>
+        <tr><td>Collision Layers / Masks</td><td>Like a boolean interaction matrix &mdash; <code>M[i][j] = 1</code> means category i can collide with category j, applied as a mask over all pairs</td></tr>
+        <tr><td>Health &amp; Damage</td><td>Like decrementing a resource counter in a simulation &mdash; when the value crosses zero, trigger a state transition (death/removal)</td></tr>
+        <tr><td>Enemy AI: Behavioral Patterns</td><td>Like swappable loss functions or activation functions &mdash; plug different functions into the same interface to get different behavior</td></tr>
+        <tr><td>Scoring with Combos</td><td>Like exponential moving average with decay &mdash; recent events are weighted heavily, but the signal decays without continuous input</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li>How does object pooling change the way you think about entity lifecycle compared to normal object creation/destruction?</li>
+      <li>What makes an enemy "interesting"? Is it their movement pattern, their health, their bullet pattern, or the combination?</li>
+      <li>Why does screen shake make impacts feel more powerful, even though it has zero gameplay effect?</li>
+      <li>How would you design wave pacing to create "tension and release" &mdash; moments of intense action followed by breathers?</li>
+    </ol>
+
+    <nav class="module-nav">
+      <a href={`${base}modules/02-platformer/`}>&larr; Module 02: 2D Platformer</a>
+      <a href={`${base}modules/04-endless-runner/`}>Module 04: Endless Runner &rarr;</a>
+    </nav>
+  </div>
+</BaseLayout>

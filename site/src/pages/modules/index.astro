@@ -1,0 +1,144 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+
+const categories = [
+  {
+    name: 'Foundation', tag: 'tag-foundation', tagLabel: 'Foundation',
+    modules: [
+      { num: '01', title: 'Pong', desc: 'Game loop, input, collision, state' },
+      { num: '02', title: '2D Platformer', desc: 'Gravity, tilemaps, game feel' },
+      { num: '03', title: 'Top-Down Shooter', desc: 'Entity management, AI, pooling' },
+      { num: '04', title: 'Endless Runner', desc: 'Procedural gen, difficulty curves' },
+    ]
+  },
+  {
+    name: 'Puzzle & Logic', tag: 'tag-advanced', tagLabel: 'Advanced',
+    modules: [
+      { num: '05', title: 'Puzzle (Tetris)', desc: 'Grid as gameplay, cascading systems' },
+      { num: '26', title: 'Sokoban', desc: 'Push mechanics, undo, dead-state detection' },
+      { num: '27', title: 'Physics Puzzle', desc: 'Physics engines, trajectories, destruction' },
+    ]
+  },
+  {
+    name: 'Strategy & Economy', tag: 'tag-advanced', tagLabel: 'Advanced',
+    modules: [
+      { num: '06', title: 'Tower Defense', desc: 'A* pathfinding, placement, economy' },
+      { num: '22', title: 'RTS', desc: 'Unit selection, fog of war, economy' },
+      { num: '23', title: 'Turn-Based Strategy', desc: 'Grid tactics, probability, cover' },
+      { num: '24', title: 'Auto-Battler', desc: 'Drafting, synergies, automated combat' },
+      { num: '25', title: '4X Strategy', desc: 'Hex grids, tech trees, empires' },
+    ]
+  },
+  {
+    name: 'Combat & Action', tag: 'tag-advanced', tagLabel: 'Advanced',
+    modules: [
+      { num: '08', title: 'Fighting Game', desc: 'Hitboxes, frame data, combos' },
+      { num: '15', title: 'Run and Gun', desc: 'Boss design, multi-directional shooting' },
+      { num: '21', title: 'Action RPG', desc: 'Loot tables, stamina, i-frames' },
+      { num: '33', title: 'Survival Horror', desc: 'Scarcity, stalker AI, tension' },
+    ]
+  },
+  {
+    name: 'RPG & Progression', tag: 'tag-advanced', tagLabel: 'Advanced',
+    modules: [
+      { num: '07', title: 'Roguelike', desc: 'Procedural dungeons, turn-based, inventory' },
+      { num: '10', title: 'Deckbuilder', desc: 'Card systems, command pattern, turns' },
+      { num: '14', title: 'Metroidvania', desc: 'Interconnected world, ability-gating' },
+      { num: '20', title: 'Turn-Based RPG', desc: 'Stats, parties, elemental systems' },
+    ]
+  },
+  {
+    name: 'Racing', tag: 'tag-advanced', tagLabel: 'Advanced',
+    modules: [
+      { num: '09', title: 'Arcade Racing', desc: 'Steering physics, checkpoints, AI' },
+      { num: '28', title: 'Simulation Racing', desc: 'Tire grip, suspension, telemetry' },
+    ]
+  },
+  {
+    name: 'Narrative & Story', tag: 'tag-advanced', tagLabel: 'Advanced',
+    modules: [
+      { num: '17', title: 'Point-and-Click', desc: 'Inventory puzzles, dialog trees' },
+      { num: '18', title: 'Visual Novel', desc: 'Branching narrative, text rendering' },
+      { num: '19', title: 'Walking Simulator', desc: 'Environmental storytelling' },
+    ]
+  },
+  {
+    name: '3D', tag: 'tag-3d', tagLabel: '3D',
+    modules: [
+      { num: '11', title: 'First-Person Game', desc: '3D space, camera, raycasting' },
+      { num: '12', title: '3D Platformer', desc: '3D camera systems, movement' },
+      { num: '16', title: 'Third-Person Shooter', desc: 'Cover, animation blending' },
+    ]
+  },
+  {
+    name: 'Simulation & Management', tag: 'tag-advanced', tagLabel: 'Advanced',
+    modules: [
+      { num: '29', title: 'Management / Tycoon', desc: 'Simulation loops, finance' },
+      { num: '30', title: 'Farming / Life Sim', desc: 'Calendar, growth timers' },
+      { num: '31', title: 'Survival / Crafting', desc: 'Gather-craft-survive loop' },
+      { num: '38', title: 'Sandbox', desc: 'Voxel worlds, noise generation' },
+    ]
+  },
+  {
+    name: 'Casual & Rhythm', tag: 'tag-advanced', tagLabel: 'Advanced',
+    modules: [
+      { num: '32', title: 'Rhythm Game', desc: 'Audio sync, timing windows' },
+      { num: '34', title: 'Idle / Incremental', desc: 'Exponential growth, offline progress' },
+    ]
+  },
+  {
+    name: 'Social & Multiplayer', tag: 'tag-social', tagLabel: 'Social',
+    modules: [
+      { num: '35', title: 'Party Game', desc: 'Mini-game framework, multiplayer' },
+      { num: '36', title: 'Trivia', desc: 'Question databases, scoring' },
+      { num: '37', title: 'Social Deduction', desc: 'Hidden roles, voting' },
+    ]
+  },
+];
+
+function moduleSlug(num, title) {
+  const slugMap = {
+    '01': '01-pong', '02': '02-platformer', '03': '03-top-down-shooter',
+    '04': '04-endless-runner', '05': '05-puzzle', '06': '06-tower-defense',
+    '07': '07-roguelike', '08': '08-fighting-game', '09': '09-racing',
+    '10': '10-deckbuilder', '11': '11-first-person-game', '12': '12-3d-platformer',
+    '14': '14-metroidvania', '15': '15-run-and-gun', '16': '16-third-person-shooter',
+    '17': '17-point-and-click', '18': '18-visual-novel', '19': '19-walking-simulator',
+    '20': '20-turn-based-rpg', '21': '21-action-rpg', '22': '22-rts',
+    '23': '23-turn-based-strategy', '24': '24-auto-battler', '25': '25-4x-strategy',
+    '26': '26-sokoban', '27': '27-physics-puzzle', '28': '28-simulation-racing',
+    '29': '29-management-tycoon', '30': '30-farming-life-sim', '31': '31-survival-crafting',
+    '32': '32-rhythm-game', '33': '33-survival-horror', '34': '34-idle-incremental',
+    '35': '35-party-game', '36': '36-trivia', '37': '37-social-deduction',
+    '38': '38-sandbox',
+  };
+  return slugMap[num] || num;
+}
+---
+
+<BaseLayout title="All Modules">
+  <div class="container page-content">
+    <h1>All Modules</h1>
+    <p>38 genre modules organized by category. Each includes history, mechanics with pseudocode, interactive demos, and a buildable MVP spec.</p>
+
+    {categories.map(cat => (
+      <section>
+        <div class="section-header">
+          <h2>{cat.name}</h2>
+          <span class="section-count">{cat.modules.length} modules</span>
+        </div>
+        <div class="module-grid">
+          {cat.modules.map(m => (
+            <a href={`${base}modules/${moduleSlug(m.num, m.title)}/`} class="module-card">
+              <span class="card-number">Module {m.num}</span>
+              <span class="card-title">{m.title}</span>
+              <span class="card-description">{m.desc}</span>
+              <span class={`card-tag ${cat.tag}`}>{cat.tagLabel}</span>
+            </a>
+          ))}
+        </div>
+      </section>
+    ))}
+  </div>
+</BaseLayout>

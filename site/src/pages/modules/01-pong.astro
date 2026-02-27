@@ -1,0 +1,1128 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 01: Pong">
+  <div class="container page-content">
+
+    <!-- Module Header -->
+    <div class="module-header">
+      <div class="module-number">Module 01</div>
+      <h1>Pong</h1>
+      <p class="module-theme">Weeks 1-2 | The foundation of everything</p>
+    </div>
+
+    <blockquote>
+      "Pong is to game development what 'Hello World' is to programming &mdash; except it teaches you physics, input, collision, and state management all at once."
+    </blockquote>
+
+    <!-- ============================================================ -->
+    <!-- WEEK 1: HISTORY & DESIGN THEORY                              -->
+    <!-- ============================================================ -->
+
+    <h2>Week 1: History &amp; Design Theory</h2>
+
+    <h3>The Origin</h3>
+    <p>
+      Allan Alcorn built Pong at Atari in 1972 as a training exercise assigned by Nolan Bushnell. It was not the first video game &mdash; that lineage traces to Ralph Baer's 1967 "Brown Box" prototype and the Magnavox Odyssey (1972) &mdash; but it was the first commercially successful arcade game. The prototype installed at Andy Capp's Tavern in Sunnyvale, California broke within days because the coin box overflowed.
+    </p>
+    <p>Pong proved that video games were a viable business.</p>
+
+    <h3>How the Genre Evolved</h3>
+    <p>
+      <strong>Breakout (1976)</strong> &mdash; Designed by Steve Wozniak for Atari (with Steve Jobs as the middleman), Breakout transformed the two-player volley into a single-player destruction loop: hit ball, break bricks, clear the screen. This introduced the concept of a level-completion objective.
+    </p>
+    <p>
+      <strong>Arkanoid (Taito, 1986)</strong> &mdash; Added power-ups, enemy elements, and level variety. Proved that even the simplest game formula could support layers of complexity without losing its core readability.
+    </p>
+
+    <h3>What Makes Ball-and-Paddle Games "Great"</h3>
+    <p>
+      These games are the purest expression of a game loop: <strong>input causes action, action produces feedback, feedback demands new input</strong>. The player always understands the system state &mdash; ball position, paddle position, trajectory. There is zero hidden information.
+    </p>
+    <p>
+      This transparency is why Pong is the best teaching tool for game development. It forces you to implement physics, input handling, collision detection, score state, and win/loss conditions &mdash; the complete skeleton of any game.
+    </p>
+
+    <h3>The Essential Mechanic</h3>
+    <p>
+      <strong>Deflection</strong> &mdash; the player redirects a moving object. Every decision is about positioning and timing relative to a projectile you do not directly control.
+    </p>
+
+    <hr />
+
+    <!-- ============================================================ -->
+    <!-- WEEK 2: BUILD THE MVP                                        -->
+    <!-- ============================================================ -->
+
+    <h2>Week 2: Build the MVP</h2>
+
+    <h3>What You're Building</h3>
+    <p>A two-paddle, one-ball game. First to N points wins. That's it.</p>
+
+    <h3>Core Concepts</h3>
+
+    <!-- ==================== CONCEPT 1: GAME LOOP ==================== -->
+
+    <h4>1. The Game Loop</h4>
+    <p>
+      A fixed-cadence loop that calls <code>processInput()</code>, <code>update(dt)</code>, and <code>render()</code> every frame. The <code>dt</code> (delta time) parameter ensures frame-rate independence.
+    </p>
+    <p>
+      <strong>Why it matters:</strong> Every real-time game runs on this loop. It is the heartbeat of any real-time application &mdash; process input, update state, render output, repeat.
+    </p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: The Game Loop</div>
+      <p class="demo-hint">Watch the dot cycle through the three phases of the game loop. Toggle between fixed and variable timestep to see the difference.</p>
+      <canvas id="demo-gameloop" width="760" height="260"></canvas>
+      <div class="demo-controls">
+        <button id="gl-toggle-btn">Switch to Variable Timestep</button>
+        <span class="value-display" id="gl-frame-display">Frame: 0</span>
+        <span class="value-display" id="gl-dt-display">dt: 16.7ms</span>
+      </div>
+    </div>
+
+    <p>
+      <strong>Implementation notes:</strong> In an engine, this is your <code>Update()</code> / <code>_process()</code> method &mdash; the engine runs the loop for you. Without an engine, use <code>requestAnimationFrame</code> (web), <code>pygame.time.Clock</code> (Python), etc.
+    </p>
+
+    <!-- ==================== CONCEPT 2: ENTITY STATE ==================== -->
+
+    <h4>2. Entity State as Data</h4>
+    <p>Model paddles and ball as simple data structures:</p>
+    <pre is:raw><code>paddle = { x, y, width, height, speed }
+ball   = { x, y, vx, vy, radius }</code></pre>
+    <p>
+      <strong>Why it matters:</strong> This is the seed of every entity/component system. Game objects are <em>data</em> that systems operate on. Separating data from behavior is the core principle behind data-oriented design in games.
+    </p>
+
+    <!-- ==================== CONCEPT 3: INPUT HANDLING ==================== -->
+
+    <h4>3. Input Handling</h4>
+    <p>
+      Read keyboard state each frame. Translate raw input into game actions (move paddle up/down).
+    </p>
+    <p>
+      <strong>Why it matters:</strong> Polling vs. event-driven input is a recurring design decision. Understanding when to check state continuously versus reacting to discrete events is a transferable skill.
+    </p>
+
+    <!-- ==================== CONCEPT 4: AABB COLLISION ==================== -->
+
+    <h4>4. AABB Collision Detection</h4>
+    <p>
+      Test whether two rectangles overlap by comparing edges on each axis. The simplest and fastest collision check.
+    </p>
+    <pre is:raw><code>collides(a, b):
+  return a.x &lt; b.x + b.width &amp;&amp;
+         a.x + a.width &gt; b.x &amp;&amp;
+         a.y &lt; b.y + b.height &amp;&amp;
+         a.y + a.height &gt; b.y</code></pre>
+    <p>
+      <strong>Why it matters:</strong> AABB is the workhorse of 2D collision and is used as a broad-phase filter even in 3D engines.
+    </p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: AABB Collision Detection</div>
+      <p class="demo-hint">Drag the two rectangles around. When they overlap, you'll see the collision detected and the overlap region highlighted.</p>
+      <canvas id="demo-aabb" width="760" height="360"></canvas>
+      <div id="aabb-math" style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-dim); margin-top: 1rem; line-height: 1.8;"></div>
+    </div>
+
+    <!-- ==================== CONCEPT 5: COLLISION RESPONSE ==================== -->
+
+    <h4>5. Collision Response</h4>
+    <p>
+      When the ball hits a paddle, reflect its velocity. Optionally adjust the angle based on where on the paddle it hits (top = up angle, bottom = down angle). This single mechanic is what makes Pong <em>a game</em> rather than a screensaver.
+    </p>
+    <p>
+      <strong>Why it matters:</strong> Separating detection from response is a fundamental pattern. Response can encode <em>gameplay feel</em>, not just physics.
+    </p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Ball-Paddle Angle Reflection</div>
+      <p class="demo-hint">Click anywhere on the canvas to launch a ball toward the paddle on the left. Where the ball hits the paddle determines the reflection angle. Top = upward, center = straight, bottom = downward.</p>
+      <canvas id="demo-reflect" width="760" height="400"></canvas>
+      <div class="demo-controls">
+        <button id="reflect-reset-btn">Reset</button>
+        <span class="value-display" id="reflect-info">Click to launch a ball</span>
+      </div>
+    </div>
+
+    <!-- ==================== CONCEPT 6: GAME STATE MACHINE ==================== -->
+
+    <h4>6. Game State Machine</h4>
+    <p>
+      Track the game's mode: <code>Start</code>, <code>Playing</code>, <code>Scored</code>, <code>GameOver</code>. Each state has different update logic and rendering.
+    </p>
+    <p>
+      <strong>Why it matters:</strong> This FSM pattern scales to menu systems, level transitions, multiplayer lobbies &mdash; any behavior with distinct modes.
+    </p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Game State Machine</div>
+      <p class="demo-hint">Click the highlighted transition buttons to move between game states. The current state glows amber. Valid transitions are shown as clickable labels.</p>
+      <canvas id="demo-fsm" width="760" height="380"></canvas>
+    </div>
+
+    <!-- ==================== CONCEPT 7: RENDERING ==================== -->
+
+    <h4>7. Rendering</h4>
+    <p>
+      Clear the screen each frame. Draw paddles as rectangles, ball as a circle/square, score as text.
+    </p>
+    <p>
+      <strong>Why it matters:</strong> Rendering is per-frame reconstruction, not retained state. Every frame is drawn from scratch based on current data &mdash; nothing persists visually between frames unless you redraw it.
+    </p>
+
+    <hr />
+
+    <!-- ==================== PUTTING IT ALL TOGETHER ==================== -->
+
+    <h3>Putting It All Together</h3>
+    <p>
+      Below is a fully playable Pong game combining every concept above: game loop, entity state, input, AABB collision, angle reflection, state machine, and per-frame rendering.
+    </p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Mini Playable Pong</div>
+      <p class="demo-hint">Move your mouse up and down to control the left paddle. The right paddle is AI-controlled. First to 5 points wins.</p>
+      <canvas id="demo-pong" width="760" height="460"></canvas>
+      <div class="demo-controls">
+        <button id="pong-restart-btn">Restart Game</button>
+        <span class="value-display" id="pong-score">0 - 0</span>
+      </div>
+    </div>
+
+    <hr />
+
+    <!-- ==================== STRETCH GOALS ==================== -->
+
+    <h3>Stretch Goals</h3>
+    <ul>
+      <li><strong>Simple AI opponent</strong> &mdash; a paddle that tracks the ball's y-position with capped speed. Introduces AI as "just another input source."</li>
+      <li><strong>Sound effects</strong> &mdash; play a clip on bounce/score. Introduces event-driven audio (observer pattern).</li>
+      <li><strong>Ball speed increase</strong> &mdash; ball gets slightly faster after each paddle hit. Your first difficulty curve.</li>
+    </ul>
+
+    <h3>MVP Spec</h3>
+    <table>
+      <thead>
+        <tr><th>Feature</th><th>Required</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Two paddles that move with keyboard input</td><td>Yes</td></tr>
+        <tr><td>Ball that bounces off walls and paddles</td><td>Yes</td></tr>
+        <tr><td>Ball angle changes based on paddle hit position</td><td>Yes</td></tr>
+        <tr><td>Score tracking, displayed on screen</td><td>Yes</td></tr>
+        <tr><td>Game over at N points</td><td>Yes</td></tr>
+        <tr><td>AI opponent</td><td>Stretch</td></tr>
+        <tr><td>Sound effects</td><td>Stretch</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliverable</h3>
+    <ul>
+      <li>A playable Pong game</li>
+      <li>Write-up: What did you learn? What was harder than expected?</li>
+    </ul>
+
+    <hr />
+
+    <!-- ==================== DISCUSSION QUESTIONS ==================== -->
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li>What happens if you don't multiply velocity by delta time? Try it on different frame rates.</li>
+      <li>Why does the ball angle on paddle hit matter so much for gameplay? What would the game feel like without it?</li>
+      <li>How would you add a "serve" mechanic (ball starts from the scoring player's side)?</li>
+    </ol>
+
+    <!-- Module Navigation -->
+    <div class="module-nav">
+      <a href={`${base}modules/`}>&larr; All Modules</a>
+      <a href={`${base}modules/`}>Next Module &rarr;</a>
+    </div>
+
+  </div>
+</BaseLayout>
+
+<script>
+// ============================================================
+// DEMO 1: GAME LOOP VISUALIZER
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-gameloop');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const toggleBtn = document.getElementById('gl-toggle-btn');
+  const frameDisp = document.getElementById('gl-frame-display');
+  const dtDisp = document.getElementById('gl-dt-display');
+
+  let fixedTimestep = true;
+  let frameCount = 0;
+  let dotPhase = 0; // 0 = Process Input, 1 = Update, 2 = Render
+  let dotProgress = 0; // 0..1 within current phase transition
+  let lastTime = performance.now();
+
+  const phases = [
+    { label: 'Process Input', color: '#3b82f6' },
+    { label: 'Update', color: '#22c55e' },
+    { label: 'Render', color: '#a855f7' }
+  ];
+
+  const boxW = 180, boxH = 80;
+  const gap = 40;
+  const totalW = phases.length * boxW + (phases.length - 1) * gap;
+  const startX = (W - totalW) / 2;
+  const boxY = H / 2 - boxH / 2;
+
+  function getBoxCenter(i) {
+    return { x: startX + i * (boxW + gap) + boxW / 2, y: boxY + boxH / 2 };
+  }
+
+  function getDotPos() {
+    const from = getBoxCenter(dotPhase);
+    const to = getBoxCenter((dotPhase + 1) % 3);
+
+    if (dotProgress <= 0.3) {
+      return from;
+    } else if (dotProgress >= 0.7) {
+      return to;
+    } else {
+      const t = (dotProgress - 0.3) / 0.4;
+      // Arc path between boxes (wrap around for phase 2->0)
+      if (dotPhase === 2) {
+        // wrap: go up and over
+        const midX = W / 2;
+        const midY = boxY - 60;
+        const t2 = t;
+        const cx = from.x + (midX - from.x) * 2 * t2;
+        const cy = from.y + (midY - from.y) * 4 * t2 * (1 - t2);
+        if (t2 <= 0.5) {
+          const lt = t2 * 2;
+          return {
+            x: from.x + (midX - from.x) * lt,
+            y: from.y + (midY - from.y) * lt
+          };
+        } else {
+          const lt = (t2 - 0.5) * 2;
+          return {
+            x: midX + (to.x - midX) * lt,
+            y: midY + (to.y - midY) * lt
+          };
+        }
+      }
+      return {
+        x: from.x + (to.x - from.x) * t,
+        y: from.y + (to.y - from.y) * t
+      };
+    }
+  }
+
+  toggleBtn.addEventListener('click', function() {
+    fixedTimestep = !fixedTimestep;
+    toggleBtn.textContent = fixedTimestep ? 'Switch to Variable Timestep' : 'Switch to Fixed Timestep';
+  });
+
+  function draw(now) {
+    const rawDt = now - lastTime;
+    lastTime = now;
+    const dt = fixedTimestep ? 16.67 : rawDt;
+
+    frameCount++;
+    const speed = fixedTimestep ? 0.0012 : 0.0012 * (rawDt / 16.67);
+    dotProgress += speed * rawDt;
+    if (dotProgress >= 1) {
+      dotProgress -= 1;
+      dotPhase = (dotPhase + 1) % 3;
+    }
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Draw connection arrows
+    ctx.strokeStyle = '#27272a';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 2; i++) {
+      const from = getBoxCenter(i);
+      const to = getBoxCenter(i + 1);
+      ctx.beginPath();
+      ctx.moveTo(from.x + boxW / 2, from.y);
+      ctx.lineTo(to.x - boxW / 2, to.y);
+      ctx.stroke();
+      // arrowhead
+      const ax = to.x - boxW / 2;
+      const ay = to.y;
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(ax - 8, ay - 5);
+      ctx.lineTo(ax - 8, ay + 5);
+      ctx.fillStyle = '#27272a';
+      ctx.fill();
+    }
+
+    // Draw loop-back arrow (Render -> Process Input)
+    const rfrom = getBoxCenter(2);
+    const rto = getBoxCenter(0);
+    ctx.beginPath();
+    ctx.strokeStyle = '#27272a';
+    ctx.moveTo(rfrom.x, rfrom.y - boxH / 2);
+    ctx.quadraticCurveTo(W / 2, boxY - 70, rto.x, rto.y - boxH / 2);
+    ctx.stroke();
+    // arrowhead at destination
+    const aarx = rto.x;
+    const aary = rto.y - boxH / 2;
+    ctx.beginPath();
+    ctx.moveTo(aarx, aary);
+    ctx.lineTo(aarx - 5, aary - 8);
+    ctx.lineTo(aarx + 5, aary - 8);
+    ctx.fillStyle = '#27272a';
+    ctx.fill();
+
+    // Draw boxes
+    for (let i = 0; i < 3; i++) {
+      const bx = startX + i * (boxW + gap);
+      const isActive = (dotProgress <= 0.3 && dotPhase === i);
+      const col = phases[i].color;
+
+      ctx.fillStyle = isActive ? col + '22' : '#141416';
+      ctx.strokeStyle = isActive ? col : '#3f3f46';
+      ctx.lineWidth = isActive ? 2 : 1;
+      ctx.beginPath();
+      ctx.roundRect(bx, boxY, boxW, boxH, 8);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = isActive ? col : '#a1a1aa';
+      ctx.font = '600 14px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(phases[i].label, bx + boxW / 2, boxY + boxH / 2);
+    }
+
+    // Draw dot
+    const dotPos = getDotPos();
+    const activeColor = phases[dotPhase].color;
+    ctx.beginPath();
+    ctx.arc(dotPos.x, dotPos.y, 8, 0, Math.PI * 2);
+    ctx.fillStyle = activeColor;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(dotPos.x, dotPos.y, 14, 0, Math.PI * 2);
+    ctx.fillStyle = activeColor + '33';
+    ctx.fill();
+
+    // Timestep label
+    ctx.fillStyle = fixedTimestep ? '#22c55e' : '#ef4444';
+    ctx.font = '600 12px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(fixedTimestep ? 'FIXED TIMESTEP' : 'VARIABLE TIMESTEP', 16, 24);
+
+    frameDisp.textContent = 'Frame: ' + frameCount;
+    dtDisp.textContent = 'dt: ' + dt.toFixed(1) + 'ms';
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+
+// ============================================================
+// DEMO 2: AABB COLLISION DETECTION
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-aabb');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const mathDiv = document.getElementById('aabb-math');
+
+  const rects = [
+    { x: 180, y: 100, w: 160, h: 120, color: '#3b82f6', label: 'A' },
+    { x: 400, y: 140, w: 140, h: 100, color: '#a855f7', label: 'B' }
+  ];
+
+  let dragging = null;
+  let dragOff = { x: 0, y: 0 };
+
+  function getCanvasPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = W / rect.width;
+    const scaleY = H / rect.height;
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY
+    };
+  }
+
+  canvas.addEventListener('mousedown', function(e) {
+    const p = getCanvasPos(e);
+    for (let i = rects.length - 1; i >= 0; i--) {
+      const r = rects[i];
+      if (p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h) {
+        dragging = i;
+        dragOff.x = p.x - r.x;
+        dragOff.y = p.y - r.y;
+        break;
+      }
+    }
+  });
+
+  canvas.addEventListener('mousemove', function(e) {
+    if (dragging === null) return;
+    const p = getCanvasPos(e);
+    rects[dragging].x = p.x - dragOff.x;
+    rects[dragging].y = p.y - dragOff.y;
+  });
+
+  canvas.addEventListener('mouseup', function() { dragging = null; });
+  canvas.addEventListener('mouseleave', function() { dragging = null; });
+
+  // Touch support
+  canvas.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    const t = e.touches[0];
+    const p = getCanvasPos(t);
+    for (let i = rects.length - 1; i >= 0; i--) {
+      const r = rects[i];
+      if (p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h) {
+        dragging = i;
+        dragOff.x = p.x - r.x;
+        dragOff.y = p.y - r.y;
+        break;
+      }
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchmove', function(e) {
+    e.preventDefault();
+    if (dragging === null) return;
+    const p = getCanvasPos(e.touches[0]);
+    rects[dragging].x = p.x - dragOff.x;
+    rects[dragging].y = p.y - dragOff.y;
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', function() { dragging = null; });
+
+  function aabbCollides(a, b) {
+    return a.x < b.x + b.w &&
+           a.x + a.w > b.x &&
+           a.y < b.y + b.h &&
+           a.y + a.h > b.y;
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    const a = rects[0], b = rects[1];
+    const colliding = aabbCollides(a, b);
+
+    // Draw overlap region
+    if (colliding) {
+      const ox = Math.max(a.x, b.x);
+      const oy = Math.max(a.y, b.y);
+      const ox2 = Math.min(a.x + a.w, b.x + b.w);
+      const oy2 = Math.min(a.y + a.h, b.y + b.h);
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.25)';
+      ctx.fillRect(ox, oy, ox2 - ox, oy2 - oy);
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
+      ctx.strokeRect(ox, oy, ox2 - ox, oy2 - oy);
+      ctx.setLineDash([]);
+    }
+
+    // Draw rectangles
+    for (const r of rects) {
+      ctx.fillStyle = colliding ? 'rgba(239, 68, 68, 0.15)' : r.color + '15';
+      ctx.strokeStyle = colliding ? '#ef4444' : r.color;
+      ctx.lineWidth = 2;
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+      ctx.strokeRect(r.x, r.y, r.w, r.h);
+
+      // Label
+      ctx.fillStyle = colliding ? '#ef4444' : r.color;
+      ctx.font = '700 18px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(r.label, r.x + r.w / 2, r.y + r.h / 2);
+    }
+
+    // Status text
+    ctx.font = '700 16px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    if (colliding) {
+      ctx.fillStyle = '#ef4444';
+      ctx.fillText('COLLIDING', W / 2, 30);
+    } else {
+      ctx.fillStyle = '#71717a';
+      ctx.fillText('No collision', W / 2, 30);
+    }
+
+    // Math display
+    const c1 = (a.x < b.x + b.w);
+    const c2 = (a.x + a.w > b.x);
+    const c3 = (a.y < b.y + b.h);
+    const c4 = (a.y + a.h > b.y);
+    function s(v) { return Math.round(v); }
+    function hi(pass) { return pass ? 'color:#22c55e' : 'color:#ef4444'; }
+    mathDiv.innerHTML =
+      '<span style="' + hi(c1) + '">A.x(' + s(a.x) + ') &lt; B.x+B.w(' + s(b.x + b.w) + ') = ' + c1 + '</span><br>' +
+      '<span style="' + hi(c2) + '">A.x+A.w(' + s(a.x + a.w) + ') &gt; B.x(' + s(b.x) + ') = ' + c2 + '</span><br>' +
+      '<span style="' + hi(c3) + '">A.y(' + s(a.y) + ') &lt; B.y+B.h(' + s(b.y + b.h) + ') = ' + c3 + '</span><br>' +
+      '<span style="' + hi(c4) + '">A.y+A.h(' + s(a.y + a.h) + ') &gt; B.y(' + s(b.y) + ') = ' + c4 + '</span>' +
+      '<br><strong style="color:' + (colliding ? '#f59e0b' : '#71717a') + '">Result: ' + (colliding ? 'COLLISION' : 'no collision') + '</strong>';
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+
+// ============================================================
+// DEMO 3: BALL-PADDLE ANGLE REFLECTION
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-reflect');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const resetBtn = document.getElementById('reflect-reset-btn');
+  const infoSpan = document.getElementById('reflect-info');
+
+  const paddleX = 60, paddleW = 16, paddleH = 120;
+  const paddleY = H / 2 - paddleH / 2;
+  const ballR = 8;
+
+  let balls = [];
+  let trails = [];
+
+  function reset() {
+    balls = [];
+    trails = [];
+    infoSpan.textContent = 'Click to launch a ball';
+  }
+
+  resetBtn.addEventListener('click', reset);
+
+  canvas.addEventListener('click', function(e) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = W / rect.width;
+    const scaleY = H / rect.height;
+    const mx = (e.clientX - rect.left) * scaleX;
+    const my = (e.clientY - rect.top) * scaleY;
+
+    // Launch ball from click point toward paddle
+    const speed = 5;
+    const dx = paddleX + paddleW - mx;
+    const dy = (paddleY + paddleH / 2) - my;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    balls.push({
+      x: mx, y: my,
+      vx: (dx / dist) * speed,
+      vy: (dy / dist) * speed * 0.3,
+      reflected: false,
+      hitY: null,
+      angle: null,
+      trail: []
+    });
+    infoSpan.textContent = 'Ball launched!';
+  });
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Draw paddle
+    ctx.fillStyle = '#f59e0b';
+    ctx.fillRect(paddleX, paddleY, paddleW, paddleH);
+
+    // Paddle zone indicators
+    const zones = ['Up', 'Straight', 'Down'];
+    const zoneH = paddleH / 3;
+    for (let i = 0; i < 3; i++) {
+      ctx.strokeStyle = '#f59e0b55';
+      ctx.setLineDash([3, 3]);
+      if (i > 0) {
+        ctx.beginPath();
+        ctx.moveTo(paddleX, paddleY + i * zoneH);
+        ctx.lineTo(paddleX + paddleW, paddleY + i * zoneH);
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#71717a';
+      ctx.font = '11px "JetBrains Mono", monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(zones[i], paddleX + paddleW + 8, paddleY + i * zoneH + zoneH / 2 + 4);
+    }
+
+    // Update and draw balls
+    for (const ball of balls) {
+      ball.trail.push({ x: ball.x, y: ball.y });
+      if (ball.trail.length > 80) ball.trail.shift();
+
+      // Draw trail
+      for (let i = 0; i < ball.trail.length; i++) {
+        const alpha = i / ball.trail.length * 0.4;
+        ctx.beginPath();
+        ctx.arc(ball.trail[i].x, ball.trail[i].y, 3, 0, Math.PI * 2);
+        ctx.fillStyle = ball.reflected ? 'rgba(34,197,94,' + alpha + ')' : 'rgba(59,130,246,' + alpha + ')';
+        ctx.fill();
+      }
+
+      // Check paddle collision
+      if (!ball.reflected &&
+          ball.x - ballR <= paddleX + paddleW &&
+          ball.x + ballR >= paddleX &&
+          ball.y >= paddleY &&
+          ball.y <= paddleY + paddleH) {
+
+        const hitPos = (ball.y - paddleY) / paddleH; // 0 = top, 1 = bottom
+        const maxAngle = Math.PI / 3; // 60 degrees
+        const angle = (hitPos - 0.5) * 2 * maxAngle;
+
+        const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+        ball.vx = Math.cos(angle) * speed;
+        ball.vy = Math.sin(angle) * speed;
+        ball.x = paddleX + paddleW + ballR;
+        ball.reflected = true;
+        ball.hitY = ball.y;
+        ball.angle = angle;
+        ball.trail = [];
+
+        infoSpan.textContent = 'Hit: ' + (hitPos * 100).toFixed(0) + '% | Angle: ' + (angle * 180 / Math.PI).toFixed(1) + ' deg';
+      }
+
+      // Wall bounce
+      if (ball.y - ballR <= 0 || ball.y + ballR >= H) {
+        ball.vy = -ball.vy;
+        ball.y = ball.y - ballR <= 0 ? ballR : H - ballR;
+      }
+
+      ball.x += ball.vx;
+      ball.y += ball.vy;
+
+      // Draw ball
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ballR, 0, Math.PI * 2);
+      ctx.fillStyle = ball.reflected ? '#22c55e' : '#3b82f6';
+      ctx.fill();
+
+      // Draw angle arrow at hit point
+      if (ball.reflected && ball.hitY !== null) {
+        const hx = paddleX + paddleW;
+        const hy = ball.hitY;
+        ctx.beginPath();
+        ctx.arc(hx, hy, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#f59e0b';
+        ctx.fill();
+
+        const arrowLen = 50;
+        const ax = hx + Math.cos(ball.angle) * arrowLen;
+        const ay = hy + Math.sin(ball.angle) * arrowLen;
+        ctx.beginPath();
+        ctx.moveTo(hx, hy);
+        ctx.lineTo(ax, ay);
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Arrowhead
+        const headLen = 8;
+        const ha = Math.atan2(ay - hy, ax - hx);
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);
+        ctx.lineTo(ax - headLen * Math.cos(ha - 0.4), ay - headLen * Math.sin(ha - 0.4));
+        ctx.lineTo(ax - headLen * Math.cos(ha + 0.4), ay - headLen * Math.sin(ha + 0.4));
+        ctx.closePath();
+        ctx.fillStyle = '#f59e0b';
+        ctx.fill();
+      }
+    }
+
+    // Remove off-screen balls
+    balls = balls.filter(b => b.x > -50 && b.x < W + 50 && b.y > -50 && b.y < H + 50);
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+
+// ============================================================
+// DEMO 4: GAME STATE MACHINE
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-fsm');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const states = [
+    { name: 'Start', x: 120, y: 100 },
+    { name: 'Playing', x: 400, y: 100 },
+    { name: 'Scored', x: 400, y: 280 },
+    { name: 'Game Over', x: 120, y: 280 }
+  ];
+
+  const transitions = [
+    { from: 0, to: 1, label: 'Press Start', input: 'click' },
+    { from: 1, to: 2, label: 'Ball Out', input: 'click' },
+    { from: 2, to: 1, label: 'Continue', input: 'click' },
+    { from: 2, to: 3, label: 'Score Limit', input: 'click' },
+    { from: 3, to: 0, label: 'Restart', input: 'click' }
+  ];
+
+  let current = 0;
+  let animProgress = 1;
+  let animFrom = 0;
+  let animTo = 0;
+  let pulse = 0;
+
+  function getValidTransitions() {
+    return transitions.filter(t => t.from === current);
+  }
+
+  function getCanvasPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left) * (W / rect.width),
+      y: (e.clientY - rect.top) * (H / rect.height)
+    };
+  }
+
+  // Clickable transition buttons
+  function getTransitionBtnRect(t, idx) {
+    const fromS = states[t.from];
+    const toS = states[t.to];
+    const mx = (fromS.x + toS.x) / 2;
+    const my = (fromS.y + toS.y) / 2;
+    // Offset slightly to not overlap
+    const offset = (t.from === 2 && t.to === 3) ? -25 : (t.from === 2 && t.to === 1) ? 25 : 0;
+    const btnW = 100;
+    const btnH = 26;
+    return { x: mx - btnW / 2 + offset, y: my - btnH / 2, w: btnW, h: btnH, label: t.label };
+  }
+
+  canvas.addEventListener('click', function(e) {
+    if (animProgress < 1) return;
+    const p = getCanvasPos(e);
+    const valid = getValidTransitions();
+    for (let i = 0; i < valid.length; i++) {
+      const btn = getTransitionBtnRect(valid[i], i);
+      if (p.x >= btn.x && p.x <= btn.x + btn.w && p.y >= btn.y && p.y <= btn.y + btn.h) {
+        animFrom = current;
+        animTo = valid[i].to;
+        current = valid[i].to;
+        animProgress = 0;
+        break;
+      }
+    }
+  });
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    pulse += 0.03;
+    if (animProgress < 1) animProgress = Math.min(1, animProgress + 0.03);
+
+    const stateR = 55;
+
+    // Draw all transition arrows
+    for (const t of transitions) {
+      const fromS = states[t.from];
+      const toS = states[t.to];
+      const dx = toS.x - fromS.x;
+      const dy = toS.y - fromS.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const nx = dx / dist, ny = dy / dist;
+
+      ctx.beginPath();
+      ctx.moveTo(fromS.x + nx * stateR, fromS.y + ny * stateR);
+      ctx.lineTo(toS.x - nx * stateR, toS.y - ny * stateR);
+      ctx.strokeStyle = '#27272a';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Arrowhead
+      const ax = toS.x - nx * stateR;
+      const ay = toS.y - ny * stateR;
+      const angle = Math.atan2(dy, dx);
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(ax - 10 * Math.cos(angle - 0.35), ay - 10 * Math.sin(angle - 0.35));
+      ctx.lineTo(ax - 10 * Math.cos(angle + 0.35), ay - 10 * Math.sin(angle + 0.35));
+      ctx.closePath();
+      ctx.fillStyle = '#27272a';
+      ctx.fill();
+    }
+
+    // Draw states
+    for (let i = 0; i < states.length; i++) {
+      const s = states[i];
+      const isActive = (i === current);
+      const pulseR = isActive ? stateR + Math.sin(pulse) * 3 : stateR;
+
+      // Glow
+      if (isActive) {
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, pulseR + 8, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(245, 158, 11, 0.1)';
+        ctx.fill();
+      }
+
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, pulseR, 0, Math.PI * 2);
+      ctx.fillStyle = isActive ? '#f59e0b18' : '#141416';
+      ctx.strokeStyle = isActive ? '#f59e0b' : '#3f3f46';
+      ctx.lineWidth = isActive ? 2.5 : 1.5;
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = isActive ? '#f59e0b' : '#a1a1aa';
+      ctx.font = (isActive ? '700' : '500') + ' 14px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(s.name, s.x, s.y);
+    }
+
+    // Draw transition buttons for valid transitions
+    const valid = getValidTransitions();
+    for (let i = 0; i < valid.length; i++) {
+      const btn = getTransitionBtnRect(valid[i], i);
+      ctx.fillStyle = '#1c1c20';
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(btn.x, btn.y, btn.w, btn.h, 4);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#f59e0b';
+      ctx.font = '600 11px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(btn.label, btn.x + btn.w / 2, btn.y + btn.h / 2);
+    }
+
+    // Valid inputs hint
+    ctx.fillStyle = '#71717a';
+    ctx.font = '12px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    const validNames = valid.map(v => '"' + v.label + '"').join(', ');
+    ctx.fillText('Valid transitions: ' + (validNames || 'none'), W / 2, H - 16);
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+
+// ============================================================
+// DEMO 5: MINI PLAYABLE PONG
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-pong');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const restartBtn = document.getElementById('pong-restart-btn');
+  const scoreDisp = document.getElementById('pong-score');
+
+  const PADDLE_W = 14, PADDLE_H = 90, PADDLE_MARGIN = 30;
+  const BALL_R = 7;
+  const WIN_SCORE = 5;
+  const BALL_SPEED = 5;
+  const AI_SPEED = 3.5;
+
+  let state, p1, p2, ball, scoreL, scoreR, lastTime, msg;
+
+  function resetBall(dir) {
+    const angle = (Math.random() - 0.5) * Math.PI / 3;
+    ball = {
+      x: W / 2,
+      y: H / 2,
+      vx: Math.cos(angle) * BALL_SPEED * dir,
+      vy: Math.sin(angle) * BALL_SPEED
+    };
+  }
+
+  function init() {
+    scoreL = 0;
+    scoreR = 0;
+    p1 = { x: PADDLE_MARGIN, y: H / 2 - PADDLE_H / 2 };
+    p2 = { x: W - PADDLE_MARGIN - PADDLE_W, y: H / 2 - PADDLE_H / 2 };
+    resetBall(1);
+    state = 'playing';
+    msg = '';
+    lastTime = performance.now();
+    scoreDisp.textContent = scoreL + ' - ' + scoreR;
+  }
+
+  restartBtn.addEventListener('click', init);
+
+  // Mouse control for player 1
+  let mouseY = H / 2;
+  canvas.addEventListener('mousemove', function(e) {
+    const rect = canvas.getBoundingClientRect();
+    mouseY = (e.clientY - rect.top) * (H / rect.height);
+  });
+
+  // Touch support
+  canvas.addEventListener('touchmove', function(e) {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    mouseY = (e.touches[0].clientY - rect.top) * (H / rect.height);
+  }, { passive: false });
+
+  function update() {
+    if (state !== 'playing') return;
+
+    // Player 1 follows mouse
+    const targetY = mouseY - PADDLE_H / 2;
+    p1.y += (targetY - p1.y) * 0.15;
+    p1.y = Math.max(0, Math.min(H - PADDLE_H, p1.y));
+
+    // AI for player 2
+    const aiTarget = ball.y - PADDLE_H / 2;
+    const aiDiff = aiTarget - p2.y;
+    if (Math.abs(aiDiff) > 4) {
+      p2.y += Math.sign(aiDiff) * Math.min(AI_SPEED, Math.abs(aiDiff));
+    }
+    p2.y = Math.max(0, Math.min(H - PADDLE_H, p2.y));
+
+    // Move ball
+    ball.x += ball.vx;
+    ball.y += ball.vy;
+
+    // Wall bounce
+    if (ball.y - BALL_R <= 0) { ball.vy = Math.abs(ball.vy); ball.y = BALL_R; }
+    if (ball.y + BALL_R >= H) { ball.vy = -Math.abs(ball.vy); ball.y = H - BALL_R; }
+
+    // Paddle 1 collision (left)
+    if (ball.vx < 0 &&
+        ball.x - BALL_R <= p1.x + PADDLE_W &&
+        ball.x + BALL_R >= p1.x &&
+        ball.y >= p1.y && ball.y <= p1.y + PADDLE_H) {
+      const hitPos = (ball.y - p1.y) / PADDLE_H;
+      const angle = (hitPos - 0.5) * Math.PI / 3;
+      const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) * 1.03;
+      ball.vx = Math.cos(angle) * speed;
+      ball.vy = Math.sin(angle) * speed;
+      ball.x = p1.x + PADDLE_W + BALL_R;
+    }
+
+    // Paddle 2 collision (right)
+    if (ball.vx > 0 &&
+        ball.x + BALL_R >= p2.x &&
+        ball.x - BALL_R <= p2.x + PADDLE_W &&
+        ball.y >= p2.y && ball.y <= p2.y + PADDLE_H) {
+      const hitPos = (ball.y - p2.y) / PADDLE_H;
+      const angle = Math.PI - (hitPos - 0.5) * Math.PI / 3;
+      const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) * 1.03;
+      ball.vx = Math.cos(angle) * speed;
+      ball.vy = Math.sin(angle) * speed;
+      ball.x = p2.x - BALL_R;
+    }
+
+    // Scoring
+    if (ball.x < -20) {
+      scoreR++;
+      scoreDisp.textContent = scoreL + ' - ' + scoreR;
+      if (scoreR >= WIN_SCORE) {
+        state = 'gameover';
+        msg = 'AI Wins!';
+      } else {
+        resetBall(1);
+      }
+    }
+    if (ball.x > W + 20) {
+      scoreL++;
+      scoreDisp.textContent = scoreL + ' - ' + scoreR;
+      if (scoreL >= WIN_SCORE) {
+        state = 'gameover';
+        msg = 'You Win!';
+      } else {
+        resetBall(-1);
+      }
+    }
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Center line
+    ctx.setLineDash([6, 8]);
+    ctx.strokeStyle = '#27272a';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(W / 2, 0);
+    ctx.lineTo(W / 2, H);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Scores
+    ctx.fillStyle = '#3f3f46';
+    ctx.font = '700 48px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(scoreL, W / 2 - 60, 20);
+    ctx.fillText(scoreR, W / 2 + 60, 20);
+
+    // Paddles
+    ctx.fillStyle = '#f59e0b';
+    ctx.beginPath();
+    ctx.roundRect(p1.x, p1.y, PADDLE_W, PADDLE_H, 4);
+    ctx.fill();
+
+    ctx.fillStyle = '#a1a1aa';
+    ctx.beginPath();
+    ctx.roundRect(p2.x, p2.y, PADDLE_W, PADDLE_H, 4);
+    ctx.fill();
+
+    // Ball
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, BALL_R, 0, Math.PI * 2);
+    ctx.fillStyle = '#fafafa';
+    ctx.fill();
+
+    // Ball glow
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, BALL_R + 4, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(250, 250, 250, 0.1)';
+    ctx.fill();
+
+    // Game over overlay
+    if (state === 'gameover') {
+      ctx.fillStyle = 'rgba(10, 10, 11, 0.7)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#f59e0b';
+      ctx.font = '700 36px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(msg, W / 2, H / 2 - 20);
+      ctx.fillStyle = '#71717a';
+      ctx.font = '14px Inter, sans-serif';
+      ctx.fillText('Click "Restart Game" to play again', W / 2, H / 2 + 20);
+    }
+
+    // "You" / "AI" labels
+    ctx.fillStyle = '#71717a';
+    ctx.font = '11px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('YOU', p1.x + PADDLE_W / 2, H - 12);
+    ctx.fillText('AI', p2.x + PADDLE_W / 2, H - 12);
+  }
+
+  function loop() {
+    update();
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  init();
+  requestAnimationFrame(loop);
+})();
+</script>

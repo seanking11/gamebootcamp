@@ -1,0 +1,157 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+
+const foundationModules = [
+  { num: '01', title: 'Pong', desc: 'Game loop, input, collision, state', href: `${base}modules/01-pong/` },
+  { num: '02', title: '2D Platformer', desc: 'Gravity, tilemaps, game feel', href: `${base}modules/02-platformer/` },
+  { num: '03', title: 'Top-Down Shooter', desc: 'Entity management, AI, pooling', href: `${base}modules/03-top-down-shooter/` },
+  { num: '04', title: 'Endless Runner', desc: 'Procedural generation, difficulty curves', href: `${base}modules/04-endless-runner/` },
+];
+
+const paths = [
+  { name: 'Foundation', desc: 'Core game dev skills — start here', modules: 5 },
+  { name: 'Combat Deep Dive', desc: 'Fighting, shooting, action', modules: 7 },
+  { name: 'Into 3D', desc: 'FPS, 3D platformer, TPS', modules: 8 },
+  { name: 'Strategy & Systems', desc: 'Tactics, economy, planning', modules: 7 },
+  { name: 'Narrative & Story', desc: 'Interactive fiction, dialog', modules: 6 },
+  { name: 'Party & Social', desc: 'Multiplayer, social games', modules: 5 },
+];
+---
+
+<BaseLayout title="Home">
+  <div class="container">
+    <section class="hero">
+      <h1>Game Dev <span>Bootcamp</span></h1>
+      <p class="subtitle">
+        38 genre modules. Interactive demos. Built for software developers
+        who want to understand how games work.
+      </p>
+      <div class="cta-group">
+        <a href={`${base}modules/01-pong/`} class="btn-primary">Start with Pong</a>
+        <a href={`${base}modules/`} class="btn-secondary">Browse all modules</a>
+      </div>
+    </section>
+
+    <div class="demo-container" style="margin-top:1rem;">
+      <div class="demo-label">Live Demo</div>
+      <p class="demo-hint">Move your mouse to control the left paddle. This is what you'll build in Module 01.</p>
+      <canvas id="hero-pong" width="760" height="300"></canvas>
+    </div>
+
+    <section>
+      <div class="section-header">
+        <h2>Start here</h2>
+        <span class="section-count">Foundation Track — 4 modules</span>
+      </div>
+      <div class="module-grid">
+        {foundationModules.map(m => (
+          <a href={m.href} class="module-card">
+            <span class="card-number">Module {m.num}</span>
+            <span class="card-title">{m.title}</span>
+            <span class="card-description">{m.desc}</span>
+            <span class="card-tag tag-foundation">Foundation</span>
+          </a>
+        ))}
+      </div>
+    </section>
+
+    <section>
+      <div class="section-header">
+        <h2>Learning Paths</h2>
+        <span class="section-count">12 curated paths</span>
+      </div>
+      <p>Don't do all 38 modules. Pick a path that matches your goal.</p>
+      <div class="module-grid">
+        {paths.map(p => (
+          <div class="module-card">
+            <span class="card-title">{p.name}</span>
+            <span class="card-description">{p.desc}</span>
+            <span class="card-tag tag-advanced">{p.modules} modules</span>
+          </div>
+        ))}
+      </div>
+      <p style="text-align:center; margin-top:1rem;">
+        <a href={`${base}paths/`}>View all 12 paths &rarr;</a>
+      </p>
+    </section>
+
+    <section style="padding:3rem 0;">
+      <div class="section-header">
+        <h2>How it works</h2>
+      </div>
+      <div class="module-grid" style="grid-template-columns: repeat(3, 1fr);">
+        <div style="padding:1rem;">
+          <h4 style="margin-top:0;">Week 1: Learn</h4>
+          <p>History, design theory, and mechanics breakdown. Understand <em>why</em> a genre works before you build it.</p>
+        </div>
+        <div style="padding:1rem;">
+          <h4 style="margin-top:0;">Week 2: Build</h4>
+          <p>Build a playable MVP with pseudocode, stretch goals, and a clear spec.</p>
+        </div>
+        <div style="padding:1rem;">
+          <h4 style="margin-top:0;">Reflect</h4>
+          <p>Write up what you learned. Discuss with your group. Then pick the next module.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+</BaseLayout>
+
+<script>
+const canvas = document.getElementById('hero-pong');
+if (canvas) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const pW = 10, pH = 60;
+  let lY = H/2 - pH/2, rY = H/2 - pH/2;
+  let b = { x: W/2, y: H/2, vx: 3, vy: 2, r: 6 };
+  let sc = { l: 0, r: 0 };
+
+  canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    lY = (e.clientY - rect.top) * (H / rect.height) - pH/2;
+    lY = Math.max(0, Math.min(H - pH, lY));
+  });
+
+  function update() {
+    rY += ((b.y - pH/2) - rY) * 0.04;
+    rY = Math.max(0, Math.min(H - pH, rY));
+    b.x += b.vx; b.y += b.vy;
+    if (b.y - b.r <= 0 || b.y + b.r >= H) b.vy *= -1;
+    if (b.x - b.r <= pW + 15 && b.y >= lY && b.y <= lY + pH && b.vx < 0) {
+      b.vx *= -1; b.vy += ((b.y - (lY + pH/2)) / (pH/2)) * 2;
+    }
+    if (b.x + b.r >= W - pW - 15 && b.y >= rY && b.y <= rY + pH && b.vx > 0) {
+      b.vx *= -1; b.vy += ((b.y - (rY + pH/2)) / (pH/2)) * 2;
+    }
+    if (b.x < 0) { sc.r++; rb(); }
+    if (b.x > W) { sc.l++; rb(); }
+    const sp = Math.sqrt(b.vx*b.vx + b.vy*b.vy);
+    if (sp > 6) { b.vx *= 6/sp; b.vy *= 6/sp; }
+  }
+
+  function rb() {
+    b.x = W/2; b.y = H/2;
+    b.vx = Math.random() > 0.5 ? 3 : -3;
+    b.vy = (Math.random() - 0.5) * 4;
+  }
+
+  function draw() {
+    ctx.fillStyle = '#0d0d0f'; ctx.fillRect(0, 0, W, H);
+    ctx.setLineDash([4,8]); ctx.strokeStyle = '#27272a';
+    ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#fafafa';
+    ctx.fillRect(15, lY, pW, pH);
+    ctx.fillRect(W-15-pW, rY, pW, pH);
+    ctx.fillStyle = '#f59e0b';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#3f3f46'; ctx.font = '24px monospace'; ctx.textAlign = 'center';
+    ctx.fillText(sc.l.toString(), W/2-40, 35);
+    ctx.fillText(sc.r.toString(), W/2+40, 35);
+  }
+
+  (function loop() { update(); draw(); requestAnimationFrame(loop); })();
+}
+</script>

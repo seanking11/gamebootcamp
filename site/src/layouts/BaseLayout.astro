@@ -1,0 +1,46 @@
+---
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description = 'A game development bootcamp for software developers.' } = Astro.props;
+const base = import.meta.env.BASE_URL;
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content={description} />
+  <title>{title} | Game Dev Bootcamp</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <nav class="site-nav">
+    <div class="nav-inner">
+      <a href={`${base}`} class="nav-logo"><span>GDB</span> Game Dev Bootcamp</a>
+      <ul class="nav-links">
+        <li><a href={`${base}modules/`}>Modules</a></li>
+        <li><a href={`${base}paths/`}>Paths</a></li>
+        <li><a href={`${base}genres/`}>Genres</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <slot />
+  </main>
+
+  <footer style="text-align:center; padding:3rem 1.5rem; color:var(--text-dim); font-size:0.8rem; border-top:1px solid var(--border); margin-top:4rem;">
+    Game Dev Bootcamp — Built for developers who want to understand games.
+  </footer>
+</body>
+</html>
+
+<style is:global>
+  @import '../styles/global.css';
+</style>

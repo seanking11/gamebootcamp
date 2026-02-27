@@ -1,0 +1,362 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 06: Tower Defense">
+  <div class="container page-content">
+    <div class="module-header">
+      <div class="module-number">Module 06</div>
+      <h1>Tower Defense</h1>
+      <p class="module-theme">Optimizing placement to control the flow of enemies through space</p>
+    </div>
+
+    <hr />
+
+    <h2>Week 1: History &amp; Design Theory</h2>
+
+    <h3>The Origin</h3>
+    <p><strong>Rampart</strong> (Atari, 1990) is the game most often cited as the ancestor of tower defense, though it did not look like what we now call the genre. Players placed castle walls on a grid, cannons fired automatically at approaching ships, and between rounds you scrambled to repair your fortifications before the next wave. The loop &mdash; build, defend, repair, repeat &mdash; was the seed. But the critical ingredient was spatial strategy: you were not controlling a character; you were shaping the battlefield itself. Where you placed your walls determined whether enemies could breach them. Rampart was an arcade game and a modest commercial success, but its design DNA would lie dormant for nearly two decades before the genre it inspired exploded into the mainstream.</p>
+
+    <h3>How the Genre Evolved</h3>
+    <p><strong>Desktop Tower Defense</strong> (Paul Preece, 2007) was a free Flash game that became a phenomenon. Its genius was simplicity: enemies walked from one side of an open grid to the other, and you placed towers anywhere on the grid to create a maze. The enemies pathfound around your towers in real time, so every placement decision reshaped the battlefield. This was the game that taught a generation of players (and developers) what "tower defense" meant. It demonstrated that the genre's core appeal was not action but optimization: you were designing a system, not executing reflexes.</p>
+
+    <p><strong>Plants vs. Zombies</strong> (PopCap Games, 2009) simplified the formula for a mass audience. Instead of a free-form grid, it used lanes &mdash; zombies marched in straight horizontal lines, and you planted defenders in a grid that snapped to those lanes. This removed pathfinding complexity and replaced it with resource management (sunlight as currency) and personality (every plant and zombie had distinct character). Plants vs. Zombies proved that tower defense did not require the player to understand algorithms; it just needed to feel like a series of interesting decisions about where to spend limited resources.</p>
+
+    <p><strong>Bloons TD</strong> (Ninja Kiwi, 2007 onward) and <strong>Kingdom Rush</strong> (Ironhide, 2012) pushed depth in different directions. Bloons TD gave each tower branching upgrade paths, turning tower selection into a build-order optimization problem with hundreds of viable strategies. Kingdom Rush introduced hero units and fixed paths (no maze-building), focusing the player's attention on upgrade timing and ability usage. Together, these games demonstrated the genre's range: from open-grid mazing to fixed-path resource optimization, from casual to deeply strategic.</p>
+
+    <h3>What Makes Tower Defense Great</h3>
+    <p>Tower defense is the rare genre where the player is a systems architect, not a performer. In a platformer or a shooter, success comes from execution &mdash; timing a jump, landing a shot. In tower defense, success comes from design: you build a machine (your tower layout) and then watch it run against an input (the enemy wave). The enemies are the test suite; your tower layout is the system under test. When it works, you feel clever. When it fails, you know exactly which design decision was wrong, and you want to try again.</p>
+
+    <h3>The Essential Mechanic</h3>
+    <p><strong>Optimizing placement to control the flow of enemies through space</strong> &mdash; the player builds static defenses whose positions determine how mobile enemies traverse the map, and victory comes from designing the most efficient arrangement.</p>
+
+    <hr />
+
+    <h2>Week 2: Build the MVP</h2>
+
+    <h3>What You're Building</h3>
+    <p>A single-player tower defense game on a grid-based map. Enemies spawn in waves and follow a path toward a goal. The player places towers on the grid using currency earned from kills. Towers automatically target and shoot enemies within range. If too many enemies reach the goal, the player loses. The game should have at least 3 tower types, 5+ waves, and a basic upgrade system.</p>
+
+    <h3>Core Concepts (Must Implement)</h3>
+
+    <h4>1. A* Pathfinding</h4>
+    <p>This is the big new concept for this module. A* is a graph search algorithm that finds the shortest path between two points. It works on your grid: each cell is a node, walkable cells are connected to their neighbors, and towers (or walls) are impassable. A* uses a heuristic (an estimate of remaining distance) to explore promising paths first, making it dramatically faster than brute-force search.</p>
+    <p>Think of A* as a priority-queue-driven BFS. You maintain an open set (cells to explore) sorted by <code>f(n) = g(n) + h(n)</code>, where <code>g(n)</code> is the cost so far and <code>h(n)</code> is the heuristic estimate to the goal. At each step, you pop the lowest-cost node, check if it is the goal, and if not, expand its neighbors.</p>
+    <pre is:raw><code>function aStar(grid, start, goal):
+    openSet = PriorityQueue()
+    openSet.add(start, priority=0)
+    cameFrom = {}
+    gScore = { start: 0 }
+
+    while openSet is not empty:
+        current = openSet.popLowest()
+
+        if current == goal:
+            return reconstructPath(cameFrom, current)
+
+        for neighbor in getWalkableNeighbors(grid, current):
+            tentativeG = gScore[current] + 1   // uniform cost
+            if tentativeG &lt; gScore.getOrDefault(neighbor, INFINITY):
+                cameFrom[neighbor] = current
+                gScore[neighbor] = tentativeG
+                f = tentativeG + heuristic(neighbor, goal)
+                openSet.add(neighbor, priority=f)
+
+    return null  // no path exists
+
+function heuristic(a, b):
+    // Manhattan distance for 4-directional grid:
+    return abs(a.x - b.x) + abs(a.y - b.y)</code></pre>
+    <p><strong>Why it matters:</strong> A* is one of the most universally useful algorithms in computer science. Outside of games, it powers GPS routing, network packet routing, robot navigation, and dependency resolution. The deeper lesson is about informed search: when you have a heuristic (an estimate that never overestimates), you can explore large state spaces efficiently. You will use pathfinding or its variants in more contexts than you expect.</p>
+
+    <hr />
+
+    <h4>2. Placement Systems</h4>
+    <p>The player needs to place towers on the grid. This means you need a <strong>build mode</strong> state: when the player selects a tower type, the game enters a mode where clicking on the grid attempts to place that tower. Placement requires validation: is the cell empty? Can the player afford the tower? And critically &mdash; if your game allows maze-building &mdash; will this placement still leave a valid path for enemies?</p>
+    <pre is:raw><code>function onGridClick(cellX, cellY, selectedTowerType):
+    if not isValidPlacement(cellX, cellY):
+        showError("Cannot place here")
+        return
+
+    if player.gold &lt; selectedTowerType.cost:
+        showError("Not enough gold")
+        return
+
+    // If maze-building: check that placement doesn't block all paths
+    grid[cellY][cellX] = BLOCKED
+    testPath = aStar(grid, enemySpawn, goal)
+    if testPath == null:
+        grid[cellY][cellX] = EMPTY     // revert
+        showError("Would block enemy path")
+        return
+
+    player.gold -= selectedTowerType.cost
+    createTower(cellX, cellY, selectedTowerType)
+
+function isValidPlacement(cellX, cellY):
+    return grid[cellY][cellX] == EMPTY
+       and not isOnPath(cellX, cellY)   // for fixed-path maps
+       and isInBuildableArea(cellX, cellY)</code></pre>
+    <p><strong>Why it matters:</strong> This is input validation with transactional rollback. You tentatively apply a state change (mark the cell as blocked), validate it against a constraint (path still exists), and either commit or revert. The "would block enemy path" check is a constraint satisfaction problem &mdash; you must verify that a proposed change does not violate a system invariant before committing it.</p>
+
+    <hr />
+
+    <h4>3. Economy / Resource Management</h4>
+    <p>Towers cost gold. Enemies drop gold when killed. The player starts with enough gold for a few towers and must earn the rest through successful defense. This creates the fundamental tension of tower defense: spend now on cheap towers for immediate defense, or save for expensive towers that pay off later. The economy system is a simple ledger: income events (enemy killed) and expense events (tower purchased, tower upgraded).</p>
+    <pre is:raw><code>player = {
+    gold: 200,         // starting gold
+    lives: 20          // HP -- enemies that reach the goal cost lives
+}
+
+TOWER_COSTS = {
+    "basic":  100,
+    "sniper": 200,
+    "splash": 150
+}
+
+function onEnemyKilled(enemy):
+    player.gold += enemy.bounty
+
+function purchaseTower(type):
+    cost = TOWER_COSTS[type]
+    if player.gold >= cost:
+        player.gold -= cost
+        return true
+    return false</code></pre>
+    <p><strong>Why it matters:</strong> This is resource budgeting. There is always a trade-off between immediate throughput and long-term efficiency. The player who spends all their gold on cheap towers survives early but stalls late. The player who hoards gold has a powerful endgame but might lose lives in the meantime. Balancing an economy is one of the hardest design problems in games &mdash; the math is simple, but the feel requires extensive playtesting.</p>
+
+    <hr />
+
+    <h4>4. Targeting AI for Towers</h4>
+    <p>Each tower needs to decide which enemy to shoot. This is a strategy pattern: the tower has a targeting mode (nearest, first in path, strongest, weakest/lowest HP), and each mode is a different sorting function applied to the list of enemies within range. The player may be able to switch targeting modes per tower, or different tower types may have fixed strategies.</p>
+    <pre is:raw><code>function getTarget(tower, enemies):
+    inRange = enemies.filter(e => distance(tower, e) &lt;= tower.range)
+
+    if inRange.isEmpty():
+        return null
+
+    switch tower.targetingMode:
+        case "nearest":
+            return inRange.sortBy(e => distance(tower, e)).first()
+        case "first":
+            return inRange.sortBy(e => e.distanceAlongPath).last()
+        case "strongest":
+            return inRange.sortBy(e => e.maxHP).last()
+        case "weakest":
+            return inRange.sortBy(e => e.currentHP).first()</code></pre>
+    <p><strong>Why it matters:</strong> This is the strategy pattern in a textbook application. Each targeting mode is an interchangeable algorithm with the same interface: given a list of candidates, return the best one. The key design decision is not which strategy is "best" &mdash; it is giving the player the ability to choose the right strategy for the current situation.</p>
+
+    <hr />
+
+    <h4>5. Range Detection</h4>
+    <p>Every tower has a range radius. Each frame (or each tower tick), you need to determine which enemies are within range. The basic approach is a circle-based distance check: if the Euclidean distance between the tower center and the enemy position is less than or equal to the tower's range, the enemy is in range. For visual feedback, draw the range circle when the player hovers over or selects a tower.</p>
+    <pre is:raw><code>function isInRange(tower, enemy):
+    dx = tower.x - enemy.x
+    dy = tower.y - enemy.y
+    distSquared = dx * dx + dy * dy
+    return distSquared &lt;= tower.range * tower.range
+    // Compare squared values to avoid expensive sqrt
+
+function getEnemiesInRange(tower, allEnemies):
+    return allEnemies.filter(e => isInRange(tower, e))</code></pre>
+    <p><strong>Why it matters:</strong> Range detection is a spatial query, and the squared-distance optimization is a micro-optimization you will see everywhere in game development. At small scale, iterating over all enemies per tower per frame is fine. At large scale (hundreds of towers, thousands of enemies), you would need spatial indexing &mdash; quadtrees, spatial hash grids, or similar structures. Start with the brute-force check, and understand why spatial indexing exists for when you need it.</p>
+
+    <hr />
+
+    <h4>6. Upgrade Trees</h4>
+    <p>After placing a tower, the player can spend additional gold to upgrade it. In the simplest form, upgrades increase damage, range, or fire rate. In more complex designs, towers have branching upgrade paths: a basic tower might upgrade into either a "sniper" (high damage, slow fire, long range) or a "machine gun" (low damage, fast fire, short range). Upgrades are data, not code: define them in a configuration structure and apply stat modifications.</p>
+    <pre is:raw><code>UPGRADE_TREE = {
+    "basic": {
+        "path_a": [
+            { name: "Sharper Arrows", cost: 100, damage: +5 },
+            { name: "Sniper Scope",   cost: 200, damage: +10, range: +2 },
+            { name: "Railgun",        cost: 500, damage: +30, range: +3 }
+        ],
+        "path_b": [
+            { name: "Faster Draw",    cost: 80,  fireRate: +0.5 },
+            { name: "Twin Barrels",   cost: 180, fireRate: +1.0 },
+            { name: "Gatling Tower",  cost: 400, fireRate: +2.0, damage: +3 }
+        ]
+    }
+}
+
+function upgradeTower(tower, pathId):
+    path = UPGRADE_TREE[tower.type][pathId]
+    nextUpgrade = path[tower.upgradeLevel[pathId]]
+    if player.gold >= nextUpgrade.cost:
+        player.gold -= nextUpgrade.cost
+        applyStatModifiers(tower, nextUpgrade)
+        tower.upgradeLevel[pathId] += 1</code></pre>
+    <p><strong>Why it matters:</strong> This is data-driven configuration &mdash; the same approach you use for feature flags, tiered pricing plans, or role-based permissions. The upgrade tree is a static data structure that the game engine interprets at runtime. Adding a new upgrade path means adding data, not writing new code. This separation of data and logic is one of the most important architectural principles in software engineering, and game developers learned it early because designers need to tweak numbers constantly without recompiling.</p>
+
+    <hr />
+
+    <h4>7. Wave Design (Revisited)</h4>
+    <p>You built wave systems in Module 03 (Top-Down Shooter), but tower defense waves work differently. The player is stationary, so waves must create pressure through composition and pacing, not through surrounding the player. A good wave system mixes enemy types (fast but fragile, slow but tanky, groups of weak enemies, single powerful enemies), adjusts spawn rates, and introduces new threats at predictable intervals so the player can plan.</p>
+    <pre is:raw><code>WAVES = [
+    { enemies: [{ type: "basic", count: 10, interval: 1.0 }] },
+    { enemies: [{ type: "basic", count: 15, interval: 0.8 }] },
+    { enemies: [
+        { type: "basic", count: 10, interval: 0.8 },
+        { type: "fast",  count: 5,  interval: 0.5, delay: 5.0 }
+    ]},
+    { enemies: [{ type: "tank", count: 3, interval: 2.0 }] },
+    // Wave 5: boss wave
+    { enemies: [
+        { type: "basic", count: 20, interval: 0.5 },
+        { type: "boss",  count: 1,  interval: 0,   delay: 10.0 }
+    ]}
+]
+
+function startWave(waveIndex):
+    wave = WAVES[waveIndex]
+    for group in wave.enemies:
+        scheduleSpawns(group.type, group.count, group.interval, group.delay)</code></pre>
+    <p><strong>Why it matters:</strong> Wave design is systematic stress-testing of the player's defenses. Each wave is a pressure pattern: sustained pressure (many weak enemies), burst pressure (a group of fast enemies), heavy pressure (a tank with lots of HP), and peak events (a boss). The data-driven wave format (an array of objects with types, counts, and intervals) is a declarative configuration pattern &mdash; adding new waves means adding data, not writing new code.</p>
+
+    <hr />
+
+    <h4>8. Path Recalculation</h4>
+    <p>If your game allows the player to place towers that block the enemy path (maze-building), you must handle path recalculation. When a tower is placed, all enemies currently navigating need updated paths. There are two common approaches: <strong>fixed paths</strong> (enemies follow a predetermined route and towers can only be placed alongside it) or <strong>dynamic paths</strong> (enemies pathfind in real time and towers reshape the maze). Fixed paths are simpler and perfectly valid for an MVP. Dynamic paths are more interesting but require careful performance management.</p>
+    <pre is:raw><code>// Option A: Fixed path (defined at map creation)
+FIXED_PATH = [(0,5), (1,5), (2,5), (2,6), (2,7), ...]
+
+function moveEnemy(enemy):
+    target = FIXED_PATH[enemy.pathIndex]
+    moveToward(enemy, target)
+    if reachedTarget(enemy, target):
+        enemy.pathIndex += 1
+        if enemy.pathIndex >= FIXED_PATH.length:
+            enemyReachedGoal(enemy)
+
+// Option B: Dynamic path (recalculate on tower placement)
+function onTowerPlaced():
+    newPath = aStar(grid, spawn, goal)
+    if newPath == null:
+        rejectPlacement()  // handled in placement validation
+        return
+    // Update all active enemies:
+    for enemy in activeEnemies:
+        enemy.path = aStar(grid, enemy.currentCell, goal)</code></pre>
+    <p><strong>Why it matters:</strong> Path recalculation is cache invalidation. When the grid changes (a tower is placed), all cached paths are stale and must be recomputed. Fixed paths are the simple option &mdash; predictable, no invalidation needed. Dynamic paths are more flexible, but you pay the cost of recalculation every time the grid changes. Choosing between them is an architecture decision with familiar trade-offs: simplicity and predictability versus flexibility and computational cost.</p>
+
+    <hr />
+
+    <h3>Stretch Goals</h3>
+    <ol>
+      <li><strong>Multiple enemy paths / spawn points</strong> &mdash; Enemies enter from multiple edges of the map, forcing the player to defend in multiple directions simultaneously. This tests whether your pathfinding and placement systems generalize beyond a single start/end pair.</li>
+      <li><strong>Tower selling with depreciation</strong> &mdash; Let the player sell towers for a percentage of their total investment (purchase + upgrades). This adds a "refactoring" mechanic: sometimes the optimal move is to tear down an old design and rebuild, accepting a resource loss for a better architecture.</li>
+      <li><strong>Special abilities / active skills</strong> &mdash; Give the player a cooldown-based ability (a bomb that damages all enemies in an area, a freeze that slows a wave, a gold bonus). This introduces cooldown management &mdash; a timer-based system that prevents an action from being used again until a delay has elapsed.</li>
+      <li><strong>Creep types with special behaviors</strong> &mdash; Flying enemies that ignore the ground path (bypassing your maze entirely), healing enemies that restore HP to nearby creeps, or shielded enemies that are immune to certain tower types. Each special behavior forces the player to diversify their defense strategy rather than relying on a single dominant approach.</li>
+    </ol>
+
+    <h3>MVP Spec</h3>
+    <table>
+      <thead>
+        <tr><th>Feature</th><th>Required?</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Grid-based map with defined path or pathfinding</td><td>Yes</td></tr>
+        <tr><td>A* pathfinding (at minimum for initial path)</td><td>Yes</td></tr>
+        <tr><td>Tower placement with validation (affordability, valid cell)</td><td>Yes</td></tr>
+        <tr><td>At least 3 tower types with different stats</td><td>Yes</td></tr>
+        <tr><td>Economy system (gold from kills, spent on towers)</td><td>Yes</td></tr>
+        <tr><td>Targeting AI (at least one strategy; nearest is fine)</td><td>Yes</td></tr>
+        <tr><td>Range detection and range visualization</td><td>Yes</td></tr>
+        <tr><td>5+ enemy waves with escalating difficulty</td><td>Yes</td></tr>
+        <tr><td>At least 2 enemy types (e.g., basic and fast)</td><td>Yes</td></tr>
+        <tr><td>Lives system (enemies reaching goal cost lives)</td><td>Yes</td></tr>
+        <tr><td>Game over when lives reach zero</td><td>Yes</td></tr>
+        <tr><td>Basic upgrade system (at least 1 upgrade per tower type)</td><td>Yes</td></tr>
+        <tr><td>Dynamic path recalculation on tower placement</td><td>Stretch</td></tr>
+        <tr><td>Branching upgrade paths</td><td>Stretch</td></tr>
+        <tr><td>Tower selling</td><td>Stretch</td></tr>
+        <tr><td>Multiple spawn points</td><td>Stretch</td></tr>
+        <tr><td>Flying / special enemy types</td><td>Stretch</td></tr>
+        <tr><td>Active abilities with cooldowns</td><td>Stretch</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliverable</h3>
+    <p>A playable single-player tower defense game. Enemies spawn in waves and follow a path toward a goal. The player places and upgrades towers using gold earned from kills. Towers automatically target and fire at enemies in range. The game ends when the player survives all waves (victory) or loses all lives (defeat). Submit a screen recording or playable link alongside your source code. Include a brief write-up (a few sentences is fine) explaining whether you chose fixed paths or dynamic pathfinding and why.</p>
+
+    <h2>Analogies by Background</h2>
+
+    <blockquote>
+      <p>These analogies map game dev concepts to patterns you already know. Find your background below.</p>
+    </blockquote>
+
+    <h3>For Backend Developers</h3>
+    <table>
+      <thead>
+        <tr><th>Concept</th><th>Analogy</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>A* Pathfinding</td><td>Query optimizer cost model or network packet routing &mdash; informed search using a heuristic to explore large state spaces efficiently</td></tr>
+        <tr><td>Placement Systems</td><td>Request validation with transactional rollback &mdash; tentatively apply a change, check business rules / system invariants, commit or revert</td></tr>
+        <tr><td>Economy / Resource Management</td><td>Capacity planning &mdash; budget allocation between immediate throughput (cheap infra now) and long-term efficiency (bigger investment later)</td></tr>
+        <tr><td>Targeting AI for Towers</td><td>Load balancer algorithms (round-robin, least-connections, weighted) or cache eviction policies (LRU, LFU) &mdash; interchangeable strategies with the same interface</td></tr>
+        <tr><td>Range Detection</td><td>Geo-spatial queries in PostGIS or geofencing services &mdash; at scale, brute-force becomes spatial indexing (R-trees, quadtrees)</td></tr>
+        <tr><td>Upgrade Trees</td><td>Feature flags or tiered pricing configuration &mdash; static data structures interpreted at runtime, adding options means adding data not code</td></tr>
+        <tr><td>Wave Design</td><td>Load test scenarios &mdash; sustained load, burst traffic, heavy requests, and peak events defined as declarative configuration (like CI/CD pipelines or job schedulers)</td></tr>
+        <tr><td>Path Recalculation</td><td>CDN cache invalidation or routing table recomputation &mdash; when state changes, cached results are stale and must be recomputed</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Frontend Developers</h3>
+    <table>
+      <thead>
+        <tr><th>Concept</th><th>Analogy</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>A* Pathfinding</td><td>DOM traversal with a heuristic &mdash; like a best-first search through a component tree to find the optimal render path</td></tr>
+        <tr><td>Placement Systems</td><td>Form validation with optimistic UI &mdash; show the change, validate against rules, revert the DOM if validation fails</td></tr>
+        <tr><td>Economy / Resource Management</td><td>State budget in a Redux/Zustand store &mdash; every action (purchase/earn) is a dispatched event that updates a central balance</td></tr>
+        <tr><td>Targeting AI for Towers</td><td>Event delegation with different handler strategies &mdash; the same listener interface, but the selection logic (nearest, first, strongest) is swappable</td></tr>
+        <tr><td>Range Detection</td><td>Bounding-rect intersection checks (<code>getBoundingClientRect</code>) for detecting which elements overlap a circular region</td></tr>
+        <tr><td>Upgrade Trees</td><td>Nested component configuration objects &mdash; a JSON structure that defines what a component renders, extended by adding data</td></tr>
+        <tr><td>Wave Design</td><td>Declarative animation sequences (CSS keyframes or Framer Motion) &mdash; timed events defined as configuration, not imperative code</td></tr>
+        <tr><td>Path Recalculation</td><td>Virtual DOM diffing after state change &mdash; when the underlying data changes, the rendered output must be recomputed and reconciled</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Data / ML Engineers</h3>
+    <table>
+      <thead>
+        <tr><th>Concept</th><th>Analogy</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>A* Pathfinding</td><td>Best-first search through a state space, like beam search in sequence models &mdash; a heuristic guides exploration toward the goal</td></tr>
+        <tr><td>Placement Systems</td><td>Constraint satisfaction with rollback &mdash; like checking that adding a feature to a model does not violate multicollinearity constraints</td></tr>
+        <tr><td>Economy / Resource Management</td><td>Compute budget allocation &mdash; spend GPU hours on quick experiments now or save for a large training run later</td></tr>
+        <tr><td>Targeting AI for Towers</td><td>Scoring functions for candidate selection &mdash; rank items by different criteria (distance, strength), same interface as ranking models or selection policies in RL</td></tr>
+        <tr><td>Range Detection</td><td>k-nearest-neighbors spatial query &mdash; at scale, brute-force distance checks become KD-trees or approximate nearest neighbor indexes</td></tr>
+        <tr><td>Upgrade Trees</td><td>Hyperparameter configuration trees &mdash; branching options defined as data (YAML/JSON), parsed and applied at runtime</td></tr>
+        <tr><td>Wave Design</td><td>Synthetic data generation schedules &mdash; batches of varying size, type, and difficulty defined declaratively, like a data pipeline DAG</td></tr>
+        <tr><td>Path Recalculation</td><td>Recomputing a downstream feature when an upstream input changes &mdash; like cache invalidation in a feature store or re-running a DAG node</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li><strong>A* in the real world.</strong> A* requires an admissible heuristic &mdash; one that never overestimates the true cost. Manhattan distance works for a 4-directional grid. Where else have you encountered heuristic-driven search or optimization in backend systems? How does a database query optimizer's cost model relate to A*'s heuristic?</li>
+      <li><strong>Static vs. dynamic routing.</strong> Fixed paths are simpler but less interesting. Dynamic pathfinding is more complex but lets the player build mazes. How does this trade-off mirror the choice between static routing and dynamic routing in network infrastructure or microservice mesh configurations?</li>
+      <li><strong>Economy balance as system design.</strong> If towers are too cheap, the game is trivially easy. If enemies give too little gold, the game is impossible. How do you approach balancing an economy like this? What does playtesting an in-game economy have in common with capacity planning or cost optimization for cloud infrastructure?</li>
+      <li><strong>Performance and spatial queries.</strong> In an MVP, checking every enemy against every tower each frame is fine. At what scale does this break down, and what data structures (quadtrees, spatial hashing) would you reach for? How do these relate to spatial indexing in databases or geofencing services you have worked with?</li>
+    </ol>
+
+    <hr />
+
+    <h2>Prerequisites</h2>
+    <ul>
+      <li><strong>Module 01 (Pong) &mdash; recommended.</strong> Pong introduces the game loop, input handling, and collision detection. Tower defense builds on all of these fundamentals.</li>
+      <li><strong>Module 03 (Top-Down Shooter) &mdash; recommended.</strong> The top-down shooter introduces wave spawning, enemy AI, and projectile systems. Tower defense reuses all three concepts but shifts the player's role from direct combatant to architect. If you completed Module 03, you will find the wave and projectile systems familiar; the new challenges are pathfinding, placement, and economy.</li>
+    </ul>
+
+    <nav class="module-nav">
+      <a href={`${base}modules/05-puzzle/`}>&larr; Module 05: Puzzle Game</a>
+      <a href={`${base}modules/07-roguelike/`}>Module 07: Roguelike &rarr;</a>
+    </nav>
+  </div>
+</BaseLayout>

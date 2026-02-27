@@ -1,0 +1,208 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 04: Endless Runner">
+  <div class="container page-content">
+    <div class="module-header">
+      <div class="module-number">Module 04</div>
+      <h1>Endless Runner</h1>
+      <p class="module-theme">Procedural generation, difficulty curves, and infinite content</p>
+    </div>
+
+    <blockquote>
+      <p>"The player never wins &mdash; they only survive longer. Every run is practice, and death is information."</p>
+    </blockquote>
+
+    <hr />
+
+    <h2>Week 1: History &amp; Design Theory</h2>
+
+    <h3>The Origin</h3>
+    <p>Adam Saltsman built <strong>Canabalt</strong> in five days for the 2009 Experimental Gameplay Project. One button. One action: jump. The game scrolled automatically, accelerating until you inevitably died. It distilled game design to a single, repeatable decision under increasing pressure, and demonstrated that a browser game with one mechanic could be genuinely compelling.</p>
+    <p>Canabalt also established the template for the mobile game explosion that followed.</p>
+
+    <h3>How the Genre Evolved</h3>
+    <p><strong>Temple Run (Imangi Studios, 2011)</strong> mapped the runner to touchscreen swipe gestures and added lane-switching, sliding, and turning &mdash; giving the format spatial depth while keeping one-finger accessibility.</p>
+    <p><strong>Flappy Bird (Dong Nguyen, 2013)</strong> went the opposite direction: a single tap controlling vertical position through fixed pipe gaps. Extreme simplicity plus harsh difficulty creates compulsive replay loops. Its virality was a case study in how low friction-to-retry drives engagement.</p>
+
+    <h3>The Roguelike Connection</h3>
+    <p>The endless runner shares a core insight with roguelikes: <strong>procedural generation creates infinite replayability because memorization cannot substitute for skill.</strong></p>
+    <p><strong>Spelunky (Derek Yu, 2008/2012)</strong> uses procedural level generation to make a platformer infinitely replayable. <strong>Hades (Supergiant Games, 2020)</strong> layers persistent narrative progression over procedural runs, solving the genre's traditional weakness of feeling narratively empty.</p>
+
+    <h3>What Makes Endless Games "Great"</h3>
+    <p>The core design insight is <strong>inevitability</strong> &mdash; the game continuously escalates until the player fails. The question is never "can you win?" but "how long can you last, and what will you learn for next time?"</p>
+    <p>This reframes every run as practice and death as information. Combined with procedural generation ensuring no two runs are identical, this creates a powerful loop: die &rarr; learn &rarr; try again &rarr; get further &rarr; die &rarr; learn.</p>
+
+    <h3>The Essential Mechanic</h3>
+    <p><strong>Inevitability</strong> &mdash; the game escalates or randomizes until the player fails. The design question is never <em>if</em> you lose, but <em>when</em> and <em>what you learn</em>.</p>
+
+    <hr />
+
+    <h2>Week 2: Build the MVP</h2>
+
+    <h3>What You're Building</h3>
+    <p>An auto-scrolling game where the player avoids procedurally generated obstacles with a single input (jump or lane-switch). The world gets faster over time. High score persists between sessions.</p>
+    <p>This is the first module where there is no authored content &mdash; the game generates its own world at runtime.</p>
+
+    <h3>Core Concepts (Must Implement)</h3>
+
+    <h4>1. Procedural Generation with Constraints</h4>
+    <p>Generate obstacle/platform configurations at runtime, subject to constraints that guarantee solvability:</p>
+    <pre is:raw><code>generate_segment():
+  gap_width = random(MIN_GAP, MAX_GAP)
+  gap_height = random(MIN_HEIGHT, MAX_HEIGHT)
+
+  // Validate: can the player actually make this jump?
+  if gap_width > max_jump_distance:
+    gap_width = max_jump_distance * 0.9  // clamp to solvable
+
+  place_obstacle(gap_width, gap_height)</code></pre>
+    <p>The pipeline: <strong>random seed &rarr; candidate &rarr; validate &rarr; place or retry</strong>.</p>
+    <p><strong>Why it matters:</strong> PCG is used in roguelikes, open worlds, loot tables, and any system where hand-authored content can't scale. The constraint-validation loop (generate, check, accept or retry) is a pattern that recurs across many domains of software engineering.</p>
+
+    <h4>2. World Streaming / Ring Buffer</h4>
+    <p>Maintain a sliding window of active world chunks. As the player advances, chunks that scroll off the trailing edge are recycled to the leading edge with new content.</p>
+    <pre is:raw><code>chunks = [chunk0, chunk1, chunk2, chunk3]  // only 4 in memory
+
+on_chunk_exit(old_chunk):
+  new_content = generate_segment()
+  old_chunk.reset(new_content)
+  old_chunk.move_to(leading_edge)</code></pre>
+    <p><strong>Why it matters:</strong> This is a circular buffer applied to spatial data. It solves the fundamental problem of "infinite content, finite memory" by recycling a fixed number of chunks rather than allocating endlessly.</p>
+
+    <h4>3. Difficulty Scaling</h4>
+    <p>A function that maps elapsed time or distance to game parameters:</p>
+    <pre is:raw><code>speed = min(MAX_SPEED, BASE_SPEED + distance * RAMP_RATE)
+obstacle_density = lerp(EASY_DENSITY, HARD_DENSITY, distance / RAMP_DISTANCE)
+gap_width = lerp(EASY_GAP, HARD_GAP, distance / RAMP_DISTANCE)</code></pre>
+    <p><strong>Why it matters:</strong> Dynamic difficulty is a design tool across every genre. The curve-as-parameter pattern introduces <em>tuning knobs</em> as first-class design elements &mdash; values you expose and iterate on rather than hardcode.</p>
+
+    <h4>4. Single-Input Design</h4>
+    <p>Map one action (tap/spacebar) to context-dependent behavior through an input abstraction layer:</p>
+    <pre is:raw><code>raw input &rarr; action map &rarr; game command
+spacebar  &rarr; "primary"  &rarr; jump (if grounded) / double-jump (if airborne)</code></pre>
+    <p><strong>Why it matters:</strong> Input abstraction is how professional games handle cross-platform controls. The single-input constraint also teaches <em>design economy</em> &mdash; creating depth from minimal inputs.</p>
+
+    <h4>5. Persistent High Score</h4>
+    <p>Serialize the player's best score to persistent storage so it survives across sessions:</p>
+    <pre is:raw><code>on_death:
+  if current_score > load("high_score"):
+    save("high_score", current_score)
+  display_game_over(current_score, load("high_score"))</code></pre>
+    <p><strong>Why it matters:</strong> First introduction to persistence in this course. The save/load lifecycle scales to save-game systems, profiles, cloud saves, and leaderboards.</p>
+
+    <h4>6. Parallax Scrolling</h4>
+    <p>Render multiple background layers that scroll at different speeds to create depth:</p>
+    <pre is:raw><code>for each layer in background_layers:
+  layer.x_offset = camera.x * layer.depth_factor
+  // depth_factor: 0.1 (far clouds), 0.5 (mid buildings), 0.8 (near ground)</code></pre>
+    <p><strong>Why it matters:</strong> Introduces z-ordering and render layers. The parallax math is the conceptual foundation for perspective projection in 3D.</p>
+
+    <h4>7. Speed-as-Score</h4>
+    <p>Use cumulative distance as the primary score metric, displayed in real-time as a continuously incrementing counter.</p>
+    <p><strong>Why it matters:</strong> Implicit scoring &mdash; the score emerges from survival, not discrete events. The pacing variable (speed) is itself the progression metric.</p>
+
+    <h3>Stretch Goals (If Time Allows)</h3>
+    <ul>
+      <li><strong>Seeded randomness</strong> &mdash; Use a seeded PRNG so the same seed produces the same obstacle sequence. Enables daily challenges and deterministic testing.</li>
+      <li><strong>Near-miss rewards</strong> &mdash; Detect when the player barely avoids an obstacle (expanded "danger zone" AABB) and award bonus points. Secondary collision zones used for scoring without physical effect.</li>
+      <li><strong>Trail / after-image effects</strong> &mdash; Render fading copies of the player at recent positions (ring buffer of <code>{'{pos, opacity}'}</code>). Communicates speed visually.</li>
+      <li><strong>Analytics hooks</strong> &mdash; Emit structured events on death (<code>{'{distance, obstacle_type, speed}'}</code>) for later analysis. Gameplay telemetry applied to tuning.</li>
+    </ul>
+
+    <h3>MVP Spec</h3>
+    <table>
+      <thead>
+        <tr><th>Feature</th><th>Required</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Auto-scrolling world</td><td>Yes</td></tr>
+        <tr><td>Single-input control (jump or lane-switch)</td><td>Yes</td></tr>
+        <tr><td>Procedurally generated obstacles</td><td>Yes</td></tr>
+        <tr><td>Constraint validation (always solvable)</td><td>Yes</td></tr>
+        <tr><td>World chunk recycling (ring buffer)</td><td>Yes</td></tr>
+        <tr><td>Difficulty that increases over time</td><td>Yes</td></tr>
+        <tr><td>Distance-based score, displayed in real-time</td><td>Yes</td></tr>
+        <tr><td>Persistent high score (survives refresh/restart)</td><td>Yes</td></tr>
+        <tr><td>Parallax background</td><td>Yes</td></tr>
+        <tr><td>Seeded randomness</td><td>Stretch</td></tr>
+        <tr><td>Near-miss bonus</td><td>Stretch</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliverable</h3>
+    <ul>
+      <li>A playable endless runner</li>
+      <li>Write-up: What did you learn? What was harder than expected?</li>
+    </ul>
+
+    <h2>Analogies by Background</h2>
+
+    <blockquote>
+      <p>These analogies map game dev concepts to patterns you already know. Find your background below.</p>
+    </blockquote>
+
+    <h3>For Backend Developers</h3>
+    <table>
+      <thead>
+        <tr><th>Concept</th><th>Analogy</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Procedural Generation with Constraints</td><td>Constraint-based job scheduling &mdash; generate a candidate, validate against rules, accept or retry</td></tr>
+        <tr><td>World Streaming / Ring Buffer</td><td>Log rotation or network packet sliding windows &mdash; fixed buffer, recycle oldest entry</td></tr>
+        <tr><td>Difficulty Scaling</td><td>A/B test ramp-ups or adaptive rate limiting &mdash; a parameter curve that changes system behavior over time</td></tr>
+        <tr><td>Single-Input Design</td><td>API gateway routing &mdash; one entry point, context-dependent dispatch to different handlers</td></tr>
+        <tr><td>Persistent High Score</td><td>Key-value persistence (save/load lifecycle) &mdash; same pattern as session storage or user profile serialization</td></tr>
+        <tr><td>Parallax Scrolling</td><td>Layered middleware pipeline &mdash; each layer processes the same request at a different depth/priority</td></tr>
+        <tr><td>Speed-as-Score</td><td>Uptime counters or throughput metrics &mdash; the score is an emergent measure of continuous survival, not discrete events</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Frontend Developers</h3>
+    <table>
+      <thead>
+        <tr><th>Concept</th><th>Analogy</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Procedural Generation with Constraints</td><td>Dynamically generating DOM elements from data with validation rules before insertion</td></tr>
+        <tr><td>World Streaming / Ring Buffer</td><td>Virtual scrolling / windowed list (react-window) &mdash; only render visible items, recycle DOM nodes as the user scrolls</td></tr>
+        <tr><td>Difficulty Scaling</td><td>CSS easing functions or requestAnimationFrame-driven interpolation that changes a property over time</td></tr>
+        <tr><td>Single-Input Design</td><td>Event delegation &mdash; one event listener on a parent dispatches to context-dependent handlers</td></tr>
+        <tr><td>Persistent High Score</td><td>localStorage or IndexedDB persistence &mdash; read/write a serialized value that survives page refresh</td></tr>
+        <tr><td>Parallax Scrolling</td><td>CSS <code>transform: translateZ()</code> with <code>perspective</code> &mdash; layers at different z-depths scroll at different rates</td></tr>
+        <tr><td>Speed-as-Score</td><td>A live-updating reactive counter (like a Zustand/Redux store) whose value is derived from elapsed time</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Data / ML Engineers</h3>
+    <table>
+      <thead>
+        <tr><th>Concept</th><th>Analogy</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Procedural Generation with Constraints</td><td>Constrained sampling from a probability distribution &mdash; generate, reject if outside bounds, resample</td></tr>
+        <tr><td>World Streaming / Ring Buffer</td><td>Streaming data pipeline with a fixed-size sliding window (e.g., a rolling buffer in a time-series ingest)</td></tr>
+        <tr><td>Difficulty Scaling</td><td>A learning-rate schedule or hyperparameter annealing curve &mdash; a function that changes a parameter over training steps</td></tr>
+        <tr><td>Single-Input Design</td><td>A single-feature model that maps one input to multiple outputs depending on context (decision boundary)</td></tr>
+        <tr><td>Persistent High Score</td><td>Checkpointing model state to disk so training can resume after interruption</td></tr>
+        <tr><td>Parallax Scrolling</td><td>Multi-resolution feature maps &mdash; the same scene represented at different spatial scales (coarse to fine)</td></tr>
+        <tr><td>Speed-as-Score</td><td>A cumulative metric (like cumulative reward in RL) that emerges from continuous operation rather than discrete scoring events</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li>How do you test that procedurally generated content is always solvable? What happens when your constraints have bugs?</li>
+      <li>What makes a good difficulty curve? Should it be linear, logarithmic, step-wise? Why does Flappy Bird feel so different from Temple Run despite both being "endless"?</li>
+      <li>How would you add a meta-progression system (unlockable characters, permanent upgrades) that gives players a reason to come back beyond beating their high score?</li>
+      <li>What's the difference between "random" and "procedural"? How does seeded randomness change the player's relationship with the content?</li>
+    </ol>
+
+    <nav class="module-nav">
+      <a href={`${base}modules/03-top-down-shooter/`}>&larr; Module 03: Top-Down Shooter</a>
+      <a href={`${base}modules/05-puzzle/`}>Module 05: Puzzle Game &rarr;</a>
+    </nav>
+  </div>
+</BaseLayout>
