@@ -4,6 +4,6 @@ import mdx from '@astrojs/mdx';
 
 export default defineConfig({
   site: 'https://seanking11.github.io',
-  base: '/gamebootcamp',
+  base: '/gamebootcamp/',
   integrations: [mdx()],
 });
