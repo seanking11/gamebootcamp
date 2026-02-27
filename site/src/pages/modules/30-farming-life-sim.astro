@@ -1,0 +1,801 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 30: Farming / Life Sim">
+  <div class="container page-content">
+
+    <!-- Module Header -->
+    <div class="module-header">
+      <div class="module-number">Module 30</div>
+      <h1>Farming / Life Sim</h1>
+      <p class="module-theme">Tend a farm, befriend a village, and never have enough hours in the day | Pixel Valley Farm</p>
+    </div>
+
+    <blockquote>
+      "A great farming sim makes Tuesday feel different from Saturday and spring feel different from winter &mdash; time is not a resource to spend but a season to live through."
+    </blockquote>
+
+    <!-- ============================================================ -->
+    <!-- WEEK 1: HISTORY & DESIGN THEORY                              -->
+    <!-- ============================================================ -->
+
+    <h2>Week 1: History &amp; Design Theory</h2>
+
+    <h3>The Origin</h3>
+    <p>
+      In 1996, Yasuhiro Wada created <strong>Harvest Moon</strong> because he missed the rural countryside after moving to Tokyo. The game was a quiet rebellion against the prevailing design philosophy that games needed conflict, enemies, and win states. Instead, Harvest Moon gave the player a neglected farm and a single year to restore it. You tilled soil, planted seeds, watered crops, and waited. Days passed. Seasons changed. The town had people with names, schedules, and opinions about you. Harvest Moon proved that the loop of planting, waiting, and harvesting was deeply satisfying because it mirrored the rhythms of real life compressed into something manageable.
+    </p>
+
+    <h3>How the Genre Evolved</h3>
+    <p>
+      <strong>Harvest Moon (1996)</strong> &mdash; Established every pillar the genre still rests on: a calendar with seasons, crops that grow over real in-game days, an energy system limiting daily actions, NPCs with relationship meters, and a farm that visibly transforms through sustained effort. Progression was measured in days and seasons, not levels and experience points.
+    </p>
+    <p>
+      <strong>Animal Crossing (2001)</strong> &mdash; Nintendo took the farming sim concept and removed the farm. Animal Crossing ran on the console's real-time clock. Seasons changed with real months. Villagers remembered if you had not visited in weeks. It proved that the "life" half of "life sim" could carry an entire game without the "farming" half.
+    </p>
+    <p>
+      <strong>Stardew Valley (2016)</strong> &mdash; Eric "ConcernedApe" Barone, working alone for four years, synthesized everything the genre had learned. Stardew Valley kept Harvest Moon's farming loop but added a crafting system, a dungeon-crawling mine, deep NPC relationships, and seasonal festivals. Most importantly, Barone understood pacing: days were short and activities numerous. You could never do everything in one day.
+    </p>
+
+    <h3>What Makes It "Great"</h3>
+    <p>
+      A great farming sim creates the feeling that you are living a small life, and that small life matters. The calendar is the secret weapon: it creates natural deadlines, natural variety, and natural milestones. The relationship system adds emotional texture. And the daily time limit forces the most compelling question in all of game design: "What do I do with today?"
+    </p>
+
+    <h3>The Essential Mechanic</h3>
+    <p>
+      <strong>Managing limited time each day</strong> across competing priorities &mdash; farming, socializing, exploring, crafting.
+    </p>
+
+    <hr />
+
+    <!-- ============================================================ -->
+    <!-- WEEK 2: BUILD THE MVP                                        -->
+    <!-- ============================================================ -->
+
+    <h2>Week 2: Build the MVP</h2>
+
+    <h3>What You're Building</h3>
+    <p>
+      A single-season farming sim where the player manages a small grid-based farm over 28 in-game days. Each day has limited hours (6 AM to midnight). The player can till soil, plant seeds, water crops, harvest grown crops, sell produce for gold, give gifts to NPCs, and craft basic items. Crops take varying numbers of days to grow. After 28 days, the season ends and the game shows a summary.
+    </p>
+
+    <h3>Core Concepts</h3>
+
+    <!-- ==================== CONCEPT 1: CALENDAR ==================== -->
+
+    <h4>1. Calendar / Time System</h4>
+    <p>
+      The game tracks the current day (1-28), the time of day (6:00 AM to midnight), and advances the calendar when the player sleeps. Each in-game minute passes at an accelerated rate, and certain actions consume chunks of time. The calendar drives everything: crop growth, NPC schedules, and the end-of-season deadline.
+    </p>
+    <pre is:raw><code>calendar = {
+    day: 1,
+    season: "spring",
+    timeOfDay: 600,    // 6:00 AM
+    WAKE_TIME: 600,
+    MIDNIGHT: 2400,
+    DAYS_PER_SEASON: 28
+}
+
+function sleepAndAdvanceDay():
+    calendar.day += 1
+    calendar.timeOfDay = calendar.WAKE_TIME
+    if calendar.day &gt; calendar.DAYS_PER_SEASON:
+        triggerSeasonEnd()
+    growCrops()
+    advanceNPCSchedules()</code></pre>
+    <p>
+      <strong>Why it matters:</strong> The calendar transforms an open-ended sandbox into a game with rhythm and stakes. Without it, the player can do everything eventually and nothing matters. With it, every day is a scarce resource.
+    </p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Crop Growth Timer</div>
+      <p class="demo-hint">Click an empty plot to plant a seed (costs 1 seed from your supply). Crops progress through stages each day: seed, sprout, grown, harvestable. Click a harvestable crop to collect it. Press "Next Day" to advance time. Water gets applied automatically each day.</p>
+      <canvas id="demo-crop-growth" width="760" height="500"></canvas>
+      <div class="demo-controls">
+        <button id="crop-next-day">Next Day</button>
+        <span class="value-display" id="crop-day">Day 1 of 28</span>
+        <span class="value-display" id="crop-seeds">Seeds: 8</span>
+        <span class="value-display" id="crop-gold">Gold: 0</span>
+        <span class="value-display" id="crop-harvested">Harvested: 0</span>
+      </div>
+    </div>
+
+    <!-- ==================== CONCEPT 2: CROP GROWTH ==================== -->
+
+    <h4>2. Crop Growth Timers</h4>
+    <p>
+      Each crop has a growth timeline: planted, watered, and then advancing through growth stages over multiple days. A crop advances one stage per day only if it was watered that day. Different crops take different numbers of days, creating a planning challenge.
+    </p>
+    <pre is:raw><code>CROP_DATA = {
+    "turnip":  {stages: 3, sellPrice: 60,  seedCost: 20},
+    "potato":  {stages: 5, sellPrice: 120, seedCost: 40},
+    "melon":   {stages: 8, sellPrice: 300, seedCost: 80}
+}
+
+function growCrops():
+    for each tile in farm.tiles:
+        if tile.crop != null:
+            if tile.crop.wateredToday:
+                tile.crop.currentStage += 1
+            tile.crop.wateredToday = false</code></pre>
+    <p>
+      <strong>Why it matters:</strong> Crop timers are the genre's signature mechanic. The delay between planting and harvesting creates anticipation, and the requirement to water daily creates a ritual. When a melon finally ripens after eight days, the payoff feels earned.
+    </p>
+
+    <!-- ==================== CONCEPT 3: NPC RELATIONSHIPS ==================== -->
+
+    <h4>3. NPC Relationship / Affection System</h4>
+    <p>
+      Each NPC has a friendship level (0-100) that increases when the player gives them gifts or talks to them daily. Different NPCs prefer different gifts. At certain thresholds, new dialogue unlocks and special events trigger.
+    </p>
+    <pre is:raw><code>function giveGift(npc, item):
+    if item in NPC_DATA[npc.name].lovedGifts:
+        npc.friendship += 20
+    else if item in NPC_DATA[npc.name].likedGifts:
+        npc.friendship += 10
+    else:
+        npc.friendship += 2
+    npc.friendship = clamp(npc.friendship, 0, 100)
+    checkFriendshipMilestones(npc)</code></pre>
+    <p>
+      <strong>Why it matters:</strong> The relationship system is what turns a farming game into a life sim. NPCs give the world emotional texture and give the player a reason to care about the world beyond profit. The daily gift-and-talk ritual competes directly with farming time.
+    </p>
+
+    <!-- ==================== CONCEPT 4: DAILY TIME BUDGET ==================== -->
+
+    <h4>4. Daily Time Budget</h4>
+    <p>
+      Each day runs from 6 AM to midnight. Actions consume time: watering one tile takes 10 minutes, giving a gift takes 30 minutes. The player can never do everything they want in one day. This scarcity is the game's core tension.
+    </p>
+    <pre is:raw><code>TIME_COSTS = {
+    TILL: 20, WATER: 10, PLANT: 15, HARVEST: 10,
+    GIVE_GIFT: 30, TALK: 15, CRAFT: 45, TRAVEL_PER_TILE: 2
+}
+
+function performAction(action, tile=null):
+    timeCost = TIME_COSTS[action]
+    if tile: timeCost += manhattanDistance(player, tile) * TIME_COSTS.TRAVEL_PER_TILE
+    if calendar.timeOfDay + timeCost &gt; calendar.MIDNIGHT:
+        return "Not enough time today"
+    advanceTime(timeCost)
+    executeAction(action, tile)</code></pre>
+    <p>
+      <strong>Why it matters:</strong> The daily time budget is the invisible hand that shapes every decision. It is what makes "What do I do today?" a meaningful question. Without it, the player optimizes everything simultaneously and the game becomes a checklist.
+    </p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Daily Time Budget</div>
+      <p class="demo-hint">A clock shows hours remaining in the day. Each action costs a different amount of time. Make choices and watch the day run out. Can you fit everything in before midnight?</p>
+      <canvas id="demo-time-budget" width="760" height="420"></canvas>
+      <div class="demo-controls">
+        <button id="time-water">Water Crops (1 hr)</button>
+        <button id="time-talk">Talk to NPC (1.5 hr)</button>
+        <button id="time-gift">Give Gift (2 hr)</button>
+        <button id="time-mine">Mine Rocks (3 hr)</button>
+        <button id="time-craft">Craft Item (2.5 hr)</button>
+        <button id="time-reset">New Day</button>
+      </div>
+    </div>
+
+    <!-- ==================== CONCEPT 5: CRAFTING ==================== -->
+
+    <h4>5. Crafting / Recipe System</h4>
+    <p>
+      The player can combine items to create new items. Recipes are discovered by reaching friendship milestones. Crafting consumes time and ingredients but produces more valuable items.
+    </p>
+    <pre is:raw><code>RECIPES = {
+    "scarecrow": {ingredients: {"wood": 5, "fiber": 3}, unlocked: true},
+    "sprinkler": {ingredients: {"iron": 2, "stone": 3}, unlocked: false},
+    "jam":       {ingredients: {"melon": 1, "sugar": 1}, unlocked: false}
+}
+
+function craft(recipeName, inventory):
+    recipe = RECIPES[recipeName]
+    if not canCraft(recipe, inventory): return null
+    for ingredient, count in recipe.ingredients:
+        inventory.remove(ingredient, count)
+    advanceTime(TIME_COSTS.CRAFT)
+    return createItem(recipe.result)</code></pre>
+    <p>
+      <strong>Why it matters:</strong> Crafting adds a second economy. That melon is worth 300 gold if you sell it, but it is also the key ingredient in jam (worth 500 gold) and a loved gift for an NPC (+20 friendship). Crafting forces the player to think about multiple competing uses.
+    </p>
+
+    <!-- ==================== CONCEPT 6: SEASONAL CONTENT ==================== -->
+
+    <h4>6. Seasonal Content</h4>
+    <p>
+      The season determines which crops can be planted, what the shop sells, weather, and which events trigger. The system is designed so swapping seasons means changing a data table, not rewriting code.
+    </p>
+    <pre is:raw><code>SEASONAL_DATA = {
+    "spring": {
+        availableCrops: ["turnip", "potato"],
+        events: {day_5: "flower_festival", day_20: "egg_hunt"},
+        shopInventory: ["turnip_seed", "potato_seed", "fertilizer"]
+    }
+}
+
+function isValidCropForSeason(cropType):
+    return cropType in getSeasonData().availableCrops</code></pre>
+    <p>
+      <strong>Why it matters:</strong> Seasons give the game a macro-rhythm on top of the daily micro-rhythm. Days create urgency; seasons create strategy. Seasonal content keeps the game fresh.
+    </p>
+
+    <!-- ==================== CONCEPT 7: TOOL UPGRADES ==================== -->
+
+    <h4>7. Tool Upgrade Progression</h4>
+    <p>
+      The player starts with basic tools (watering can waters one tile). Upgrades let tools affect more tiles. Upgrades take two in-game days (the tool is unavailable), creating another time-management tradeoff.
+    </p>
+    <pre is:raw><code>TOOL_LEVELS = {
+    "watering_can": [
+        {level: "basic",  tiles: 1, pattern: [[0,0]]},
+        {level: "copper", tiles: 3, pattern: [[0,0],[1,0],[2,0]]},
+        {level: "steel",  tiles: 9, pattern: 3x3_grid}
+    ]
+}
+
+function upgradeTool(toolName, targetLevel):
+    cost = UPGRADE_COSTS[targetLevel]
+    player.gold -= cost.gold
+    player.tools[toolName].readyOnDay = calendar.day + 2</code></pre>
+    <p>
+      <strong>Why it matters:</strong> Tool upgrades are the farming sim's answer to the power curve. Early game, watering 20 tiles takes 200 minutes. Late game, the same task takes 30 minutes, freeing time for new activities.
+    </p>
+
+    <hr />
+
+    <!-- ==================== STRETCH GOALS ==================== -->
+
+    <h3>Stretch Goals</h3>
+    <ul>
+      <li><strong>Mine / foraging</strong> &mdash; Explore for crafting materials.</li>
+      <li><strong>Weather effects</strong> &mdash; Rain auto-waters crops, storms damage unharvested produce.</li>
+      <li><strong>Second season</strong> &mdash; Different crops and events.</li>
+      <li><strong>Animal husbandry</strong> &mdash; Buy a chicken, feed it daily, collect eggs.</li>
+    </ul>
+
+    <h3>MVP Spec</h3>
+    <table>
+      <thead>
+        <tr><th>Component</th><th>Minimum Viable Version</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Grid</td><td>12x12 farm plot with interactable tiles</td></tr>
+        <tr><td>Calendar</td><td>28-day single season, 6 AM to midnight</td></tr>
+        <tr><td>Crops</td><td>3 types with different growth rates and values</td></tr>
+        <tr><td>Daily Actions</td><td>Till, plant, water, harvest, give gift, talk, craft</td></tr>
+        <tr><td>NPCs</td><td>2 named characters with schedules and gift preferences</td></tr>
+        <tr><td>Crafting</td><td>3 recipes</td></tr>
+        <tr><td>Economy</td><td>Sell crops for gold, buy seeds and upgrades</td></tr>
+        <tr><td>End State</td><td>Season ends after 28 days, summary screen</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliverable</h3>
+    <p>
+      A playable single-season farming sim where the player manages a grid-based farm over 28 in-game days. Each day has a time budget that forces prioritization between farming tasks, NPC relationships, and crafting. The game demonstrates the core tension: there is always more to do than time allows.
+    </p>
+
+    <hr />
+
+    <!-- ==================== DISCUSSION QUESTIONS ==================== -->
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li><strong>The Cozy Tension Paradox:</strong> Farming sims are marketed as relaxing, but their core mechanic is time pressure. How does Stardew Valley make scarcity feel gentle instead of stressful?</li>
+      <li><strong>Content Depth vs. Breadth:</strong> Your MVP has 3 crops and 2 NPCs. At what point does adding content stop being "more game" and start being "more database"?</li>
+      <li><strong>The Gift Economy:</strong> NPC relationship systems are often criticized as transactional. How could you redesign the system to feel more organic?</li>
+      <li><strong>Real Time vs. Game Time:</strong> Animal Crossing uses real-world time; Stardew Valley uses compressed game time. What are the tradeoffs?</li>
+    </ol>
+
+    <!-- Module Navigation -->
+    <div class="module-nav">
+      <a href={`${base}modules/29-management-tycoon`}>&larr; Previous Module</a>
+      <a href={`${base}modules/31-survival-crafting`}>Next Module &rarr;</a>
+    </div>
+
+  </div>
+</BaseLayout>
+
+<script>
+// ============================================================
+// DEMO 1: CROP GROWTH TIMER (4x4 farm grid)
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-crop-growth');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const nextDayBtn = document.getElementById('crop-next-day');
+  const dayDisplay = document.getElementById('crop-day');
+  const seedsDisplay = document.getElementById('crop-seeds');
+  const goldDisplay = document.getElementById('crop-gold');
+  const harvestedDisplay = document.getElementById('crop-harvested');
+
+  const GRID = 4;
+  const CELL = 90;
+  const gridOffX = (W - GRID * CELL) / 2 - 100;
+  const gridOffY = 60;
+
+  let day = 1;
+  let seeds = 8;
+  let gold = 0;
+  let harvested = 0;
+  let grid = [];
+
+  // Crop stages: 0=seed, 1=sprout, 2=growing, 3=mature (harvestable)
+  const stageColors = ['#8B6914', '#4a7c3f', '#22c55e', '#f59e0b'];
+  const stageLabels = ['Seed', 'Sprout', 'Growing', 'Harvest!'];
+  const stageIcons = ['.', '|', 'Y', '*'];
+
+  for (let r = 0; r < GRID; r++) {
+    grid[r] = [];
+    for (let c = 0; c < GRID; c++) {
+      grid[r][c] = null; // null = empty, {stage, maxStages}
+    }
+  }
+
+  function getGridCell(e) {
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) * (W / rect.width);
+    const my = (e.clientY - rect.top) * (H / rect.height);
+    const c = Math.floor((mx - gridOffX) / CELL);
+    const r = Math.floor((my - gridOffY) / CELL);
+    if (r >= 0 && r < GRID && c >= 0 && c < GRID) return { r, c };
+    return null;
+  }
+
+  canvas.addEventListener('click', function(e) {
+    const cell = getGridCell(e);
+    if (!cell) return;
+
+    const crop = grid[cell.r][cell.c];
+    if (crop === null) {
+      // Plant
+      if (seeds > 0) {
+        seeds--;
+        grid[cell.r][cell.c] = { stage: 0, maxStages: 3 };
+      }
+    } else if (crop.stage >= crop.maxStages) {
+      // Harvest
+      gold += 60;
+      harvested++;
+      grid[cell.r][cell.c] = null;
+    }
+  });
+
+  nextDayBtn.addEventListener('click', function() {
+    if (day >= 28) return;
+    day++;
+    // Grow all crops
+    for (let r = 0; r < GRID; r++) {
+      for (let c = 0; c < GRID; c++) {
+        if (grid[r][c] !== null && grid[r][c].stage < grid[r][c].maxStages) {
+          grid[r][c].stage++;
+        }
+      }
+    }
+  });
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    dayDisplay.textContent = 'Day ' + day + ' of 28';
+    seedsDisplay.textContent = 'Seeds: ' + seeds;
+    goldDisplay.textContent = 'Gold: ' + gold;
+    harvestedDisplay.textContent = 'Harvested: ' + harvested;
+
+    // Title
+    ctx.fillStyle = '#a1a1aa';
+    ctx.font = '600 14px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Your Farm - Click to Plant / Harvest', W / 2, 35);
+
+    // Draw grid
+    for (let r = 0; r < GRID; r++) {
+      for (let c = 0; c < GRID; c++) {
+        const x = gridOffX + c * CELL;
+        const y = gridOffY + r * CELL;
+
+        // Soil
+        ctx.fillStyle = '#2a1f0e';
+        ctx.fillRect(x + 2, y + 2, CELL - 4, CELL - 4);
+        ctx.strokeStyle = '#4a3520';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x + 2, y + 2, CELL - 4, CELL - 4);
+
+        const crop = grid[r][c];
+        if (crop) {
+          const stage = Math.min(crop.stage, crop.maxStages);
+          const stageIdx = Math.min(stage, 3);
+          const color = stageColors[stageIdx];
+
+          // Draw crop visual
+          const cx = x + CELL / 2;
+          const cy = y + CELL / 2;
+
+          if (stage === 0) {
+            // Seed - small dot
+            ctx.beginPath();
+            ctx.arc(cx, cy + 10, 4, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+          } else if (stage === 1) {
+            // Sprout - small stem
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy + 15);
+            ctx.lineTo(cx, cy);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(cx, cy - 3, 5, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+          } else if (stage === 2) {
+            // Growing - taller plant
+            ctx.strokeStyle = '#4a7c3f';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy + 18);
+            ctx.lineTo(cx, cy - 10);
+            ctx.stroke();
+            // Leaves
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx - 10, cy - 8);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(cx, cy - 5);
+            ctx.lineTo(cx + 10, cy - 13);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(cx, cy - 14, 7, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+          } else {
+            // Harvest ready - big golden crop with pulse
+            const pulse = 1 + Math.sin(Date.now() / 300) * 0.1;
+            ctx.strokeStyle = '#4a7c3f';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy + 18);
+            ctx.lineTo(cx, cy - 12);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx - 12, cy - 10);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(cx, cy - 6);
+            ctx.lineTo(cx + 12, cy - 14);
+            ctx.stroke();
+            // Glowing fruit
+            ctx.beginPath();
+            ctx.arc(cx, cy - 16, 10 * pulse, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(245,158,11,0.2)';
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(cx, cy - 16, 8, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+          }
+
+          // Stage label
+          ctx.fillStyle = '#a1a1aa';
+          ctx.font = '500 9px "JetBrains Mono", monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText(stageLabels[stageIdx], x + CELL / 2, y + CELL - 8);
+        } else {
+          // Empty plot indicator
+          ctx.fillStyle = '#3f3f4633';
+          ctx.font = '400 11px Inter, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('click to', x + CELL / 2, y + CELL / 2 - 5);
+          ctx.fillText('plant', x + CELL / 2, y + CELL / 2 + 10);
+        }
+      }
+    }
+
+    // Growth legend on the right
+    const legX = gridOffX + GRID * CELL + 40;
+    const legY = gridOffY + 10;
+    ctx.fillStyle = '#a1a1aa';
+    ctx.font = '600 12px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('Growth Stages:', legX, legY);
+
+    for (let i = 0; i < 4; i++) {
+      const sy = legY + 25 + i * 30;
+      ctx.beginPath();
+      ctx.arc(legX + 8, sy, 6, 0, Math.PI * 2);
+      ctx.fillStyle = stageColors[i];
+      ctx.fill();
+      ctx.fillStyle = '#a1a1aa';
+      ctx.font = '500 11px Inter, sans-serif';
+      ctx.fillText(stageLabels[i], legX + 22, sy + 4);
+    }
+
+    // Progress bar showing season
+    const barX = legX;
+    const barY = legY + 170;
+    const barW = 200;
+    const barH = 16;
+    ctx.fillStyle = '#1e1e22';
+    ctx.fillRect(barX, barY, barW, barH);
+    ctx.fillStyle = '#22c55e';
+    ctx.fillRect(barX, barY, barW * (day / 28), barH);
+    ctx.strokeStyle = '#3f3f46';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(barX, barY, barW, barH);
+    ctx.fillStyle = '#a1a1aa';
+    ctx.font = '500 10px "JetBrains Mono", monospace';
+    ctx.fillText('Season Progress', barX, barY - 5);
+    ctx.fillText('Day ' + day + '/28', barX + barW + 8, barY + 12);
+
+    // Summary stats
+    const statY = barY + 50;
+    ctx.font = '600 12px "JetBrains Mono", monospace';
+    ctx.fillStyle = '#f59e0b';
+    ctx.fillText('Gold: ' + gold, barX, statY);
+    ctx.fillStyle = '#22c55e';
+    ctx.fillText('Harvested: ' + harvested, barX, statY + 20);
+    ctx.fillStyle = '#8B6914';
+    ctx.fillText('Seeds left: ' + seeds, barX, statY + 40);
+
+    // End of season
+    if (day >= 28) {
+      ctx.fillStyle = 'rgba(10,10,11,0.7)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#f59e0b';
+      ctx.font = '700 28px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Season Complete!', W / 2, H / 2 - 30);
+      ctx.fillStyle = '#a1a1aa';
+      ctx.font = '500 16px Inter, sans-serif';
+      ctx.fillText('Gold earned: ' + gold + '  |  Crops harvested: ' + harvested, W / 2, H / 2 + 10);
+    }
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+
+// ============================================================
+// DEMO 2: DAILY TIME BUDGET
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-time-budget');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const waterBtn = document.getElementById('time-water');
+  const talkBtn = document.getElementById('time-talk');
+  const giftBtn = document.getElementById('time-gift');
+  const mineBtn = document.getElementById('time-mine');
+  const craftBtn = document.getElementById('time-craft');
+  const resetBtn = document.getElementById('time-reset');
+
+  const START_HOUR = 6;
+  const END_HOUR = 24;
+  const TOTAL_HOURS = END_HOUR - START_HOUR; // 18 hours
+
+  let currentHour = START_HOUR;
+  let actions = [];
+  let log = [];
+
+  const ACTIONS = {
+    water: { label: 'Water Crops', cost: 1, color: '#3b82f6', icon: 'W' },
+    talk:  { label: 'Talk to NPC', cost: 1.5, color: '#22c55e', icon: 'T' },
+    gift:  { label: 'Give Gift', cost: 2, color: '#a855f7', icon: 'G' },
+    mine:  { label: 'Mine Rocks', cost: 3, color: '#f59e0b', icon: 'M' },
+    craft: { label: 'Craft Item', cost: 2.5, color: '#ef4444', icon: 'C' }
+  };
+
+  function doAction(type) {
+    const action = ACTIONS[type];
+    if (currentHour + action.cost > END_HOUR) return;
+    const startH = currentHour;
+    currentHour += action.cost;
+    actions.push({ type, startH, endH: currentHour, ...action });
+    log.push(action.label + ' (' + action.cost + 'h)');
+    if (log.length > 8) log.shift();
+  }
+
+  waterBtn.addEventListener('click', () => doAction('water'));
+  talkBtn.addEventListener('click', () => doAction('talk'));
+  giftBtn.addEventListener('click', () => doAction('gift'));
+  mineBtn.addEventListener('click', () => doAction('mine'));
+  craftBtn.addEventListener('click', () => doAction('craft'));
+  resetBtn.addEventListener('click', () => { currentHour = START_HOUR; actions = []; log = []; });
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    const clockCX = 160;
+    const clockCY = 200;
+    const clockR = 120;
+    const hoursLeft = END_HOUR - currentHour;
+    const fraction = (currentHour - START_HOUR) / TOTAL_HOURS;
+
+    // Draw clock face
+    ctx.beginPath();
+    ctx.arc(clockCX, clockCY, clockR, 0, Math.PI * 2);
+    ctx.fillStyle = '#111114';
+    ctx.fill();
+    ctx.strokeStyle = '#3f3f46';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Time remaining arc (green portion)
+    const startAngle = -Math.PI / 2;
+    const usedAngle = startAngle + fraction * Math.PI * 2;
+
+    // Used portion (dark)
+    if (fraction > 0) {
+      ctx.beginPath();
+      ctx.moveTo(clockCX, clockCY);
+      ctx.arc(clockCX, clockCY, clockR - 4, startAngle, usedAngle);
+      ctx.closePath();
+      ctx.fillStyle = '#27272a';
+      ctx.fill();
+    }
+
+    // Color segments for each action
+    for (const a of actions) {
+      const aStart = startAngle + ((a.startH - START_HOUR) / TOTAL_HOURS) * Math.PI * 2;
+      const aEnd = startAngle + ((a.endH - START_HOUR) / TOTAL_HOURS) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(clockCX, clockCY);
+      ctx.arc(clockCX, clockCY, clockR - 4, aStart, aEnd);
+      ctx.closePath();
+      ctx.fillStyle = a.color + '55';
+      ctx.fill();
+    }
+
+    // Hour markers
+    for (let h = 0; h < TOTAL_HOURS; h++) {
+      const angle = startAngle + (h / TOTAL_HOURS) * Math.PI * 2;
+      const inner = clockR - 12;
+      const outer = clockR - 2;
+      ctx.beginPath();
+      ctx.moveTo(clockCX + Math.cos(angle) * inner, clockCY + Math.sin(angle) * inner);
+      ctx.lineTo(clockCX + Math.cos(angle) * outer, clockCY + Math.sin(angle) * outer);
+      ctx.strokeStyle = '#3f3f46';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Label every 3 hours
+      if (h % 3 === 0) {
+        const lx = clockCX + Math.cos(angle) * (clockR + 16);
+        const ly = clockCY + Math.sin(angle) * (clockR + 16);
+        const hourNum = START_HOUR + h;
+        const label = hourNum <= 12 ? hourNum + (hourNum < 12 ? 'AM' : 'PM') : (hourNum - 12) + 'PM';
+        ctx.fillStyle = '#71717a';
+        ctx.font = '500 9px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, lx, ly);
+      }
+    }
+
+    // Clock hand
+    const handAngle = startAngle + fraction * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(clockCX, clockCY);
+    ctx.lineTo(clockCX + Math.cos(handAngle) * (clockR - 25), clockCY + Math.sin(handAngle) * (clockR - 25));
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // Center dot
+    ctx.beginPath();
+    ctx.arc(clockCX, clockCY, 5, 0, Math.PI * 2);
+    ctx.fillStyle = '#f59e0b';
+    ctx.fill();
+
+    // Hours remaining text
+    ctx.fillStyle = hoursLeft <= 4 ? '#ef4444' : '#a1a1aa';
+    ctx.font = '700 20px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(hoursLeft.toFixed(1) + 'h left', clockCX, clockCY + clockR + 40);
+
+    const timeLabel = currentHour < 12 ? currentHour + ':00 AM' :
+                      currentHour === 12 ? '12:00 PM' :
+                      (currentHour < 24 ? (currentHour - 12).toFixed(0) + ':' + ((currentHour % 1) * 60).toFixed(0).padStart(2, '0') + ' PM' : 'Midnight');
+    ctx.fillStyle = '#71717a';
+    ctx.font = '500 12px Inter, sans-serif';
+    ctx.fillText('Current: ' + currentHour.toFixed(1) + ':00', clockCX, clockCY + clockR + 58);
+
+    // Action log on the right
+    const logX = 340;
+    const logY = 40;
+
+    ctx.fillStyle = '#a1a1aa';
+    ctx.font = '600 13px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText("Today's Actions:", logX, logY);
+
+    if (actions.length === 0) {
+      ctx.fillStyle = '#71717a';
+      ctx.font = '400 12px Inter, sans-serif';
+      ctx.fillText('No actions yet. Use the buttons below.', logX, logY + 25);
+    }
+
+    for (let i = 0; i < actions.length; i++) {
+      const a = actions[i];
+      const ay = logY + 25 + i * 28;
+
+      // Color bar
+      ctx.fillStyle = a.color;
+      ctx.fillRect(logX, ay - 6, 4, 20);
+
+      ctx.fillStyle = '#a1a1aa';
+      ctx.font = '500 11px Inter, sans-serif';
+      ctx.fillText(a.label, logX + 12, ay + 4);
+
+      ctx.fillStyle = '#71717a';
+      ctx.font = '500 10px "JetBrains Mono", monospace';
+      ctx.fillText(a.cost + 'h', logX + 150, ay + 4);
+    }
+
+    // Time bar visualization
+    const barX = 340;
+    const barY = 340;
+    const barW = 380;
+    const barH = 30;
+
+    ctx.fillStyle = '#111114';
+    ctx.fillRect(barX, barY, barW, barH);
+    ctx.strokeStyle = '#3f3f46';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(barX, barY, barW, barH);
+
+    // Action blocks on bar
+    for (const a of actions) {
+      const startFrac = (a.startH - START_HOUR) / TOTAL_HOURS;
+      const endFrac = (a.endH - START_HOUR) / TOTAL_HOURS;
+      ctx.fillStyle = a.color + '88';
+      ctx.fillRect(barX + startFrac * barW, barY, (endFrac - startFrac) * barW, barH);
+      // Letter
+      ctx.fillStyle = '#fff';
+      ctx.font = '700 11px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(a.icon, barX + ((startFrac + endFrac) / 2) * barW, barY + barH / 2 + 4);
+    }
+
+    // Bar labels
+    ctx.fillStyle = '#71717a';
+    ctx.font = '500 9px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('6AM', barX, barY + barH + 14);
+    ctx.textAlign = 'center';
+    ctx.fillText('12PM', barX + barW * (6 / TOTAL_HOURS), barY + barH + 14);
+    ctx.fillText('6PM', barX + barW * (12 / TOTAL_HOURS), barY + barH + 14);
+    ctx.textAlign = 'right';
+    ctx.fillText('12AM', barX + barW, barY + barH + 14);
+
+    // Midnight warning
+    if (hoursLeft <= 0) {
+      ctx.fillStyle = 'rgba(10,10,11,0.6)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#a855f7';
+      ctx.font = '700 24px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Day Over - Time for bed!', W / 2, H / 2);
+      ctx.fillStyle = '#71717a';
+      ctx.font = '500 14px Inter, sans-serif';
+      ctx.fillText('You completed ' + actions.length + ' actions today', W / 2, H / 2 + 30);
+    }
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+</script>

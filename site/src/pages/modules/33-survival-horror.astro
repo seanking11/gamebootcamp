@@ -1,0 +1,908 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 33: Survival Horror">
+  <div class="container page-content">
+
+    <!-- Module Header -->
+    <div class="module-header">
+      <div class="module-number">Module 33</div>
+      <h1>Survival Horror</h1>
+      <p class="module-theme">You are not the hunter &mdash; you are the hunted, and you never have enough bullets | The Dark Below</p>
+    </div>
+
+    <blockquote>
+      "The scariest thing in a game is not what you can see &mdash; it is the sound of footsteps in a hallway you thought was empty."
+    </blockquote>
+
+    <!-- ============================================================ -->
+    <!-- WEEK 1: HISTORY & DESIGN THEORY                              -->
+    <!-- ============================================================ -->
+
+    <h2>Week 1: History &amp; Design Theory</h2>
+
+    <h3>The Origin</h3>
+    <p>
+      In 1996, Shinji Mikami and Capcom released <strong>Resident Evil</strong> and coined the term "survival horror." The game dropped players into a mansion filled with zombies and gave them almost nothing to fight back with &mdash; a knife, a handgun with scarce ammunition, and a handful of healing herbs. Inventory was limited to six slots, and saving consumed a finite resource (ink ribbons). Every system was designed around a single principle: scarcity. You never had enough ammo to kill everything, enough health to take hits carelessly, or enough saves to retry freely. This scarcity transformed a third-person action game into something genuinely frightening &mdash; not because the zombies were scary, but because facing them meant spending resources you could not afford to lose.
+    </p>
+
+    <h3>How the Genre Evolved</h3>
+    <p>
+      <strong>Resident Evil (1996)</strong> &mdash; Defined the genre's mechanical vocabulary: fixed camera angles that obscure threats, tank controls that make movement vulnerable, strict inventory limits, save points that consume resources, and ammunition so scarce that players learned to dodge enemies rather than fight them.
+    </p>
+    <p>
+      <strong>Silent Hill 2 (2001)</strong> &mdash; Shifted from physical horror to psychological horror. The town was shrouded in fog and darkness, and monsters were manifestations of guilt. Audio designer Akira Yamaoka created a soundscape where industrial noise and radio static were as frightening as any monster. Proved that atmosphere surrounding the monster was the most powerful tool.
+    </p>
+    <p>
+      <strong>Amnesia: The Dark Descent (2010)</strong> &mdash; Frictional Games removed combat entirely. The player could run, hide, and close doors. Enemies could not be killed. A sanity mechanic degraded the player's perception in darkness, but light attracted enemies. Proved that powerlessness is the purest form of fear.
+    </p>
+
+    <h3>What Makes It "Great"</h3>
+    <p>
+      A great survival horror game is an exercise in controlled deprivation. Every system takes something away: ammo, health, visibility, safe places, sanity. The pacing alternates between tension and release: a safe room is an emotional reset that makes the next dark hallway feel even darker. The enemy design matters less than the enemy's presence &mdash; a monster that patrols unpredictably is scarier than one that attacks on sight. What the player cannot see is more frightening than what they can.
+    </p>
+
+    <h3>The Essential Mechanic</h3>
+    <p>
+      <strong>Resource scarcity</strong> &mdash; never having enough ammo or health to feel safe, forcing careful decision-making.
+    </p>
+
+    <hr />
+
+    <!-- ============================================================ -->
+    <!-- WEEK 2: BUILD THE MVP                                        -->
+    <!-- ============================================================ -->
+
+    <h2>Week 2: Build the MVP</h2>
+
+    <h3>What You're Building</h3>
+    <p>
+      A top-down survival horror game in an abandoned facility. The player navigates interconnected rooms, collecting sparse ammo and health kits while avoiding a stalker enemy that uses a 5-state AI (patrol, investigate, chase, search, return). The player has a flashlight with limited battery. Darkness is a core mechanic: rooms are dark unless illuminated. Some rooms are safe rooms where the enemy cannot enter.
+    </p>
+
+    <h3>Core Concepts</h3>
+
+    <!-- ==================== CONCEPT 1: RESOURCE SCARCITY ==================== -->
+
+    <h4>1. Resource Scarcity Design</h4>
+    <p>
+      The total ammunition and health items in the game is deliberately insufficient to kill every enemy and heal every wound. The player is forced to decide: fight and spend bullets, or sneak past and risk taking damage?
+    </p>
+    <pre is:raw><code>RESOURCE_BUDGET = {
+    totalAmmo: 24,          // Enough to kill ~4 enemies, but there are 8
+    totalHealthKits: 5,     // Each heals 40 HP; player has 100 HP
+    totalBatteries: 3,      // Each adds 60 seconds of flashlight
+    totalSaveItems: 4       // Limited saves (ink ribbon style)
+}
+
+ENEMY_STATS = {
+    "zombie":  {health: 30, damage: 20, bulletsToKill: 6},
+    "stalker": {health: 999, damage: 35, bulletsToKill: null}  // Cannot be killed
+}</code></pre>
+    <p>
+      <strong>Why it matters:</strong> Scarcity is the fundamental design lever. Without it, the game is an action game with creepy art. With it, every encounter becomes a risk-reward calculation.
+    </p>
+
+    <!-- ==================== CONCEPT 2: STALKER AI ==================== -->
+
+    <h4>2. AI Stalker / Hunter Enemy</h4>
+    <p>
+      The stalker cannot be killed and uses a multi-state behavior system: patrol (walks a route), investigate (heard a sound), chase (spotted the player), search (lost sight, checks nearby), and return (gives up, resumes patrol). The stalker reacts to player sounds and line-of-sight.
+    </p>
+    <pre is:raw><code>STALKER_STATES = {
+    PATROL:      {speed: 1.0, detectionRange: 5},
+    INVESTIGATE: {speed: 1.5, detectionRange: 7},
+    CHASE:       {speed: 2.5, detectionRange: 12},
+    SEARCH:      {speed: 1.2, detectionRange: 8},
+    RETURN:      {speed: 1.0, detectionRange: 5}
+}
+
+function updateStalker(stalker, player, deltaTime):
+    switch stalker.state:
+        case PATROL:
+            followPatrolRoute(stalker)
+            if canSeePlayer(): stalker.state = CHASE
+            else if heardSound(): stalker.state = INVESTIGATE
+        case CHASE:
+            moveToward(stalker, player.position)
+            if not canSeePlayer(): stalker.state = SEARCH
+        case SEARCH:
+            searchNearby(stalker, lastKnownPos)
+            if searchTimer &lt;= 0: stalker.state = RETURN</code></pre>
+    <p>
+      <strong>Why it matters:</strong> The stalker creates unpredictable tension. Every decision &mdash; run or walk, flashlight on or off, shortcut through darkness or long way through lit halls &mdash; is filtered through "where is the stalker right now?"
+    </p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Stalker AI State Machine</div>
+      <p class="demo-hint">A top-down grid with a player (blue) and enemy (red). The enemy has states: Patrol, Investigate, Chase, Search. Move the player with <strong>arrow keys</strong> or <strong>WASD</strong> to trigger state transitions. The current AI state is shown. Press <strong>N</strong> to make noise and attract the enemy.</p>
+      <canvas id="demo-stalker" width="760" height="500"></canvas>
+      <div class="demo-controls">
+        <span class="value-display" id="stalker-state">State: PATROL</span>
+        <span class="value-display" id="stalker-info">Move with arrows/WASD. Press N for noise.</span>
+      </div>
+    </div>
+
+    <!-- ==================== CONCEPT 3: SOUND DESIGN ==================== -->
+
+    <h4>3. Sound Design for Tension</h4>
+    <p>
+      Player actions generate sound events with a radius. The stalker's hearing system detects these events. Running is louder than walking. Shooting is loudest. The player's panic response (running away) can make the situation worse.
+    </p>
+    <pre is:raw><code>SOUND_EVENTS = {
+    "walk":      {radius: 2, alertLevel: 0.2},
+    "run":       {radius: 6, alertLevel: 0.7},
+    "shoot":     {radius: 12, alertLevel: 1.0},
+    "open_door": {radius: 4, alertLevel: 0.5}
+}
+
+function emitPlayerSound(soundType, position):
+    world.activeSounds.add({
+        position, radius: SOUND_EVENTS[soundType].radius,
+        alertLevel: SOUND_EVENTS[soundType].alertLevel
+    })</code></pre>
+    <p>
+      <strong>Why it matters:</strong> Sound creates a feedback loop: the player's own actions attract the stalker, meaning panic makes things worse. The safe room's silence is itself a form of design.
+    </p>
+
+    <!-- ==================== CONCEPT 4: CAMERA AS FEAR ==================== -->
+
+    <h4>4. Camera as a Fear Tool</h4>
+    <p>
+      The player can only see within their flashlight cone plus a small ambient radius. Anything behind or to the sides is invisible. The flashlight rotates with the player's facing direction, creating blind spots.
+    </p>
+    <pre is:raw><code>CAMERA_CONFIG = {
+    ambientVisRadius: 2,
+    flashlightArcAngle: 45,   // degrees
+    flashlightRange: 8,       // tiles
+    fullDarkAlpha: 0.95
+}
+
+function calculateVisibility(player):
+    visibleTiles = getTilesInRadius(player.position, ambientVisRadius)
+    if player.flashlightOn:
+        for tile in getTilesInCone(player.position, flashlightRange, flashlightArc):
+            if hasLineOfSight(player, tile):
+                visibleTiles.add(tile)
+    return visibleTiles</code></pre>
+    <p>
+      <strong>Why it matters:</strong> Restricted visibility is the most powerful fear tool. The player must choose between seeing further (flashlight on, battery draining, visible to stalker) and hiding (flashlight off, nearly blind, conserving battery).
+    </p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Flashlight / Darkness</div>
+      <p class="demo-hint">A dark room with a player. <strong>Arrow keys</strong> to move, <strong>mouse</strong> to aim the flashlight. Only the cone of light reveals the room. Hidden items (yellow) are only visible in the light. Press <strong>F</strong> to toggle the flashlight on/off.</p>
+      <canvas id="demo-flashlight" width="760" height="500"></canvas>
+      <div class="demo-controls">
+        <span class="value-display" id="flash-battery">Battery: 100%</span>
+        <span class="value-display" id="flash-items">Items Found: 0 / ?</span>
+        <span class="value-display" id="flash-status">Flashlight: ON</span>
+      </div>
+    </div>
+
+    <!-- ==================== CONCEPT 5: SAFE ROOMS ==================== -->
+
+    <h4>5. Safe Rooms / Tension-Release Pacing</h4>
+    <p>
+      Safe rooms are areas where the stalker cannot enter. They contain save points, sometimes pickups, and distinct calm audio. The level alternates between dangerous exploration and safe room respites.
+    </p>
+    <pre is:raw><code>function enterRoom(player, room):
+    if room.isSafeRoom:
+        stalker.state = SEARCH   // Cannot follow
+        crossfadeAudio(SAFE_ROOM_MUSIC)
+        room.lightLevel = 1.0    // Fully lit
+        showNotification("Safe Room")</code></pre>
+    <p>
+      <strong>Why it matters:</strong> Safe rooms reset the player's emotional baseline. The calm music and full lighting create genuine relief that makes the next dark hallway feel even worse.
+    </p>
+
+    <!-- ==================== CONCEPT 6: INVENTORY ==================== -->
+
+    <h4>6. Inventory Tetris</h4>
+    <p>
+      Items have different sizes and must fit into a grid-based inventory. Ammo takes 1 slot, health kits take 2. The inventory screen does not pause the game &mdash; the stalker can still approach.
+    </p>
+    <pre is:raw><code>INVENTORY_CONFIG = { gridWidth: 4, gridHeight: 2 }  // 8 cells
+
+ITEM_SIZES = {
+    "handgun_ammo": {w: 1, h: 1},
+    "health_kit":   {w: 1, h: 2},
+    "battery":      {w: 1, h: 1},
+    "key_card":     {w: 1, h: 1}
+}</code></pre>
+    <p>
+      <strong>Why it matters:</strong> Inventory Tetris forces the player to think about what they truly need. The non-pausing design means spending too long rearranging items is itself a risk.
+    </p>
+
+    <!-- ==================== CONCEPT 7: DARKNESS & LIGHTING ==================== -->
+
+    <h4>7. Darkness and Lighting as Mechanics</h4>
+    <p>
+      The flashlight is a resource, a detection tool, and a risk. It drains battery, and batteries are scarce. Turning it on makes the player visible to the stalker from greater range. The tension between seeing and hiding is the core dilemma.
+    </p>
+    <pre is:raw><code>FLASHLIGHT_CONFIG = {
+    maxBattery: 100,
+    drainRate: 8,              // ~12 seconds continuous use
+    detectionMultiplier: 2.0,  // Stalker sees from 2x range
+    flickerThreshold: 20       // Starts flickering when low
+}</code></pre>
+    <p>
+      <strong>Why it matters:</strong> The flashlight creates a rhythm of on-off-on-off, constant micro-decisions. The flicker at low battery is pure psychological design: unreliable light is more frightening than no light.
+    </p>
+
+    <hr />
+
+    <!-- ==================== STRETCH GOALS ==================== -->
+
+    <h3>Stretch Goals</h3>
+    <ul>
+      <li><strong>Second enemy type</strong> &mdash; Slower, but attracted to light instead of sound.</li>
+      <li><strong>Sanity system</strong> &mdash; Visual distortions from staying in darkness too long.</li>
+      <li><strong>Environmental puzzles</strong> &mdash; Combine key items, enter codes found on walls.</li>
+      <li><strong>Multiple endings</strong> &mdash; Based on resources consumed and choices made.</li>
+    </ul>
+
+    <h3>MVP Spec</h3>
+    <table>
+      <thead>
+        <tr><th>Component</th><th>Minimum Viable Version</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Map</td><td>10 interconnected rooms (7 dangerous, 2 safe, 1 exit)</td></tr>
+        <tr><td>Player</td><td>Move, aim flashlight, shoot, interact, open inventory</td></tr>
+        <tr><td>Stalker</td><td>5-state AI: patrol, investigate, chase, search, return</td></tr>
+        <tr><td>Flashlight</td><td>Cone visibility, battery drain, flicker at low charge</td></tr>
+        <tr><td>Inventory</td><td>4x2 grid, items have sizes, does not pause game</td></tr>
+        <tr><td>Resources</td><td>24 ammo, 5 health kits, 3 batteries across entire game</td></tr>
+        <tr><td>Safe Rooms</td><td>2 rooms with save points, calm music, full lighting</td></tr>
+        <tr><td>Darkness</td><td>Rooms dark by default, flashlight provides visibility</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliverable</h3>
+    <p>
+      A playable survival horror game where the player navigates a dark facility with a limited flashlight, collects scarce resources, manages a grid-based inventory, and avoids a stalker enemy driven by a 5-state AI. The player should feel genuinely tense in dark rooms and genuinely relieved in safe rooms.
+    </p>
+
+    <hr />
+
+    <!-- ==================== DISCUSSION QUESTIONS ==================== -->
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li><strong>The Powerlessness Spectrum:</strong> Resident Evil gives you a gun with scarce ammo. Amnesia gives you nothing. Where on the spectrum should your MVP sit? Is a player with 3 bullets more scared or less scared than one with 0?</li>
+      <li><strong>Sound as Game Design:</strong> The stalker reacts to player sounds, meaning panic makes things worse. How do you communicate this without breaking immersion?</li>
+      <li><strong>Pacing and Desensitization:</strong> After 30 minutes, even the most frightening stalker becomes familiar. How do you prevent desensitization?</li>
+      <li><strong>The Inventory Decision:</strong> Non-pausing inventory means opening the bag is itself a risk. How does this change player behavior compared to a paused inventory?</li>
+    </ol>
+
+    <!-- Module Navigation -->
+    <div class="module-nav">
+      <a href={`${base}modules/32-rhythm-game`}>&larr; Previous Module</a>
+      <a href={`${base}modules/`}>All Modules &rarr;</a>
+    </div>
+
+  </div>
+</BaseLayout>
+
+<script>
+// ============================================================
+// DEMO 1: STALKER AI STATE MACHINE
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-stalker');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const stateEl = document.getElementById('stalker-state');
+  const infoEl = document.getElementById('stalker-info');
+
+  const TILE = 32;
+  const COLS = Math.floor(W / TILE);
+  const ROWS = Math.floor(H / TILE);
+
+  // Simple grid: 0=floor, 1=wall
+  const grid = [];
+  for (let r = 0; r < ROWS; r++) {
+    grid[r] = [];
+    for (let c = 0; c < COLS; c++) {
+      grid[r][c] = 0;
+    }
+  }
+  // Add some walls
+  const walls = [
+    [3,3],[3,4],[3,5],[3,6],[3,7],
+    [7,2],[7,3],[7,4],
+    [7,8],[7,9],[7,10],[7,11],
+    [3,14],[3,15],[3,16],[3,17],
+    [10,5],[10,6],[10,7],
+    [5,10],[6,10],
+    [12,12],[12,13],[12,14],[13,14],
+    [3,20],[3,21],[4,21],[5,21],
+    [10,16],[10,17],[10,18],[11,18],[12,18]
+  ];
+  for (const [r, c] of walls) {
+    if (r < ROWS && c < COLS) grid[r][c] = 1;
+  }
+
+  let player = { x: 4, y: 12, moving: false };
+  let stalker = {
+    x: 18, y: 3,
+    state: 'PATROL',
+    patrolIdx: 0,
+    target: null,
+    lastKnownPlayer: null,
+    searchTimer: 0,
+    speed: 0
+  };
+
+  const patrolRoute = [
+    { x: 18, y: 3 }, { x: 18, y: 10 }, { x: 12, y: 10 },
+    { x: 12, y: 3 }, { x: 18, y: 3 }
+  ];
+
+  let noisePos = null;
+  let noiseTimer = 0;
+
+  const keys = {};
+  document.addEventListener('keydown', function(e) {
+    keys[e.code] = true;
+    if (e.code === 'KeyN') {
+      noisePos = { x: player.x, y: player.y };
+      noiseTimer = 60;
+    }
+  });
+  document.addEventListener('keyup', function(e) { keys[e.code] = false; });
+
+  function canMove(x, y) {
+    if (x < 0 || x >= COLS || y < 0 || y >= ROWS) return false;
+    return grid[y][x] === 0;
+  }
+
+  function dist(a, b) {
+    return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
+  }
+
+  function hasLineOfSight(ax, ay, bx, by) {
+    const steps = Math.max(Math.abs(bx - ax), Math.abs(by - ay));
+    for (let i = 0; i <= steps; i++) {
+      const t = steps === 0 ? 0 : i / steps;
+      const cx = Math.round(ax + (bx - ax) * t);
+      const cy = Math.round(ay + (by - ay) * t);
+      if (cx >= 0 && cx < COLS && cy >= 0 && cy < ROWS && grid[cy][cx] === 1) return false;
+    }
+    return true;
+  }
+
+  function moveToward(entity, tx, ty, speed) {
+    const dx = tx - entity.x;
+    const dy = ty - entity.y;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    if (d < 0.1) return true;
+    const step = Math.min(speed, d);
+    const nx = entity.x + (dx / d) * step;
+    const ny = entity.y + (dy / d) * step;
+    if (canMove(Math.round(nx), Math.round(ny))) {
+      entity.x = nx;
+      entity.y = ny;
+    }
+    return d < 0.3;
+  }
+
+  let moveTimer = 0;
+
+  function update() {
+    // Player movement
+    moveTimer++;
+    if (moveTimer >= 8) {
+      moveTimer = 0;
+      let dx = 0, dy = 0;
+      if (keys['ArrowLeft'] || keys['KeyA']) dx = -1;
+      if (keys['ArrowRight'] || keys['KeyD']) dx = 1;
+      if (keys['ArrowUp'] || keys['KeyW']) dy = -1;
+      if (keys['ArrowDown'] || keys['KeyS']) dy = 1;
+      if (dx !== 0 || dy !== 0) {
+        const nx = player.x + dx;
+        const ny = player.y + dy;
+        if (canMove(nx, ny)) {
+          player.x = nx;
+          player.y = ny;
+        }
+      }
+    }
+
+    if (noiseTimer > 0) noiseTimer--;
+
+    const d = dist(stalker, player);
+    const canSee = d < 6 && hasLineOfSight(Math.round(stalker.x), Math.round(stalker.y), player.x, player.y);
+    const heardNoise = noisePos && noiseTimer > 30 && dist(stalker, noisePos) < 10;
+
+    // Stalker AI
+    const speed = 0.04;
+    switch (stalker.state) {
+      case 'PATROL': {
+        const wp = patrolRoute[stalker.patrolIdx];
+        const arrived = moveToward(stalker, wp.x, wp.y, speed);
+        if (arrived) stalker.patrolIdx = (stalker.patrolIdx + 1) % patrolRoute.length;
+        if (canSee) {
+          stalker.state = 'CHASE';
+          stalker.lastKnownPlayer = { x: player.x, y: player.y };
+        } else if (heardNoise) {
+          stalker.state = 'INVESTIGATE';
+          stalker.target = { ...noisePos };
+        }
+        break;
+      }
+      case 'INVESTIGATE': {
+        if (stalker.target) {
+          const arrived = moveToward(stalker, stalker.target.x, stalker.target.y, speed * 1.3);
+          if (canSee) {
+            stalker.state = 'CHASE';
+            stalker.lastKnownPlayer = { x: player.x, y: player.y };
+          } else if (arrived) {
+            stalker.state = 'SEARCH';
+            stalker.searchTimer = 180;
+          }
+        }
+        break;
+      }
+      case 'CHASE': {
+        moveToward(stalker, player.x, player.y, speed * 2);
+        stalker.lastKnownPlayer = { x: player.x, y: player.y };
+        if (!canSee) {
+          stalker.state = 'SEARCH';
+          stalker.searchTimer = 240;
+        }
+        break;
+      }
+      case 'SEARCH': {
+        stalker.searchTimer--;
+        if (stalker.lastKnownPlayer) {
+          // Wander near last known
+          const ox = (Math.sin(stalker.searchTimer * 0.05) * 3);
+          const oy = (Math.cos(stalker.searchTimer * 0.07) * 3);
+          moveToward(stalker, stalker.lastKnownPlayer.x + ox, stalker.lastKnownPlayer.y + oy, speed * 1.1);
+        }
+        if (canSee) {
+          stalker.state = 'CHASE';
+          stalker.lastKnownPlayer = { x: player.x, y: player.y };
+        } else if (stalker.searchTimer <= 0) {
+          stalker.state = 'RETURN';
+        }
+        break;
+      }
+      case 'RETURN': {
+        const wp = patrolRoute[stalker.patrolIdx];
+        const arrived = moveToward(stalker, wp.x, wp.y, speed);
+        if (arrived) {
+          stalker.state = 'PATROL';
+        }
+        if (canSee) {
+          stalker.state = 'CHASE';
+          stalker.lastKnownPlayer = { x: player.x, y: player.y };
+        }
+        break;
+      }
+    }
+
+    stateEl.textContent = 'State: ' + stalker.state;
+    const stateDesc = {
+      PATROL: 'Enemy is walking its route...',
+      INVESTIGATE: 'Enemy heard something! Moving to investigate.',
+      CHASE: 'SPOTTED! Enemy is chasing you!',
+      SEARCH: 'Enemy lost sight. Searching nearby...',
+      RETURN: 'Enemy gave up. Returning to patrol.'
+    };
+    infoEl.textContent = stateDesc[stalker.state];
+  }
+
+  function draw() {
+    update();
+    ctx.clearRect(0, 0, W, H);
+
+    // Draw grid
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const x = c * TILE;
+        const y = r * TILE;
+        if (grid[r][c] === 1) {
+          ctx.fillStyle = '#2a2a30';
+          ctx.fillRect(x, y, TILE, TILE);
+        } else {
+          ctx.fillStyle = '#0f0f12';
+          ctx.fillRect(x, y, TILE, TILE);
+        }
+        ctx.strokeStyle = '#1a1a1e';
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(x, y, TILE, TILE);
+      }
+    }
+
+    // Draw patrol route (faint)
+    ctx.strokeStyle = '#ef444422';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    for (let i = 0; i < patrolRoute.length; i++) {
+      const p = patrolRoute[i];
+      if (i === 0) ctx.moveTo(p.x * TILE + TILE / 2, p.y * TILE + TILE / 2);
+      else ctx.lineTo(p.x * TILE + TILE / 2, p.y * TILE + TILE / 2);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Noise indicator
+    if (noiseTimer > 0) {
+      const nr = (60 - noiseTimer) * 3;
+      ctx.beginPath();
+      ctx.arc(noisePos.x * TILE + TILE / 2, noisePos.y * TILE + TILE / 2, nr, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(245,158,11,' + (noiseTimer / 60 * 0.5) + ')';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // Stalker detection range (faint)
+    const detRanges = { PATROL: 5, INVESTIGATE: 7, CHASE: 12, SEARCH: 8, RETURN: 5 };
+    const detR = (detRanges[stalker.state] || 5) * TILE;
+    ctx.beginPath();
+    ctx.arc(stalker.x * TILE + TILE / 2, stalker.y * TILE + TILE / 2, detR, 0, Math.PI * 2);
+    ctx.strokeStyle = stalker.state === 'CHASE' ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.08)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Draw stalker
+    const sx = stalker.x * TILE + TILE / 2;
+    const sy = stalker.y * TILE + TILE / 2;
+    const stateColors = { PATROL: '#71717a', INVESTIGATE: '#f59e0b', CHASE: '#ef4444', SEARCH: '#a855f7', RETURN: '#3b82f6' };
+
+    // Glow
+    ctx.beginPath();
+    ctx.arc(sx, sy, 16, 0, Math.PI * 2);
+    ctx.fillStyle = (stateColors[stalker.state] || '#ef4444') + '22';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(sx, sy, 10, 0, Math.PI * 2);
+    ctx.fillStyle = stateColors[stalker.state] || '#ef4444';
+    ctx.fill();
+
+    // State label above stalker
+    ctx.fillStyle = stateColors[stalker.state] || '#ef4444';
+    ctx.font = '600 9px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(stalker.state, sx, sy - 16);
+
+    // Draw player
+    const px = player.x * TILE + TILE / 2;
+    const py = player.y * TILE + TILE / 2;
+    ctx.beginPath();
+    ctx.arc(px, py, 10, 0, Math.PI * 2);
+    ctx.fillStyle = '#3b82f6';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(px, py, 14, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(59,130,246,0.15)';
+    ctx.fill();
+
+    // Player label
+    ctx.fillStyle = '#3b82f6';
+    ctx.fillText('PLAYER', px, py - 16);
+
+    // Line of sight indicator when stalker can see player
+    const d = dist(stalker, player);
+    const canSee = d < 6 && hasLineOfSight(Math.round(stalker.x), Math.round(stalker.y), player.x, player.y);
+    if (canSee) {
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(px, py);
+      ctx.strokeStyle = '#ef444466';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Alert icon
+      ctx.fillStyle = '#ef4444';
+      ctx.font = '700 18px Inter, sans-serif';
+      ctx.fillText('!', sx, sy - 26);
+    }
+
+    // Legend
+    ctx.fillStyle = '#71717a';
+    ctx.font = '500 10px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('Arrow keys / WASD to move | N to make noise', 10, H - 10);
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+
+// ============================================================
+// DEMO 2: FLASHLIGHT / DARKNESS
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-flashlight');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const batteryEl = document.getElementById('flash-battery');
+  const itemsEl = document.getElementById('flash-items');
+  const statusEl = document.getElementById('flash-status');
+
+  const TILE = 28;
+  const COLS = Math.floor(W / TILE);
+  const ROWS = Math.floor(H / TILE);
+
+  // Room layout
+  const grid = [];
+  for (let r = 0; r < ROWS; r++) {
+    grid[r] = [];
+    for (let c = 0; c < COLS; c++) {
+      // Border walls
+      if (r === 0 || r === ROWS - 1 || c === 0 || c === COLS - 1) {
+        grid[r][c] = 1;
+      } else {
+        grid[r][c] = 0;
+      }
+    }
+  }
+  // Interior walls for rooms
+  const interiorWalls = [
+    // Vertical walls
+    ...Array.from({ length: 8 }, (_, i) => [i + 2, 8]),
+    ...Array.from({ length: 6 }, (_, i) => [i + 8, 8]),
+    ...Array.from({ length: 5 }, (_, i) => [i + 2, 16]),
+    ...Array.from({ length: 8 }, (_, i) => [i + 9, 16]),
+    // Horizontal walls
+    ...Array.from({ length: 5 }, (_, i) => [6, i + 2]),
+    ...Array.from({ length: 5 }, (_, i) => [12, i + 10]),
+    ...Array.from({ length: 6 }, (_, i) => [6, i + 18]),
+  ];
+  for (const [r, c] of interiorWalls) {
+    if (r > 0 && r < ROWS - 1 && c > 0 && c < COLS - 1) {
+      grid[r][c] = 1;
+    }
+  }
+
+  // Hidden items
+  const hiddenItems = [
+    { x: 4, y: 3, found: false },
+    { x: 20, y: 4, found: false },
+    { x: 15, y: 11, found: false },
+    { x: 3, y: 14, found: false },
+    { x: 22, y: 14, found: false },
+    { x: 10, y: 5, found: false },
+    { x: 18, y: 8, found: false }
+  ];
+
+  let player = { x: 13, y: 9 };
+  let flashlightOn = true;
+  let battery = 100;
+  let mouseAngle = 0;
+  let itemsFound = 0;
+
+  const FLASH_ARC = Math.PI / 3.5; // ~51 degrees
+  const FLASH_RANGE = 9;
+  const AMBIENT_RANGE = 1.5;
+  const DRAIN_RATE = 1.5; // per second
+
+  const keys = {};
+  document.addEventListener('keydown', function(e) {
+    keys[e.code] = true;
+    if (e.code === 'KeyF') {
+      flashlightOn = !flashlightOn;
+    }
+  });
+  document.addEventListener('keyup', function(e) { keys[e.code] = false; });
+
+  canvas.addEventListener('mousemove', function(e) {
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) * (W / rect.width);
+    const my = (e.clientY - rect.top) * (H / rect.height);
+    const px = player.x * TILE + TILE / 2;
+    const py = player.y * TILE + TILE / 2;
+    mouseAngle = Math.atan2(my - py, mx - px);
+  });
+
+  let moveTimer = 0;
+
+  function canMove(x, y) {
+    if (x < 0 || x >= COLS || y < 0 || y >= ROWS) return false;
+    return grid[y][x] === 0;
+  }
+
+  function isTileVisible(tx, ty) {
+    const px = player.x;
+    const py = player.y;
+    const dx = tx - px;
+    const dy = ty - py;
+    const d = Math.sqrt(dx * dx + dy * dy);
+
+    // Ambient range
+    if (d <= AMBIENT_RANGE) return true;
+
+    // Flashlight check
+    if (!flashlightOn || battery <= 0) return false;
+    if (d > FLASH_RANGE) return false;
+
+    const angle = Math.atan2(dy, dx);
+    let diff = angle - mouseAngle;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+
+    if (Math.abs(diff) > FLASH_ARC / 2) return false;
+
+    // Line of sight
+    const steps = Math.max(Math.abs(tx - px), Math.abs(ty - py));
+    for (let i = 0; i <= steps; i++) {
+      const t = steps === 0 ? 0 : i / steps;
+      const cx = Math.round(px + (tx - px) * t);
+      const cy = Math.round(py + (ty - py) * t);
+      if (grid[cy] && grid[cy][cx] === 1) return false;
+    }
+    return true;
+  }
+
+  function draw() {
+    const dt = 1 / 60;
+
+    // Player movement
+    moveTimer++;
+    if (moveTimer >= 7) {
+      moveTimer = 0;
+      let dx = 0, dy = 0;
+      if (keys['ArrowLeft'] || keys['KeyA']) dx = -1;
+      if (keys['ArrowRight'] || keys['KeyD']) dx = 1;
+      if (keys['ArrowUp'] || keys['KeyW']) dy = -1;
+      if (keys['ArrowDown'] || keys['KeyS']) dy = 1;
+      if (dx !== 0 || dy !== 0) {
+        if (canMove(player.x + dx, player.y + dy)) {
+          player.x += dx;
+          player.y += dy;
+        }
+      }
+    }
+
+    // Battery drain
+    if (flashlightOn && battery > 0) {
+      battery -= DRAIN_RATE * dt;
+      if (battery <= 0) {
+        battery = 0;
+        flashlightOn = false;
+      }
+    }
+
+    // Check item collection
+    for (const item of hiddenItems) {
+      if (!item.found && player.x === item.x && player.y === item.y) {
+        item.found = true;
+        itemsFound++;
+      }
+    }
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Compute visibility
+    const visible = [];
+    for (let r = 0; r < ROWS; r++) {
+      visible[r] = [];
+      for (let c = 0; c < COLS; c++) {
+        visible[r][c] = isTileVisible(c, r);
+      }
+    }
+
+    // Draw tiles
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const x = c * TILE;
+        const y = r * TILE;
+        const isVisible = visible[r][c];
+
+        if (grid[r][c] === 1) {
+          ctx.fillStyle = isVisible ? '#2a2a30' : '#080808';
+          ctx.fillRect(x, y, TILE, TILE);
+        } else {
+          ctx.fillStyle = isVisible ? '#161620' : '#060606';
+          ctx.fillRect(x, y, TILE, TILE);
+        }
+
+        if (isVisible) {
+          ctx.strokeStyle = '#1a1a1e';
+          ctx.lineWidth = 0.3;
+          ctx.strokeRect(x, y, TILE, TILE);
+        }
+      }
+    }
+
+    // Draw hidden items (only if visible)
+    for (const item of hiddenItems) {
+      if (item.found) continue;
+      if (visible[item.y] && visible[item.y][item.x]) {
+        const ix = item.x * TILE + TILE / 2;
+        const iy = item.y * TILE + TILE / 2;
+        ctx.beginPath();
+        ctx.arc(ix, iy, 5, 0, Math.PI * 2);
+        ctx.fillStyle = '#f59e0b';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(ix, iy, 8, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(245,158,11,0.2)';
+        ctx.fill();
+      }
+    }
+
+    // Draw flashlight cone (subtle light effect)
+    if (flashlightOn && battery > 0) {
+      const px = player.x * TILE + TILE / 2;
+      const py = player.y * TILE + TILE / 2;
+      const range = FLASH_RANGE * TILE;
+
+      // Flicker effect when low battery
+      let alpha = 0.08;
+      if (battery < 20) {
+        alpha = Math.random() < 0.3 ? 0 : 0.06;
+      }
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.arc(px, py, range, mouseAngle - FLASH_ARC / 2, mouseAngle + FLASH_ARC / 2);
+      ctx.closePath();
+
+      const grad = ctx.createRadialGradient(px, py, 0, px, py, range);
+      grad.addColorStop(0, 'rgba(255,220,150,' + alpha * 2 + ')');
+      grad.addColorStop(0.5, 'rgba(255,220,150,' + alpha + ')');
+      grad.addColorStop(1, 'rgba(255,220,150,0)');
+      ctx.fillStyle = grad;
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Draw player
+    const ppx = player.x * TILE + TILE / 2;
+    const ppy = player.y * TILE + TILE / 2;
+    ctx.beginPath();
+    ctx.arc(ppx, ppy, 8, 0, Math.PI * 2);
+    ctx.fillStyle = '#3b82f6';
+    ctx.fill();
+
+    // Direction indicator
+    ctx.beginPath();
+    ctx.moveTo(ppx, ppy);
+    ctx.lineTo(ppx + Math.cos(mouseAngle) * 14, ppy + Math.sin(mouseAngle) * 14);
+    ctx.strokeStyle = flashlightOn ? '#f59e0b' : '#3b82f6';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Darkness overlay for non-visible areas
+    ctx.fillStyle = 'rgba(0,0,0,0.85)';
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        if (!visible[r][c]) {
+          ctx.fillRect(c * TILE, r * TILE, TILE, TILE);
+        }
+      }
+    }
+
+    // HUD
+    batteryEl.textContent = 'Battery: ' + Math.max(0, Math.round(battery)) + '%';
+    itemsEl.textContent = 'Items Found: ' + itemsFound + ' / ' + hiddenItems.length;
+    statusEl.textContent = 'Flashlight: ' + (flashlightOn ? 'ON' : 'OFF') + (battery < 20 && flashlightOn ? ' (LOW!)' : '');
+
+    // Instructions
+    ctx.fillStyle = '#71717a';
+    ctx.font = '500 10px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('Arrows/WASD: move | Mouse: aim | F: toggle flashlight', 10, H - 8);
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+</script>

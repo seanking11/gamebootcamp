@@ -1,0 +1,930 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 36: Trivia">
+  <div class="container page-content">
+    <div class="module-header">
+      <div class="module-number">Module 36</div>
+      <h1>Trivia</h1>
+      <p class="module-theme">Build a game where what you know &mdash; and how fast you know it &mdash; wins | The Fastest Brain in the Room</p>
+    </div>
+
+    <blockquote>
+      "The best trivia game makes you feel smart when you're right and curious when you're wrong."
+    </blockquote>
+
+    <hr />
+
+    <h2>Prerequisites</h2>
+    <table>
+      <thead>
+        <tr><th>Module</th><th>What You Used From It</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Module 01 - Pong</td><td>A working game loop and basic input handling. Trivia games extend this with timer management, state synchronization, and data-driven content.</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h2>Week 1: History &amp; Design Theory</h2>
+
+    <h3>The Origin</h3>
+    <p>Trivia games trace back to parlor games and pub quizzes, but the video game version found its voice in 1995 with <strong>You Don't Know Jack</strong> by Jellyvision. Rather than treating trivia as a dry flashcard exercise, YDKJ wrapped questions in irreverent humor, wordplay, and time pressure. A snarky host read questions aloud, players buzzed in with answers, and wrong answers were met with ridicule. The game understood something fundamental: trivia is not about testing knowledge &mdash; it is about the social performance of knowing (or guessing, or panicking). The format &mdash; question, timer, answer, reaction &mdash; has remained essentially unchanged for 30 years because it is one of the most naturally compelling loops in all of gaming. Everyone knows something, and everyone wants to prove it.</p>
+
+    <h3>How the Genre Evolved</h3>
+    <p><strong>You Don't Know Jack (Jellyvision, 1995)</strong> &mdash; Proved that trivia games need personality. YDKJ's host-driven format, creative question framing ("DisOrDat" categories, trick questions), and punishing wrong-answer penalties made it feel like a game show rather than a quiz. It established that presentation and pacing matter as much as question quality, and that humor is the secret ingredient that keeps players engaged between questions.</p>
+
+    <p><strong>Buzz! (Sony, 2005)</strong> &mdash; Brought trivia to the living room with dedicated wireless buzzers for the PlayStation. Buzz! demonstrated that physical input devices change the social dynamic &mdash; literally racing to press a button creates physical comedy and excitement that button presses on a controller cannot match. It also pioneered round variety within trivia (fastest finger, point builder, final countdown), showing that the same question-answer loop can feel fresh with structural variation.</p>
+
+    <p><strong>HQ Trivia (Rus Yusupov &amp; Colin Kroll, 2017)</strong> &mdash; Took trivia live with a real host, real-time participation from millions of players simultaneously, and real cash prizes. HQ proved that trivia could be a mass spectator event and that the live, synchronous format &mdash; everyone answering the same question at the same time &mdash; created electric tension. It also revealed the infrastructure challenges: server load during live events, question pacing for millions, and cheat prevention at scale.</p>
+
+    <h3>What Makes It "Great"</h3>
+    <p>A great trivia game makes every player feel like they have a chance. The question pool must span enough categories that a sports expert, a history buff, and a pop-culture junkie each get their moment to shine. Difficulty must escalate naturally so early questions build confidence and late questions create tension. Speed bonuses reward quick thinking without making the game unwinnable for careful readers. And critically, the moment between answering and seeing the result &mdash; that half-second of "am I right?" &mdash; must be preserved and dramatized. The best trivia games are not about knowing the most; they are about the emotional arc of each question: confidence, doubt, anticipation, and either triumph or the delicious sting of "I should have known that."</p>
+
+    <h3>The Essential Mechanic</h3>
+    <p>Answering questions correctly under time pressure &mdash; speed and knowledge both matter.</p>
+
+    <hr />
+
+    <h2>Week 2: Build the MVP</h2>
+
+    <h3>What You're Building</h3>
+    <p>A multiplayer trivia game where 2-4 players answer questions from a structured database, earn points based on correctness and speed, build streaks for consecutive correct answers, and compete across multiple rounds. The game pulls questions from a data file, manages timers, tracks scores with streak multipliers, and displays a final results screen.</p>
+
+    <h3>Core Concepts</h3>
+
+    <h4>1. Question Database Design</h4>
+    <p>Questions are data, not code. A well-structured question format supports multiple question types, categories, difficulty levels, and optional media. The database must be easy to author, validate, and extend.</p>
+    <pre is:raw><code>// Question data structure
+QuestionSchema:
+    id: unique string
+    text: string
+    type: enum [MULTIPLE_CHOICE, TRUE_FALSE, FILL_IN]
+    answers: Answer[]
+    correctAnswerIndex: integer
+    category: string          // "Science", "History", "Pop Culture"
+    difficulty: enum [EASY, MEDIUM, HARD]
+    timeLimit: seconds
+    explanation: optional string
+
+// Example question entry
+{
+    "id": "sci_042",
+    "text": "What planet is known as the Red Planet?",
+    "type": "MULTIPLE_CHOICE",
+    "answers": [
+        {"id": "a", "text": "Venus"},
+        {"id": "b", "text": "Mars"},
+        {"id": "c", "text": "Jupiter"},
+        {"id": "d", "text": "Saturn"}
+    ],
+    "correctAnswerIndex": 1,
+    "category": "Science",
+    "difficulty": "EASY",
+    "timeLimit": 15,
+    "explanation": "Mars appears red due to iron oxide on its surface."
+}</code></pre>
+    <p><strong>Why it matters:</strong> The question database is the content engine of the entire game. A clean schema means questions can be authored by non-programmers (in a spreadsheet or form), validated automatically, and swapped without touching game code. Separating content from logic is what makes a trivia game maintainable at scale.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Trivia Game</div>
+      <p class="demo-hint">Answer 5 game-dev themed trivia questions! Each has a countdown timer &mdash; faster correct answers earn more points. Build a streak for bonus multipliers. Click an answer button or press 1-4 to select.</p>
+      <canvas id="demo-trivia" width="760" height="460"></canvas>
+      <div class="demo-controls">
+        <button id="trivia-a1">1</button>
+        <button id="trivia-a2">2</button>
+        <button id="trivia-a3">3</button>
+        <button id="trivia-a4">4</button>
+        <button id="trivia-start">Start Quiz</button>
+        <span class="value-display" id="trivia-status">Press Start to begin!</span>
+      </div>
+    </div>
+
+    <h4>2. Timer-based Answer Windows</h4>
+    <p>Each question has a countdown timer. The player must answer before time runs out. Faster correct answers earn more points, creating tension between speed and deliberation.</p>
+    <pre is:raw><code>class QuestionTimer:
+    maxTime = 15
+    elapsed = 0
+    isActive = false
+
+    function getSpeedBonus():
+        remainingRatio = getRemaining() / maxTime
+        return floor(remainingRatio * MAX_SPEED_BONUS)
+
+    function render():
+        remaining = getRemaining()
+        barWidth = (remaining / maxTime) * FULL_BAR_WIDTH
+        barColor = remaining > 5 ? GREEN : remaining > 2 ? YELLOW : RED
+        drawBar(barWidth, barColor)
+        if remaining < 3:
+            pulseText(ceil(remaining))
+            playTickSound()</code></pre>
+    <p><strong>Why it matters:</strong> The timer is what transforms trivia from a relaxed quiz into a game. Without it, players can deliberate forever and the pacing collapses. The speed bonus creates a risk/reward decision: answer immediately for maximum points, or wait to think and risk running out of time.</p>
+
+    <h4>3. Multiple Input Methods</h4>
+    <p>Trivia games must support diverse input devices: keyboard buttons, touchscreen taps, controller presses, or even voice input. An input abstraction layer lets the game accept answers from any source.</p>
+    <pre is:raw><code>// Abstract input interface
+interface AnswerInput:
+    function getSelectedAnswer() -> answerId or null
+    function isConfirmed() -> boolean
+
+// Keyboard implementation
+class KeyboardAnswerInput implements AnswerInput:
+    ANSWER_KEYS = { "1": "a", "2": "b", "3": "c", "4": "d" }
+
+    function getSelectedAnswer():
+        for key, answerId in ANSWER_KEYS:
+            if isKeyPressed(key):
+                return answerId
+        return null</code></pre>
+    <p><strong>Why it matters:</strong> The input method defines the social experience. Keyboard buttons work for local play. Phone-as-controller lets everyone use their own device privately. Abstracting input means you can support all of these without rewriting the question-answer loop.</p>
+
+    <h4>4. Scoring with Streaks and Multipliers</h4>
+    <p>Points are awarded for correct answers, with bonuses for speed and consecutive correct answers (streaks). Streaks multiply the base score, creating high-risk, high-reward dynamics.</p>
+    <pre is:raw><code>class ScoringSystem:
+    BASE_POINTS = 100
+    MAX_SPEED_BONUS = 50
+    STREAK_MULTIPLIERS = [1, 1, 1.5, 2, 2.5, 3]
+
+    function scoreAnswer(playerId, isCorrect, speedBonus):
+        player = playerScores[playerId]
+        if isCorrect:
+            player.streak += 1
+            streakIndex = min(player.streak, STREAK_MULTIPLIERS.length - 1)
+            multiplier = STREAK_MULTIPLIERS[streakIndex]
+            points = floor((BASE_POINTS + speedBonus) * multiplier)
+            player.total += points
+        else:
+            player.streak = 0</code></pre>
+    <p><strong>Why it matters:</strong> Flat scoring is boring &mdash; the leader after question 5 is almost always the leader after question 15. Streaks create drama: a player on a 5-question streak is earning triple points, so one mistake costs them enormously.</p>
+
+    <h4>5. Question Selection Algorithm</h4>
+    <p>The algorithm chooses which question to show next, balancing difficulty progression, category variety, and avoiding repeats.</p>
+    <pre is:raw><code>class QuestionSelector:
+    allQuestions = []
+    usedQuestionIds = set()
+    recentCategories = []
+
+    function selectNextQuestion(roundNumber, totalRounds):
+        available = allQuestions.filter(q => q.id NOT in usedQuestionIds)
+        progress = roundNumber / totalRounds
+        if progress < 0.3: targetDifficulty = EASY
+        else if progress < 0.7: targetDifficulty = MEDIUM
+        else: targetDifficulty = HARD
+
+        candidates = available.filter(q => q.difficulty == targetDifficulty)
+        // Prefer categories not recently used
+        recentCats = set(recentCategories.last(3))
+        preferred = candidates.filter(q => q.category NOT in recentCats)
+        if preferred.isNotEmpty(): candidates = preferred
+        selected = random(candidates)
+        return selected</code></pre>
+    <p><strong>Why it matters:</strong> If players see the same question twice, trust in the game evaporates. If three Science questions appear in a row, the history expert feels cheated. The selection algorithm is invisible when it works and game-breaking when it does not.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Question Selection Balance</div>
+      <p class="demo-hint">A visualization of the question pool by category and difficulty. The algorithm picks the next question to balance coverage. Click "Pick Next" to see the selection distribution update in real time. Watch how it avoids repeating categories and escalates difficulty.</p>
+      <canvas id="demo-selection" width="760" height="460"></canvas>
+      <div class="demo-controls">
+        <button id="sel-pick">Pick Next Question</button>
+        <button id="sel-auto">Auto-Pick (10 questions)</button>
+        <button id="sel-reset">Reset</button>
+        <span class="value-display" id="sel-status">Questions picked: 0</span>
+      </div>
+    </div>
+
+    <h4>6. Content Pipeline / Authoring Tools</h4>
+    <p>Creating, validating, and managing thousands of questions requires tooling beyond a text editor. A content pipeline lets non-programmers author questions and catches errors before they reach players.</p>
+    <pre is:raw><code>function validateQuestion(question):
+    errors = []
+    if question.text.length == 0:
+        errors.append("Question text is empty")
+    if question.answers.length < 2:
+        errors.append("Must have at least 2 answers")
+    if question.correctAnswerIndex >= question.answers.length:
+        errors.append("Correct answer index out of range")
+    if question.answers.hasDuplicateTexts():
+        errors.append("Duplicate answer text detected")
+    return errors</code></pre>
+    <p><strong>Why it matters:</strong> A trivia game is only as good as its questions. If authoring is painful, you will have too few questions and players will see repeats. The pipeline is an investment in content velocity &mdash; the ability to add hundreds of quality questions quickly is what keeps a trivia game alive.</p>
+
+    <h4>7. Live Multiplayer Synchronization</h4>
+    <p>All players must see the same question at the same time and submit answers within the same window. In local play this is trivial (shared state), but the architecture must support the possibility of networked play.</p>
+    <pre is:raw><code>class TriviaGameState:
+    currentQuestion: Question
+    phase: enum [SHOWING_QUESTION, ACCEPTING_ANSWERS, SHOWING_RESULT, BETWEEN_QUESTIONS]
+    timer: float
+    playerAnswers: { playerId: AnswerResult }
+
+class LocalTriviaGame:
+    state = TriviaGameState()
+
+    function onPlayerAnswer(playerId, answerId):
+        if state.phase != ACCEPTING_ANSWERS: return
+        if playerId in state.playerAnswers: return
+        state.playerAnswers[playerId] = processAnswer(answerId, state)
+        if allPlayersAnswered(): endAnswerWindow()</code></pre>
+    <p><strong>Why it matters:</strong> Synchronization is what makes trivia multiplayer rather than parallel solitaire. Every player must experience the question reveal, the ticking countdown, and the answer reveal at the same moment.</p>
+
+    <hr />
+
+    <h3>Stretch Goals</h3>
+    <ol>
+      <li>Add image and audio questions (album art, sound clips, maps).</li>
+      <li>Implement phone-as-controller input using WebSockets for private answer submission.</li>
+      <li>Add a "wager" round where players bet points on their confidence.</li>
+      <li>Create a question editor UI for authoring new questions in-game.</li>
+      <li>Add category selection so players vote on the topic for the next round.</li>
+      <li>Implement an audience mode where spectators can answer for bonus prizes.</li>
+    </ol>
+
+    <h3>MVP Spec</h3>
+    <table>
+      <thead>
+        <tr><th>Element</th><th>Scope</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Players</td><td>2-4 local players, each with assigned input keys</td></tr>
+        <tr><td>Question database</td><td>30+ questions in JSON file, covering 4+ categories and 3 difficulty levels</td></tr>
+        <tr><td>Question types</td><td>Multiple choice (4 options) as the primary type</td></tr>
+        <tr><td>Timer</td><td>Countdown per question (15s default), visual bar + color change at low time</td></tr>
+        <tr><td>Scoring</td><td>Base points + speed bonus + streak multiplier, displayed per-question and cumulatively</td></tr>
+        <tr><td>Rounds</td><td>10-15 questions per game, difficulty escalating from easy to hard</td></tr>
+        <tr><td>Selection</td><td>No repeat questions, category rotation, difficulty scaling by round</td></tr>
+        <tr><td>Results</td><td>Final scoreboard with rankings, total points, best streak, and fastest answer</td></tr>
+        <tr><td>Feedback</td><td>Correct/incorrect indication, streak announcements, explanation of correct answer</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliverable</h3>
+    <p>A playable trivia game where 2-4 players answer multiple-choice questions under time pressure, earn points modified by speed and streak bonuses, and compete across 10-15 rounds with escalating difficulty. Questions load from an external data file with at least 30 entries. The game should feel like a game show: dramatic countdowns, satisfying correct-answer feedback, and a final results screen that makes the winner feel like a champion.</p>
+
+    <hr />
+
+    <h2>Analogies by Background</h2>
+
+    <blockquote>
+      <p>These analogies map game dev concepts to patterns you already know. Find your background below.</p>
+    </blockquote>
+
+    <h3>For Backend Developers</h3>
+    <table>
+      <thead>
+        <tr><th>Concept</th><th>Analogy</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Question database design</td><td>Like designing a REST API schema &mdash; well-defined fields, validation rules, and a contract that separates content from business logic</td></tr>
+        <tr><td>Timer-based answer windows</td><td>Like request timeouts with SLAs &mdash; the client must respond within a deadline, and late responses are rejected</td></tr>
+        <tr><td>Multiple input methods</td><td>Like supporting multiple authentication methods behind a single auth interface</td></tr>
+        <tr><td>Scoring with streaks</td><td>Like rate-limiting with burst allowances &mdash; sustained good performance earns a higher throughput multiplier</td></tr>
+        <tr><td>Question selection algorithm</td><td>Like a load balancer with weighted routing &mdash; distribute requests across categories while respecting constraints</td></tr>
+        <tr><td>Content pipeline</td><td>Like a CI/CD pipeline for database migrations &mdash; validate, transform, and deploy content with automated checks</td></tr>
+        <tr><td>Live multiplayer sync</td><td>Like distributed consensus &mdash; all nodes must agree on the current state before processing</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Frontend Developers</h3>
+    <table>
+      <thead>
+        <tr><th>Concept</th><th>Analogy</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Question database design</td><td>Like a CMS schema for structured content &mdash; each question is a content entry with typed fields and validation</td></tr>
+        <tr><td>Timer-based answer windows</td><td>Like form submission with a session timeout &mdash; the UI communicates urgency through visual countdown</td></tr>
+        <tr><td>Multiple input methods</td><td>Like progressive enhancement for accessibility &mdash; keyboard, mouse, touch all flow through the same event handler</td></tr>
+        <tr><td>Scoring with streaks</td><td>Like gamified UI animations &mdash; a "combo" counter that scales visual feedback based on sustained engagement</td></tr>
+        <tr><td>Question selection algorithm</td><td>Like a content recommendation feed &mdash; showing varied, non-repeating content matching the user's context</td></tr>
+        <tr><td>Content pipeline</td><td>Like a design system with Storybook &mdash; tooling that lets content creators preview and validate their work</td></tr>
+        <tr><td>Live multiplayer sync</td><td>Like collaborative real-time editing (CRDT/OT) &mdash; all connected clients see the same state</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Data / ML Engineers</h3>
+    <table>
+      <thead>
+        <tr><th>Concept</th><th>Analogy</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Question database design</td><td>Like a labeled dataset &mdash; each question is a data point with features and a label, and schema quality determines model quality</td></tr>
+        <tr><td>Timer-based answer windows</td><td>Like inference latency budgets &mdash; the model must return a prediction within a time constraint</td></tr>
+        <tr><td>Multiple input methods</td><td>Like multi-modal model inputs &mdash; text, image, and audio all feed into the same prediction pipeline</td></tr>
+        <tr><td>Scoring with streaks</td><td>Like reward shaping in RL &mdash; bonus rewards for consistent performance encourage stable behavior</td></tr>
+        <tr><td>Question selection algorithm</td><td>Like active learning sample selection &mdash; choosing the next data point that maximizes information gain</td></tr>
+        <tr><td>Content pipeline</td><td>Like a data labeling pipeline with quality checks &mdash; human annotators create content, validators catch errors</td></tr>
+        <tr><td>Live multiplayer sync</td><td>Like parameter server synchronization in distributed training &mdash; all workers operate on the same model version</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li><strong>Knowledge breadth vs. depth:</strong> Should a trivia game reward deep expertise in one category or broad knowledge across many? How does category selection change the competitive dynamics?</li>
+      <li><strong>The content treadmill:</strong> A trivia game with 100 questions is fun once. A trivia game with 10,000 questions is fun for months. How do you build a content pipeline that scales? What role could AI play in question authoring?</li>
+      <li><strong>Speed vs. knowledge:</strong> Speed bonuses reward quick answers, but they also reward impulsive guessing. How do you tune the speed bonus so that a thoughtful player has a chance against a fast player?</li>
+      <li><strong>Voice as input:</strong> If players speak their answers aloud instead of pressing buttons, the game becomes a fundamentally different social experience. How does voice input change game design and the emotional arc of a question?</li>
+    </ol>
+
+    <nav class="module-nav">
+      <a href={`${base}modules/35-party-game/`}>&larr; Module 35: Party Game</a>
+      <a href={`${base}modules/37-social-deduction/`}>Module 37: Social Deduction &rarr;</a>
+    </nav>
+  </div>
+</BaseLayout>
+
+<script>
+// ============================================================
+// DEMO 1: Trivia Game
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-trivia');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const QUESTIONS = [
+    {
+      text: "What year was Pong released by Atari?",
+      answers: ["1970", "1972", "1975", "1980"],
+      correct: 1,
+      category: "Game History",
+      difficulty: "Easy",
+      explanation: "Allan Alcorn built Pong at Atari in 1972 as a training exercise."
+    },
+    {
+      text: "Which game popularized the 'idle' genre in 2013?",
+      answers: ["Adventure Capitalist", "Cookie Clicker", "Candy Crush", "Flappy Bird"],
+      correct: 1,
+      category: "Game Design",
+      difficulty: "Easy",
+      explanation: "Orteil's Cookie Clicker went viral and created the idle genre."
+    },
+    {
+      text: "In fighting games, what are the three phases of an attack?",
+      answers: ["Wind, Strike, Cool", "Startup, Active, Recovery", "Charge, Hit, Rest", "Prep, Damage, End"],
+      correct: 1,
+      category: "Game Mechanics",
+      difficulty: "Medium",
+      explanation: "Every attack has startup frames, active frames (hitbox live), and recovery frames."
+    },
+    {
+      text: "What networking technique do modern fighting games use for online play?",
+      answers: ["Lockstep", "Rollback netcode", "Client-server prediction", "Peer mesh sync"],
+      correct: 1,
+      category: "Game Tech",
+      difficulty: "Hard",
+      explanation: "Rollback netcode predicts inputs and corrects when wrong, enabling responsive online play."
+    },
+    {
+      text: "In Minecraft, what happens when water meets lava at source level?",
+      answers: ["Steam", "Obsidian", "Cobblestone", "Nothing"],
+      correct: 1,
+      category: "Game Design",
+      difficulty: "Medium",
+      explanation: "Water meeting lava source creates obsidian - an emergent behavior from block interaction rules."
+    }
+  ];
+
+  let state = {
+    phase: 'idle', // idle, question, reveal, done
+    questionIdx: 0,
+    timer: 0,
+    maxTime: 12,
+    score: 0,
+    streak: 0,
+    bestStreak: 0,
+    selectedAnswer: -1,
+    pointsThisQ: 0,
+    results: [],
+    flashTimer: 0
+  };
+
+  function getStreakMultiplier() {
+    const mults = [1, 1, 1.5, 2, 2.5, 3];
+    return mults[Math.min(state.streak, mults.length - 1)];
+  }
+
+  function selectAnswer(idx) {
+    if (state.phase !== 'question' || state.selectedAnswer >= 0) return;
+    state.selectedAnswer = idx;
+    const q = QUESTIONS[state.questionIdx];
+    const correct = idx === q.correct;
+    const speedRatio = Math.max(0, state.timer / state.maxTime);
+    const speedBonus = Math.floor(speedRatio * 50);
+
+    if (correct) {
+      state.streak++;
+      if (state.streak > state.bestStreak) state.bestStreak = state.streak;
+      const mult = getStreakMultiplier();
+      state.pointsThisQ = Math.floor((100 + speedBonus) * mult);
+      state.score += state.pointsThisQ;
+    } else {
+      state.streak = 0;
+      state.pointsThisQ = 0;
+    }
+    state.results.push({ correct, points: state.pointsThisQ, speed: speedRatio });
+    state.phase = 'reveal';
+    state.flashTimer = 2.5;
+  }
+
+  function nextQuestion() {
+    state.questionIdx++;
+    if (state.questionIdx >= QUESTIONS.length) {
+      state.phase = 'done';
+    } else {
+      state.phase = 'question';
+      state.timer = state.maxTime;
+      state.selectedAnswer = -1;
+      state.pointsThisQ = 0;
+    }
+  }
+
+  document.getElementById('trivia-start').addEventListener('click', () => {
+    state.phase = 'question';
+    state.questionIdx = 0;
+    state.timer = state.maxTime;
+    state.score = 0;
+    state.streak = 0;
+    state.bestStreak = 0;
+    state.selectedAnswer = -1;
+    state.results = [];
+  });
+
+  for (let i = 0; i < 4; i++) {
+    document.getElementById('trivia-a' + (i + 1)).addEventListener('click', () => selectAnswer(i));
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key >= '1' && e.key <= '4') selectAnswer(parseInt(e.key) - 1);
+  });
+
+  let lastTime = performance.now();
+  function update(now) {
+    const dt = (now - lastTime) / 1000;
+    lastTime = now;
+
+    if (state.phase === 'question') {
+      state.timer -= dt;
+      if (state.timer <= 0) {
+        state.timer = 0;
+        state.selectedAnswer = -1;
+        state.streak = 0;
+        state.pointsThisQ = 0;
+        state.results.push({ correct: false, points: 0, speed: 0 });
+        state.phase = 'reveal';
+        state.flashTimer = 2.5;
+      }
+    } else if (state.phase === 'reveal') {
+      state.flashTimer -= dt;
+      if (state.flashTimer <= 0) {
+        nextQuestion();
+      }
+    }
+
+    // Update button labels
+    if (state.phase === 'question' || state.phase === 'reveal') {
+      const q = QUESTIONS[state.questionIdx];
+      for (let i = 0; i < 4; i++) {
+        document.getElementById('trivia-a' + (i + 1)).textContent = (i + 1) + ': ' + q.answers[i];
+      }
+    }
+
+    const statusEl = document.getElementById('trivia-status');
+    if (state.phase === 'idle') statusEl.textContent = 'Press Start to begin!';
+    else if (state.phase === 'done') statusEl.textContent = 'Final Score: ' + state.score + ' | Best Streak: ' + state.bestStreak;
+    else statusEl.textContent = 'Score: ' + state.score + ' | Streak: ' + state.streak + 'x';
+
+    draw();
+    requestAnimationFrame(update);
+  }
+
+  function draw() {
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, W, H);
+
+    if (state.phase === 'idle') {
+      ctx.fillStyle = '#e0e0e0';
+      ctx.font = 'bold 28px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Game Dev Trivia Challenge', W / 2, H / 2 - 30);
+      ctx.font = '16px Inter, sans-serif';
+      ctx.fillStyle = '#888888';
+      ctx.fillText('5 questions about game development history and mechanics', W / 2, H / 2 + 10);
+      ctx.fillText('Click "Start Quiz" or press 1-4 to answer', W / 2, H / 2 + 35);
+      return;
+    }
+
+    if (state.phase === 'done') {
+      drawFinalResults();
+      return;
+    }
+
+    const q = QUESTIONS[state.questionIdx];
+
+    // Question number and category
+    ctx.fillStyle = '#888888';
+    ctx.font = '14px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('Question ' + (state.questionIdx + 1) + ' / ' + QUESTIONS.length + '  |  ' + q.category + '  |  ' + q.difficulty, 20, 30);
+
+    // Timer bar
+    const timerRatio = state.timer / state.maxTime;
+    const barW = W - 40;
+    ctx.fillStyle = '#333355';
+    ctx.fillRect(20, 42, barW, 12);
+    const barColor = timerRatio > 0.4 ? '#6bcb77' : timerRatio > 0.15 ? '#ffd93d' : '#ff6b6b';
+    ctx.fillStyle = barColor;
+    ctx.fillRect(20, 42, barW * timerRatio, 12);
+
+    // Timer text
+    ctx.fillStyle = barColor;
+    ctx.font = 'bold 14px JetBrains Mono, monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(state.timer.toFixed(1) + 's', W - 20, 38);
+
+    // Streak display
+    if (state.streak > 0) {
+      ctx.fillStyle = '#ffd93d';
+      ctx.font = 'bold 16px Inter, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('Streak: ' + state.streak + ' (' + getStreakMultiplier().toFixed(1) + 'x)', 20, 85);
+      if (state.streak >= 3) {
+        ctx.fillStyle = '#ff6b6b';
+        ctx.fillText(state.streak >= 5 ? 'UNSTOPPABLE!' : 'On Fire!', 250, 85);
+      }
+    }
+
+    // Score
+    ctx.fillStyle = '#e0e0e0';
+    ctx.font = 'bold 18px Inter, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText('Score: ' + state.score, W - 20, 85);
+
+    // Question text
+    ctx.fillStyle = '#e0e0e0';
+    ctx.font = 'bold 22px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(q.text, W / 2, 130);
+
+    // Answer buttons
+    const btnW = 340, btnH = 55;
+    const startY = 165;
+    const positions = [
+      { x: 20, y: startY },
+      { x: W / 2 + 10, y: startY },
+      { x: 20, y: startY + btnH + 10 },
+      { x: W / 2 + 10, y: startY + btnH + 10 }
+    ];
+    const answerColors = ['#3b5998', '#2d8659', '#b5651d', '#7b2d8b'];
+
+    for (let i = 0; i < 4; i++) {
+      const p = positions[i];
+      let bgColor = answerColors[i];
+      let textColor = '#e0e0e0';
+
+      if (state.phase === 'reveal') {
+        if (i === q.correct) {
+          bgColor = '#2ecc71';
+          textColor = '#ffffff';
+        } else if (i === state.selectedAnswer && i !== q.correct) {
+          bgColor = '#e74c3c';
+          textColor = '#ffffff';
+        } else {
+          bgColor = '#333355';
+          textColor = '#666666';
+        }
+      } else if (i === state.selectedAnswer) {
+        bgColor = '#555588';
+      }
+
+      ctx.fillStyle = bgColor;
+      ctx.beginPath();
+      const r = 8;
+      ctx.moveTo(p.x + r, p.y);
+      ctx.lineTo(p.x + btnW - r, p.y);
+      ctx.quadraticCurveTo(p.x + btnW, p.y, p.x + btnW, p.y + r);
+      ctx.lineTo(p.x + btnW, p.y + btnH - r);
+      ctx.quadraticCurveTo(p.x + btnW, p.y + btnH, p.x + btnW - r, p.y + btnH);
+      ctx.lineTo(p.x + r, p.y + btnH);
+      ctx.quadraticCurveTo(p.x, p.y + btnH, p.x, p.y + btnH - r);
+      ctx.lineTo(p.x, p.y + r);
+      ctx.quadraticCurveTo(p.x, p.y, p.x + r, p.y);
+      ctx.fill();
+
+      ctx.fillStyle = textColor;
+      ctx.font = 'bold 16px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText((i + 1) + '. ' + q.answers[i], p.x + btnW / 2, p.y + btnH / 2 + 6);
+    }
+
+    // Reveal feedback
+    if (state.phase === 'reveal') {
+      const isCorrect = state.selectedAnswer === q.correct;
+      const fbY = 320;
+      ctx.fillStyle = isCorrect ? '#2ecc71' : '#e74c3c';
+      ctx.font = 'bold 24px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(isCorrect ? 'Correct! +' + state.pointsThisQ + ' points' : (state.selectedAnswer < 0 ? 'Time\'s up!' : 'Wrong!'), W / 2, fbY);
+
+      ctx.fillStyle = '#aaaacc';
+      ctx.font = '14px Inter, sans-serif';
+      ctx.fillText(q.explanation, W / 2, fbY + 30);
+
+      if (isCorrect && state.pointsThisQ > 100) {
+        ctx.fillStyle = '#ffd93d';
+        ctx.font = '13px Inter, sans-serif';
+        ctx.fillText('Speed bonus + streak multiplier applied!', W / 2, fbY + 55);
+      }
+    }
+
+    // Score history bar at bottom
+    const barStartY = H - 80;
+    ctx.fillStyle = '#888888';
+    ctx.font = '12px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('Question results:', 20, barStartY);
+    for (let i = 0; i < state.results.length; i++) {
+      const r = state.results[i];
+      const bx = 20 + i * 80;
+      ctx.fillStyle = r.correct ? '#2ecc71' : '#e74c3c';
+      ctx.fillRect(bx, barStartY + 8, 70, 25);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 12px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(r.correct ? '+' + r.points : 'X', bx + 35, barStartY + 25);
+    }
+  }
+
+  function drawFinalResults() {
+    ctx.fillStyle = '#ffd93d';
+    ctx.font = 'bold 32px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Quiz Complete!', W / 2, 60);
+
+    ctx.fillStyle = '#e0e0e0';
+    ctx.font = 'bold 48px Inter, sans-serif';
+    ctx.fillText(state.score + ' points', W / 2, 120);
+
+    ctx.font = '18px Inter, sans-serif';
+    ctx.fillStyle = '#aaaacc';
+    const correct = state.results.filter(r => r.correct).length;
+    ctx.fillText(correct + '/' + QUESTIONS.length + ' correct  |  Best streak: ' + state.bestStreak, W / 2, 160);
+
+    // Results breakdown
+    ctx.font = '14px Inter, sans-serif';
+    for (let i = 0; i < state.results.length; i++) {
+      const r = state.results[i];
+      const y = 200 + i * 35;
+      ctx.fillStyle = r.correct ? '#2ecc71' : '#e74c3c';
+      ctx.textAlign = 'left';
+      ctx.fillText((r.correct ? 'Correct' : 'Wrong') + '  +' + r.points + ' pts', 100, y);
+      ctx.fillStyle = '#888888';
+      ctx.fillText('Q' + (i + 1) + ': ' + QUESTIONS[i].text.substring(0, 50) + '...', 250, y);
+    }
+
+    ctx.fillStyle = '#888888';
+    ctx.font = '14px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Click "Start Quiz" to play again!', W / 2, H - 30);
+  }
+
+  requestAnimationFrame(update);
+})();
+
+// ============================================================
+// DEMO 2: Question Selection Balance
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-selection');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const CATEGORIES = ['Game History', 'Mechanics', 'Design', 'Technology', 'Art & Audio'];
+  const DIFFICULTIES = ['Easy', 'Medium', 'Hard'];
+  const CAT_COLORS = ['#ff6b6b', '#ffd93d', '#6bcb77', '#4ecdc4', '#a78bfa'];
+  const DIFF_COLORS = ['#6bcb77', '#ffd93d', '#ff6b6b'];
+
+  // Generate a pool of questions
+  const pool = [];
+  let qId = 0;
+  for (const cat of CATEGORIES) {
+    for (const diff of DIFFICULTIES) {
+      const count = 4 + Math.floor(Math.random() * 3);
+      for (let i = 0; i < count; i++) {
+        pool.push({ id: qId++, category: cat, difficulty: diff, used: false, selected: false, lastPicked: -1 });
+      }
+    }
+  }
+
+  let picked = [];
+  let pickCount = 0;
+  let recentCategories = [];
+  let highlightQ = null;
+  let highlightTimer = 0;
+  let targetDifficulty = 'Easy';
+
+  function pickNext() {
+    const available = pool.filter(q => !q.used);
+    if (available.length === 0) return;
+
+    // Determine target difficulty based on progress
+    const progress = pickCount / pool.length;
+    if (progress < 0.3) targetDifficulty = 'Easy';
+    else if (progress < 0.7) targetDifficulty = 'Medium';
+    else targetDifficulty = 'Hard';
+
+    let candidates = available.filter(q => q.difficulty === targetDifficulty);
+    if (candidates.length === 0) candidates = available;
+
+    // Prefer categories not recently used
+    const recentSet = new Set(recentCategories.slice(-2));
+    const preferred = candidates.filter(q => !recentSet.has(q.category));
+    if (preferred.length > 0) candidates = preferred;
+
+    const sel = candidates[Math.floor(Math.random() * candidates.length)];
+    sel.used = true;
+    sel.lastPicked = pickCount;
+    highlightQ = sel;
+    highlightTimer = 1.0;
+    recentCategories.push(sel.category);
+    picked.push(sel);
+    pickCount++;
+  }
+
+  function resetAll() {
+    for (const q of pool) { q.used = false; q.lastPicked = -1; }
+    picked = [];
+    pickCount = 0;
+    recentCategories = [];
+    highlightQ = null;
+    targetDifficulty = 'Easy';
+  }
+
+  document.getElementById('sel-pick').addEventListener('click', pickNext);
+  document.getElementById('sel-reset').addEventListener('click', resetAll);
+  document.getElementById('sel-auto').addEventListener('click', () => {
+    let count = 0;
+    const interval = setInterval(() => {
+      pickNext();
+      count++;
+      if (count >= 10 || pool.filter(q => !q.used).length === 0) clearInterval(interval);
+    }, 200);
+  });
+
+  let lastTime = performance.now();
+  function update(now) {
+    const dt = (now - lastTime) / 1000;
+    lastTime = now;
+    if (highlightTimer > 0) highlightTimer -= dt;
+
+    document.getElementById('sel-status').textContent = 'Questions picked: ' + pickCount + ' / ' + pool.length + '  |  Target difficulty: ' + targetDifficulty;
+    draw();
+    requestAnimationFrame(update);
+  }
+
+  function draw() {
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, W, H);
+
+    // Title
+    ctx.fillStyle = '#e0e0e0';
+    ctx.font = 'bold 16px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('Question Pool Visualization', 20, 25);
+    ctx.fillStyle = '#888888';
+    ctx.font = '12px Inter, sans-serif';
+    ctx.fillText('Each dot is a question. Faded = already used. Highlighted = just picked.', 20, 43);
+
+    // Draw question pool grid
+    const gridX = 20, gridY = 60, cellW = 12, cellH = 12, gap = 3;
+    let row = 0;
+    for (let c = 0; c < CATEGORIES.length; c++) {
+      const catQuestions = pool.filter(q => q.category === CATEGORIES[c]);
+      const cy = gridY + c * 50;
+
+      ctx.fillStyle = CAT_COLORS[c];
+      ctx.font = 'bold 12px Inter, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(CATEGORIES[c], gridX, cy);
+
+      for (let d = 0; d < DIFFICULTIES.length; d++) {
+        const diffQs = catQuestions.filter(q => q.difficulty === DIFFICULTIES[d]);
+        const dx = gridX + 110 + d * 160;
+
+        ctx.fillStyle = '#555577';
+        ctx.font = '10px Inter, sans-serif';
+        if (c === 0) ctx.fillText(DIFFICULTIES[d], dx, gridY - 8);
+
+        for (let i = 0; i < diffQs.length; i++) {
+          const q = diffQs[i];
+          const qx = dx + i * (cellW + gap);
+          const qy = cy - 8;
+
+          if (highlightQ === q && highlightTimer > 0) {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(qx - 2, qy - 2, cellW + 4, cellH + 4);
+          }
+
+          if (q.used) {
+            ctx.fillStyle = CAT_COLORS[c] + '33';
+          } else {
+            ctx.fillStyle = CAT_COLORS[c];
+          }
+          ctx.fillRect(qx, qy, cellW, cellH);
+        }
+      }
+    }
+
+    // Distribution charts
+    const chartY = 310;
+    ctx.fillStyle = '#e0e0e0';
+    ctx.font = 'bold 14px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('Selection Distribution', 20, chartY);
+
+    // Category distribution
+    const catCounts = CATEGORIES.map(cat => picked.filter(q => q.category === cat).length);
+    const maxCatCount = Math.max(...catCounts, 1);
+    const barH = 18, barGap = 5;
+    const barMaxW = 200;
+
+    ctx.fillStyle = '#888888';
+    ctx.font = '11px Inter, sans-serif';
+    ctx.fillText('By Category:', 20, chartY + 20);
+
+    for (let i = 0; i < CATEGORIES.length; i++) {
+      const by = chartY + 28 + i * (barH + barGap);
+      ctx.fillStyle = '#555577';
+      ctx.font = '11px Inter, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(CATEGORIES[i], 110, by + 13);
+
+      ctx.fillStyle = '#222244';
+      ctx.fillRect(120, by, barMaxW, barH);
+      ctx.fillStyle = CAT_COLORS[i];
+      ctx.fillRect(120, by, (catCounts[i] / maxCatCount) * barMaxW, barH);
+
+      ctx.fillStyle = '#e0e0e0';
+      ctx.font = '10px JetBrains Mono, monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(catCounts[i].toString(), 125 + (catCounts[i] / maxCatCount) * barMaxW + 5, by + 13);
+    }
+
+    // Difficulty distribution
+    const diffCounts = DIFFICULTIES.map(d => picked.filter(q => q.difficulty === d).length);
+    const maxDiffCount = Math.max(...diffCounts, 1);
+
+    ctx.fillStyle = '#888888';
+    ctx.font = '11px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('By Difficulty:', 400, chartY + 20);
+
+    for (let i = 0; i < DIFFICULTIES.length; i++) {
+      const by = chartY + 28 + i * (barH + barGap);
+      ctx.fillStyle = '#555577';
+      ctx.font = '11px Inter, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(DIFFICULTIES[i], 475, by + 13);
+
+      ctx.fillStyle = '#222244';
+      ctx.fillRect(485, by, barMaxW, barH);
+      ctx.fillStyle = DIFF_COLORS[i];
+      ctx.fillRect(485, by, (diffCounts[i] / maxDiffCount) * barMaxW, barH);
+
+      ctx.fillStyle = '#e0e0e0';
+      ctx.font = '10px JetBrains Mono, monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(diffCounts[i].toString(), 490 + (diffCounts[i] / maxDiffCount) * barMaxW + 5, by + 13);
+    }
+
+    // Pick order timeline
+    if (picked.length > 0) {
+      const tlY = chartY + 120;
+      ctx.fillStyle = '#888888';
+      ctx.font = '11px Inter, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('Pick Order (color = category):', 20, tlY);
+
+      const maxShow = Math.min(picked.length, 40);
+      const startIdx = Math.max(0, picked.length - maxShow);
+      for (let i = startIdx; i < picked.length; i++) {
+        const q = picked[i];
+        const tx = 20 + (i - startIdx) * 18;
+        const catIdx = CATEGORIES.indexOf(q.category);
+        ctx.fillStyle = CAT_COLORS[catIdx];
+        ctx.fillRect(tx, tlY + 6, 14, 14);
+        // Difficulty indicator
+        const dIdx = DIFFICULTIES.indexOf(q.difficulty);
+        ctx.fillStyle = dIdx === 0 ? '#ffffff' : dIdx === 1 ? '#888888' : '#333333';
+        ctx.fillRect(tx + 4, tlY + 10, 6, 6);
+      }
+    }
+  }
+
+  requestAnimationFrame(update);
+})();
+</script>

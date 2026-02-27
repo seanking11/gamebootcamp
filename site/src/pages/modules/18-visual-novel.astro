@@ -1,0 +1,968 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 18: Visual Novel">
+  <div class="container page-content">
+    <div class="module-header">
+      <div class="module-number">Module 18</div>
+      <h1>Visual Novel</h1>
+      <p class="module-theme">Branching narrative where choices shape the story &mdash; your decisions write the ending.</p>
+    </div>
+
+    <blockquote>"The most powerful game mechanic is the one that makes you put down the controller and think."</blockquote>
+
+    <hr />
+
+    <h2>Prerequisites</h2>
+    <table>
+      <thead>
+        <tr><th>Module</th><th>What You Used From It</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Module 01 - Pong</td><td>Basic game loop, input handling, and rendering. Visual novels are architecturally simple but require clean state management.</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h2>Week 1: History &amp; Design Theory</h2>
+
+    <h3>The Origin</h3>
+    <p><em>Phoenix Wright: Ace Attorney</em> (2001), directed by Shu Takumi at Capcom, demonstrated that a visual novel could be built around <em>active deduction</em> rather than passive reading. While earlier visual novels like <em>Snatcher</em> (1988) and <em>Tokimeki Memorial</em> (1994) had established branching narrative and character relationship systems, <em>Phoenix Wright</em> added a courtroom mechanic where the player had to examine evidence, identify contradictions in testimony, and present the right piece of evidence at the right moment. This transformed the visual novel from a genre where the player simply selected dialog options into one where the player <em>reasoned</em> through problems, making choices feel consequential not because of branching paths but because they tested comprehension.</p>
+
+    <h3>How the Genre Evolved</h3>
+    <p><strong>Doki Doki Literature Club (2017):</strong> Dan Salvato's free game used the visual novel format's conventions against the player, subverting expectations in ways that required the medium's tropes to function. It manipulated save files, broke the fourth wall by addressing the player directly, and corrupted its own interface. It demonstrated that the visual novel's data-driven structure &mdash; where story lives in script files and the engine merely renders them &mdash; could itself become a narrative device when the "script" appears to malfunction.</p>
+
+    <p><strong>13 Sentinels: Aegis Rim (2019):</strong> Vanillaware's George Kamitani created a visual novel with 13 playable protagonists whose stories interleaved across multiple timelines. The player chose which character's route to pursue and in what order, with each route revealing information that recontextualized the others. It proved that the <em>order</em> in which the player experienced story beats changed their meaning, making the route system itself a form of storytelling.</p>
+
+    <h3>What Makes Visual Novels "Great"</h3>
+    <p>The core design insight of the visual novel is that <strong>anticipation of consequences is more engaging than the consequences themselves</strong>. When a player faces a choice &mdash; "Do you tell her the truth?" &mdash; the power of that moment lives not in the branching code but in the seconds the player spends <em>deliberating</em>. The best visual novels design choices where the player genuinely does not know what will happen, where they care enough about the characters to agonize, and where the consequences may not reveal themselves for hours. This delayed consequence loop is uniquely powerful: it transforms reading into an active, anxious experience.</p>
+
+    <h3>The Essential Mechanic</h3>
+    <p><strong>Making choices that branch the story, where consequences may not be immediately apparent</strong> &mdash; the player reads, deliberates, decides, and lives with outcomes that reveal themselves over time.</p>
+
+    <hr />
+
+    <h2>Week 2: Build the MVP</h2>
+
+    <h3>What You're Building</h3>
+    <p>A short branching story (10-20 story beats) with at least 3 meaningful choices leading to at least 2 distinct endings. The story is defined in a data file (not hardcoded), rendered with character sprites that change expression, a typewriter text effect, and background scene transitions. The player can save and load their progress.</p>
+    <p>This module is 2D. No engine is required.</p>
+
+    <h3>Core Concepts (Must Implement)</h3>
+
+    <h4>1. Branching Narrative as a Directed Graph</h4>
+    <p>The story is a directed graph where each node is a story beat and each edge represents a transition. Choice nodes have multiple outgoing edges, one per option. The graph may converge (branches rejoin), diverge (branches split permanently), or both.</p>
+    <pre is:raw><code>story = {
+    "start": {
+        type: "text",
+        speaker: "narrator",
+        text: "The letter arrived on a Tuesday. You recognized the handwriting.",
+        next: "choice_open_letter"
+    },
+    "choice_open_letter": {
+        type: "choice",
+        text: "The envelope sits on your desk.",
+        options: [
+            { text: "Open it immediately.", next: "open_letter",
+              set_flag: "opened_eagerly" },
+            { text: "Leave it for later.", next: "ignore_letter",
+              set_flag: "ignored_letter" },
+        ]
+    },
+    "open_letter": {
+        type: "text",
+        speaker: "protagonist",
+        text: "My hands trembled as I tore it open...",
+        next: "letter_contents"
+    },
+    "ignore_letter": {
+        type: "text",
+        speaker: "narrator",
+        text: "You set it aside. By evening, curiosity won.",
+        next: "letter_contents"  // Branches reconverge
+    },
+    ...
+    "ending_good": {
+        type: "ending",
+        text: "You made it through. Together.",
+        ending_name: "The Bridge Between"
+    }
+}</code></pre>
+    <p><strong>Why it matters:</strong> The directed graph is the fundamental architecture of the visual novel. Defining the story as data rather than code means writers can author content independently of programmers, and the engine can be reused for any story.</p>
+
+    <!-- Demo 1: Branching Narrative Visualizer -->
+    <div class="demo-container">
+      <div class="demo-label">Demo: Branching Narrative Visualizer</div>
+      <p class="demo-hint">Click on choices to navigate the story. The node graph on the right shows story beats. Your current node is yellow, visited nodes are green, and unreachable dead-end branches gray out. Reach an ending to see which path you took!</p>
+      <canvas id="demo-narrative" width="760" height="480"></canvas>
+    </div>
+
+    <h4>2. Text Rendering / Typewriter Effect</h4>
+    <p>Text appears character by character rather than all at once, creating a reading rhythm that mimics natural pacing. The player can click to instantly complete the current text block, then click again to advance.</p>
+    <pre is:raw><code>class TypewriterText:
+    def __init__(self):
+        self.full_text = ""
+        self.visible_chars = 0
+        self.chars_per_second = 30
+        self.timer = 0.0
+        self.complete = false
+        self.pauses = {}  # char_index -> pause_duration
+
+    def set_text(self, text):
+        self.full_text = text
+        self.visible_chars = 0
+        self.timer = 0.0
+        self.complete = false
+        self.pauses = {}
+        for i, char in enumerate(text):
+            if char == '.': self.pauses[i] = 0.3
+            elif char == ',': self.pauses[i] = 0.15
+            elif char == '!': self.pauses[i] = 0.25
+
+    def update(self, dt):
+        if self.complete: return
+        self.timer += dt
+        while self.timer >= 1.0 / self.chars_per_second:
+            self.timer -= 1.0 / self.chars_per_second
+            self.visible_chars += 1
+            if self.visible_chars in self.pauses:
+                self.timer -= self.pauses[self.visible_chars]
+            if self.visible_chars >= len(self.full_text):
+                self.complete = true
+                break
+
+    def skip_to_end(self):
+        self.visible_chars = len(self.full_text)
+        self.complete = true</code></pre>
+    <p><strong>Why it matters:</strong> The typewriter effect controls pacing, which is everything in a text-driven game. A dramatic revelation delivered all at once loses impact. Character by character, with pauses at punctuation, the text breathes.</p>
+
+    <!-- Demo 2: Typewriter Text with Character Expressions -->
+    <div class="demo-container">
+      <div class="demo-label">Demo: Typewriter Text with Expressions</div>
+      <p class="demo-hint">Text appears character by character. Use the speed slider to adjust. The character sprite on the left changes expression based on the mood of the text. Click anywhere to skip the current text or advance to the next line.</p>
+      <canvas id="demo-typewriter" width="760" height="400"></canvas>
+      <div style="margin-top: 8px; display: flex; align-items: center; gap: 12px;">
+        <label style="color: #aabbcc; font-family: monospace; font-size: 13px;">Speed:</label>
+        <input type="range" id="speed-slider" min="5" max="120" value="35" style="width: 200px;" />
+        <span id="speed-value" style="color: #88bbee; font-family: monospace; font-size: 13px;">35 cps</span>
+      </div>
+    </div>
+
+    <h4>3. Character Sprite and Expression System</h4>
+    <p>Characters are displayed as layered sprites on screen. Each character has a set of expression variants (happy, sad, angry, surprised). The story data specifies which characters are visible and which expression to display at any beat.</p>
+    <pre is:raw><code>class CharacterSprite:
+    def __init__(self, name, base_position):
+        self.name = name
+        self.position = base_position  # "left", "center", "right"
+        self.expressions = {}          # expression_name -> image
+        self.current_expression = "neutral"
+        self.visible = false
+        self.alpha = 0.0
+
+    def set_expression(self, expression_name):
+        if expression_name in self.expressions:
+            self.current_expression = expression_name
+
+    def show(self, fade_duration=0.3):
+        self.visible = true
+        self.fade_target = 1.0
+        self.fade_speed = 1.0 / fade_duration
+
+    def hide(self, fade_duration=0.3):
+        self.fade_target = 0.0
+        self.fade_speed = 1.0 / fade_duration</code></pre>
+    <p><strong>Why it matters:</strong> Character sprites are the visual anchor. Expression changes synchronized with dialog text create the illusion of a reacting, emotional character. A single sprite swap from "neutral" to "surprised" at the right moment communicates more than a paragraph.</p>
+
+    <h4>4. Choice System with Consequence Tracking</h4>
+    <p>Choices set flags that affect future story branches. Some consequences are immediate, while others are delayed (a flag set in chapter 1 determines an outcome in chapter 5).</p>
+    <pre is:raw><code>class ChoiceTracker:
+    def __init__(self):
+        self.flags = {}
+        self.choice_history = []
+        self.affinity = {}          # Character relationship scores
+
+    def make_choice(self, choice_data):
+        self.choice_history.append({
+            "node": choice_data["node_id"],
+            "chosen": choice_data["option_index"],
+            "text": choice_data["option_text"]
+        })
+        if "set_flag" in choice_data:
+            self.flags[choice_data["set_flag"]] = true
+        if "affinity" in choice_data:
+            for character, delta in choice_data["affinity"].items():
+                self.affinity[character] = self.affinity.get(character, 0) + delta
+
+    def evaluate_condition(self, condition):
+        if " AND " in condition:
+            parts = condition.split(" AND ")
+            return all(self.evaluate_condition(p.strip()) for p in parts)
+        if condition.startswith("affinity:"):
+            parts = condition.split()
+            char_name = parts[0].split(":")[1]
+            operator = parts[1]
+            value = int(parts[2])
+            actual = self.affinity.get(char_name, 0)
+            if operator == ">=": return actual >= value
+        return self.flags.get(condition, false)</code></pre>
+    <p><strong>Why it matters:</strong> Delayed consequences are the soul of the visual novel. If every choice had immediate, obvious results, the player would simply optimize. When consequences are delayed, the player must make choices based on values &mdash; "What would I actually do?" rather than "Which option gives the best reward?"</p>
+
+    <h4>5. Multiple Endings / Route System</h4>
+    <p>The game has multiple distinct endings determined by accumulated choices and flags. An ending selection function evaluates the player's history to determine which ending to show.</p>
+    <pre is:raw><code>ENDINGS = {
+    "ending_together": {
+        name: "The Bridge Between",
+        conditions: "told_elena_truth AND affinity:elena >= 3",
+        priority: 1,
+        text: "You cross the bridge side by side..."
+    },
+    "ending_alone_good": {
+        name: "A New Morning",
+        conditions: "!told_elena_truth AND showed_courage",
+        priority: 2,
+        text: "You stand at the bridge alone, but at peace..."
+    },
+    "ending_alone_bad": {
+        name: "Midnight, Alone",
+        conditions: null,  # Default/fallback ending
+        priority: 99,
+        text: "The bridge is empty. The letter blows into the river..."
+    }
+}
+
+def determine_ending(choice_tracker):
+    sorted_endings = sorted(ENDINGS.values(), key=lambda e: e["priority"])
+    for ending in sorted_endings:
+        if ending["conditions"] is null:
+            return ending
+        if choice_tracker.evaluate_condition(ending["conditions"]):
+            return ending
+    return sorted_endings[-1]</code></pre>
+    <p><strong>Why it matters:</strong> Multiple endings give choices weight retroactively. Even if the player does not replay, knowing that other endings <em>exist</em> validates the feeling that their choices mattered.</p>
+
+    <h4>6. Scripting / Data-Driven Story Format</h4>
+    <p>The entire story is defined in external data files (JSON, YAML, or a custom format), not hardcoded in the game logic. The engine reads these files and interprets them.</p>
+    <pre is:raw><code># story.json — the story as pure data
+{
+  "nodes": {
+    "start": {
+      "type": "text",
+      "speaker": "narrator",
+      "text": "The letter arrived on a Tuesday.",
+      "background": "apartment_evening",
+      "characters": [],
+      "music": "quiet_piano",
+      "next": "choice_open_letter"
+    }
+  },
+  "characters": {
+    "elena": {
+      "display_name": "Elena",
+      "color": "#7EC8E3",
+      "expressions": {
+        "neutral": "elena_neutral.png",
+        "happy": "elena_happy.png",
+        "sad": "elena_sad.png"
+      }
+    }
+  }
+}</code></pre>
+    <p><strong>Why it matters:</strong> Separating story data from engine code is the architectural decision that makes visual novels practical. A hardcoded story cannot be written by non-programmers, cannot be easily tested in isolation, and cannot be swapped or modded.</p>
+
+    <h4>7. Background / Scene Transitions</h4>
+    <p>Background images change to establish location. Transitions between backgrounds use effects like crossfade, dissolve, or cut-to-black to create pacing and mood.</p>
+    <pre is:raw><code>class BackgroundRenderer:
+    def __init__(self):
+        self.current_bg = null
+        self.next_bg = null
+        self.transition_type = "none"
+        self.transition_progress = 0.0
+
+    def change_background(self, new_bg_image, transition="crossfade"):
+        if self.current_bg is null:
+            self.current_bg = new_bg_image
+            return
+        self.next_bg = new_bg_image
+        self.transition_type = transition
+        self.transition_progress = 0.0
+
+    def update(self, dt):
+        if self.transition_type == "none": return
+        self.transition_progress += dt * self.transition_speed
+        if self.transition_progress >= 1.0:
+            self.current_bg = self.next_bg
+            self.next_bg = null
+            self.transition_type = "none"</code></pre>
+    <p><strong>Why it matters:</strong> Backgrounds establish place and mood. The transition type communicates narrative pacing &mdash; a hard cut implies sudden change, a slow crossfade implies gentle passage of time.</p>
+
+    <hr />
+
+    <h3>Stretch Goals</h3>
+    <ul>
+      <li><strong>Save/load with multiple slots:</strong> Allow the player to save at any point and maintain multiple save files.</li>
+      <li><strong>Text log / backlog:</strong> A scrollable history of all text and choices the player has seen.</li>
+      <li><strong>Auto-advance mode:</strong> Automatically advance text after a configurable delay.</li>
+      <li><strong>Ending gallery:</strong> A screen that shows which endings the player has discovered.</li>
+    </ul>
+
+    <h3>MVP Spec</h3>
+    <table>
+      <thead><tr><th>Feature</th><th>Required</th></tr></thead>
+      <tbody>
+        <tr><td>Story defined in data file (JSON, YAML, or DSL)</td><td>Yes</td></tr>
+        <tr><td>Story engine that traverses the narrative graph</td><td>Yes</td></tr>
+        <tr><td>Typewriter text rendering with skip</td><td>Yes</td></tr>
+        <tr><td>At least 2 character sprites with 3+ expressions each</td><td>Yes</td></tr>
+        <tr><td>Expression changes synchronized with story beats</td><td>Yes</td></tr>
+        <tr><td>At least 3 meaningful choices with flag-setting</td><td>Yes</td></tr>
+        <tr><td>At least 1 delayed consequence</td><td>Yes</td></tr>
+        <tr><td>At least 2 distinct endings</td><td>Yes</td></tr>
+        <tr><td>Background images with crossfade transitions</td><td>Yes</td></tr>
+        <tr><td>Speaker name and text styling per character</td><td>Yes</td></tr>
+        <tr><td>Save/load with multiple slots</td><td>Stretch</td></tr>
+        <tr><td>Text log / backlog</td><td>Stretch</td></tr>
+        <tr><td>Auto-advance mode</td><td>Stretch</td></tr>
+        <tr><td>Ending gallery</td><td>Stretch</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliverable</h3>
+    <p>Submit your playable visual novel with source code, the story data file, and a <strong>narrative graph diagram</strong> showing all story nodes, choices, branches, and endings. Include a short write-up (300-500 words) answering: <em>How did you design your choices so that the player feels their decisions matter? Describe one choice where the consequence is delayed and explain how you used flags to connect the choice to its eventual outcome.</em></p>
+
+    <hr />
+
+    <h2>Analogies by Background</h2>
+    <blockquote><p>These analogies map game dev concepts to patterns you already know.</p></blockquote>
+
+    <h3>For Backend Developers</h3>
+    <table>
+      <thead><tr><th>Game Dev Concept</th><th>Backend Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Branching narrative graph</td><td>A workflow engine (Temporal, Step Functions) &mdash; nodes are workflow steps, edges are transitions, and the execution path depends on runtime conditions</td></tr>
+        <tr><td>Typewriter text rendering</td><td>Streaming HTTP responses &mdash; delivering data character by character rather than in a single payload, with the consumer able to request the full payload early (skip)</td></tr>
+        <tr><td>Character sprite/expression system</td><td>A template engine with partials &mdash; the base template (character) swaps in different partials (expressions) based on context variables</td></tr>
+        <tr><td>Choice system with consequence tracking</td><td>Event sourcing &mdash; every choice is an immutable event appended to a log, and current state is derived by replaying all events</td></tr>
+        <tr><td>Multiple endings / route system</td><td>A rules engine &mdash; ordered rules evaluated top-down, where the first rule whose conditions match produces the result</td></tr>
+        <tr><td>Data-driven story format</td><td>Configuration-as-code &mdash; runtime behavior is entirely determined by declarative configuration files</td></tr>
+        <tr><td>Background / scene transitions</td><td>Blue-green deployment &mdash; transitioning smoothly from one active state to another with a brief overlap period</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Frontend Developers</h3>
+    <table>
+      <thead><tr><th>Game Dev Concept</th><th>Frontend Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Branching narrative graph</td><td>A state machine for UI flow (XState) &mdash; each state renders different content, transitions are triggered by user actions</td></tr>
+        <tr><td>Typewriter text rendering</td><td>A CSS animation on <code>width</code> with <code>overflow: hidden</code> on a monospace element &mdash; or a JS interval that reveals characters one at a time</td></tr>
+        <tr><td>Character sprite/expression system</td><td>Conditional rendering of image components &mdash; a component receives an <code>expression</code> prop and renders the corresponding image</td></tr>
+        <tr><td>Choice system with consequence tracking</td><td>Redux action history &mdash; each choice dispatches an action that updates the store</td></tr>
+        <tr><td>Multiple endings / route system</td><td>A/B test resolution &mdash; evaluating conditions from a prioritized list of variants</td></tr>
+        <tr><td>Data-driven story format</td><td>CMS-driven content &mdash; the React app is the engine, the content comes from a headless CMS</td></tr>
+        <tr><td>Background / scene transitions</td><td>CSS transitions between background images &mdash; crossfade using overlapping absolutely-positioned divs</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Data / ML Engineers</h3>
+    <table>
+      <thead><tr><th>Game Dev Concept</th><th>Data / ML Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Branching narrative graph</td><td>A decision tree with stateful traversal &mdash; each internal node splits on a player choice, leaf nodes are endings</td></tr>
+        <tr><td>Typewriter text rendering</td><td>Streaming inference &mdash; a language model generating tokens one at a time, with the option to batch-return remaining tokens</td></tr>
+        <tr><td>Character sprite/expression system</td><td>Feature visualization &mdash; displaying different visual representations of a data entity depending on active features</td></tr>
+        <tr><td>Choice system with consequence tracking</td><td>Feature store updates &mdash; each choice writes a feature to the store, and downstream models read from it</td></tr>
+        <tr><td>Multiple endings / route system</td><td>Model selection based on metadata &mdash; evaluating a ranked list of candidate models against the current data profile</td></tr>
+        <tr><td>Data-driven story format</td><td>Config-driven pipelines &mdash; the pipeline code is generic, and config determines what runs</td></tr>
+        <tr><td>Background / scene transitions</td><td>Dataset blending &mdash; smoothly transitioning between two data distributions by interpolating weights</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li><strong>The paradox of choice:</strong> Research suggests that more options can lead to decision paralysis and less satisfaction. How many choices should a visual novel offer per chapter? How did you balance this in your MVP?</li>
+      <li><strong>Visible vs. invisible consequences:</strong> Some visual novels show you exactly what changed after a choice ("Elena will remember this"). Others hide consequences entirely. What are the design implications of each approach?</li>
+      <li><strong>The replay problem:</strong> Visual novels encourage replay to see different endings, but replaying means re-reading content. How can designers balance making each playthrough feel fresh?</li>
+      <li><strong>Story as data vs. story as code:</strong> Your MVP defines the story in a data file. What are the tradeoffs versus writing story logic directly in code?</li>
+    </ol>
+
+    <nav class="module-nav">
+      <a href={`${base}modules/17-point-and-click/`}>&larr; Module 17: Point-and-Click Adventure</a>
+      <a href={`${base}modules/19-walking-simulator/`}>Module 19: Walking Simulator &rarr;</a>
+    </nav>
+  </div>
+
+  <script>
+    // Demo 1: Branching Narrative Visualizer
+    (function() {
+      const canvas = document.getElementById('demo-narrative');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width, H = canvas.height;
+      const STORY_W = 400;
+      const GRAPH_X = 420;
+
+      const story = {
+        start:      { type:'text', speaker:'Narrator', text:'You stand at a crossroads in the dark forest. A faint light glimmers to the north. The south path smells of smoke.', next:'choice1' },
+        choice1:    { type:'choice', text:'Which path do you choose?', options:[
+          { text:'Go north, toward the light.', next:'north1', flag:'went_north' },
+          { text:'Go south, toward the smoke.', next:'south1', flag:'went_south' },
+        ]},
+        north1:     { type:'text', speaker:'Narrator', text:'The light leads to a clearing where an old lantern hangs from a branch. Beneath it, a fox watches you calmly.', next:'choice2n' },
+        choice2n:   { type:'choice', text:'The fox tilts its head.', options:[
+          { text:'Reach out to the fox.', next:'fox_friend', flag:'befriended_fox' },
+          { text:'Take the lantern and leave.', next:'lantern', flag:'took_lantern' },
+        ]},
+        fox_friend: { type:'text', speaker:'Narrator', text:'The fox nuzzles your hand. It stands and begins to walk deeper into the woods, glancing back at you.', next:'choice3' },
+        lantern:    { type:'text', speaker:'Narrator', text:'The lantern is warm in your hands. With its light, shadows retreat. But the fox has vanished.', next:'choice3' },
+        south1:     { type:'text', speaker:'Narrator', text:'The smoke rises from a dying campfire. Someone was here recently. A journal lies open on a log.', next:'choice2s' },
+        choice2s:   { type:'choice', text:'The journal pages flutter in the wind.', options:[
+          { text:'Read the journal.', next:'read_journal', flag:'read_journal' },
+          { text:'Follow the footprints leading away.', next:'footprints', flag:'followed_tracks' },
+        ]},
+        read_journal:{ type:'text', speaker:'Narrator', text:'"Day 47. The bridge is the only way out. But it only appears for those who know the word. The fox knows."', next:'choice3' },
+        footprints: { type:'text', speaker:'Narrator', text:'The tracks lead to a ravine. On the other side, you can see the shimmer of a bridge that is not quite there.', next:'choice3' },
+        choice3:    { type:'choice', text:'The forest grows darker. You sense the end of your journey is near.', options:[
+          { text:'Call out into the darkness.', next:'ending_call' },
+          { text:'Walk forward in silence.', next:'ending_silence' },
+        ]},
+        ending_call:    { type:'ending', speaker:'Narrator', text:'Your voice echoes through the trees. After a long silence, something answers. A bridge materializes, made of moonlight. You cross into the dawn.', ending_name:'Voice of the Forest' },
+        ending_silence: { type:'ending', speaker:'Narrator', text:'In silence, you walk. The trees part. The forest was never trapping you - it was waiting for you to stop running. You emerge, changed.', ending_name:'The Quiet Path' },
+      };
+
+      const nodePositions = {
+        start:       { x:90, y:15 },
+        choice1:     { x:90, y:55 },
+        north1:      { x:40, y:100 },
+        south1:      { x:140, y:100 },
+        choice2n:    { x:40, y:145 },
+        choice2s:    { x:140, y:145 },
+        fox_friend:  { x:10, y:195 },
+        lantern:     { x:70, y:195 },
+        read_journal:{ x:115, y:195 },
+        footprints:  { x:175, y:195 },
+        choice3:     { x:90, y:250 },
+        ending_call: { x:50, y:305 },
+        ending_silence:{ x:135, y:305 },
+      };
+
+      let currentNode = 'start';
+      const visited = { start: true };
+      const flags = {};
+      const choicePath = ['start'];
+
+      function getEdges() {
+        const edges = [];
+        for (const [id, node] of Object.entries(story)) {
+          if (node.type === 'text' && node.next) {
+            edges.push([id, node.next]);
+          }
+          if (node.type === 'choice' && node.options) {
+            for (const opt of node.options) {
+              edges.push([id, opt.next]);
+            }
+          }
+        }
+        return edges;
+      }
+
+      function getReachable() {
+        const reachable = new Set();
+        const queue = ['start'];
+        while (queue.length > 0) {
+          const n = queue.shift();
+          if (reachable.has(n)) continue;
+          reachable.add(n);
+          const node = story[n];
+          if (node.type === 'text' && node.next) queue.push(node.next);
+          if (node.type === 'choice' && node.options) {
+            for (const opt of node.options) queue.push(opt.next);
+          }
+        }
+        return reachable;
+      }
+
+      function wrapText(text, maxW) {
+        const words = text.split(' ');
+        const lines = [];
+        let line = '';
+        for (const word of words) {
+          const test = line + word + ' ';
+          if (ctx.measureText(test).width > maxW) {
+            lines.push(line.trim());
+            line = word + ' ';
+          } else {
+            line = test;
+          }
+        }
+        if (line.trim()) lines.push(line.trim());
+        return lines;
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, W, H);
+        ctx.fillStyle = '#111822';
+        ctx.fillRect(0, 0, STORY_W, H);
+        ctx.fillStyle = '#0d1520';
+        ctx.fillRect(GRAPH_X, 0, W - GRAPH_X, H);
+        ctx.strokeStyle = '#2a3a4a';
+        ctx.beginPath(); ctx.moveTo(GRAPH_X-2, 0); ctx.lineTo(GRAPH_X-2, H); ctx.stroke();
+
+        const node = story[currentNode];
+
+        if (node.type === 'ending') {
+          ctx.fillStyle = '#ffdd88';
+          ctx.font = 'bold 18px monospace';
+          ctx.fillText('ENDING', 20, 35);
+          ctx.fillStyle = '#ddaa44';
+          ctx.font = 'italic 15px monospace';
+          ctx.fillText('"' + node.ending_name + '"', 20, 60);
+          ctx.fillStyle = '#ccddee';
+          ctx.font = '14px monospace';
+          const lines = wrapText(node.text, STORY_W - 40);
+          for (let i = 0; i < lines.length; i++) {
+            ctx.fillText(lines[i], 20, 95 + i * 22);
+          }
+          ctx.fillStyle = '#667788';
+          ctx.font = '13px monospace';
+          ctx.fillText('Click to restart.', 20, 95 + (lines.length + 1) * 22 + 20);
+        } else {
+          ctx.fillStyle = '#ffdd88';
+          ctx.font = 'bold 14px monospace';
+          ctx.fillText(node.speaker || '', 20, 30);
+          ctx.fillStyle = '#ccddee';
+          ctx.font = '14px monospace';
+          const textToShow = node.type === 'choice' ? node.text : node.text;
+          const lines = wrapText(textToShow, STORY_W - 40);
+          let ty = 60;
+          for (const l of lines) { ctx.fillText(l, 20, ty); ty += 22; }
+
+          if (node.type === 'choice') {
+            ty += 15;
+            ctx.fillStyle = '#667788';
+            ctx.font = '12px monospace';
+            ctx.fillText('Choose:', 20, ty); ty += 25;
+            for (let i = 0; i < node.options.length; i++) {
+              const opt = node.options[i];
+              const oy = ty + i * 42;
+              ctx.fillStyle = '#1a2a3a';
+              ctx.fillRect(20, oy, STORY_W - 40, 34);
+              ctx.strokeStyle = '#3a5a7a';
+              ctx.lineWidth = 1;
+              ctx.strokeRect(20, oy, STORY_W - 40, 34);
+              ctx.fillStyle = '#88ccee';
+              ctx.font = '13px monospace';
+              ctx.fillText((i+1) + '. ' + opt.text, 30, oy + 22);
+            }
+          } else {
+            ty += 20;
+            ctx.fillStyle = '#556677';
+            ctx.font = '12px monospace';
+            ctx.fillText('Click to continue...', 20, ty);
+          }
+        }
+
+        // Graph
+        const gox = GRAPH_X + 25, goy = 40;
+        ctx.fillStyle = '#667788';
+        ctx.font = 'bold 13px monospace';
+        ctx.fillText('Story Graph', GRAPH_X + 15, 25);
+
+        const edges = getEdges();
+        const reachable = getReachable();
+
+        for (const [from, to] of edges) {
+          if (!nodePositions[from] || !nodePositions[to]) continue;
+          const fp = nodePositions[from], tp = nodePositions[to];
+          const bothVisited = visited[from] && visited[to];
+          const inPath = choicePath.includes(from) && choicePath.includes(to);
+          ctx.strokeStyle = inPath ? 'rgba(68, 220, 120, 0.6)' : bothVisited ? 'rgba(68, 180, 120, 0.3)' : 'rgba(80, 100, 120, 0.2)';
+          ctx.lineWidth = inPath ? 2 : 1;
+          ctx.beginPath();
+          ctx.moveTo(gox + fp.x, goy + fp.y);
+          ctx.lineTo(gox + tp.x, goy + tp.y);
+          ctx.stroke();
+        }
+
+        for (const [id, pos] of Object.entries(nodePositions)) {
+          const nx = gox + pos.x, ny = goy + pos.y;
+          const node2 = story[id];
+          let fill = '#222a33', stroke = '#3a4a55';
+          if (id === currentNode) { fill = '#ddaa22'; stroke = '#ffcc44'; }
+          else if (visited[id]) { fill = '#227744'; stroke = '#44bb66'; }
+          else if (!reachable.has(id)) { fill = '#1a1a22'; stroke = '#2a2a33'; }
+
+          const isEnding = node2 && node2.type === 'ending';
+          const isChoice = node2 && node2.type === 'choice';
+
+          ctx.fillStyle = fill;
+          if (isEnding) {
+            ctx.beginPath();
+            ctx.moveTo(nx, ny - 12);
+            ctx.lineTo(nx + 14, ny);
+            ctx.lineTo(nx + 8, ny + 12);
+            ctx.lineTo(nx - 8, ny + 12);
+            ctx.lineTo(nx - 14, ny);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = stroke;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+          } else if (isChoice) {
+            ctx.fillRect(nx - 12, ny - 10, 24, 20);
+            ctx.strokeStyle = stroke;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(nx - 12, ny - 10, 24, 20);
+          } else {
+            ctx.beginPath();
+            ctx.arc(nx, ny, 11, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = stroke;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+          }
+
+          ctx.fillStyle = id === currentNode ? '#000' : '#ccc';
+          ctx.font = '7px monospace';
+          ctx.textAlign = 'center';
+          const label = id.length > 9 ? id.substring(0, 8) + '..' : id;
+          ctx.fillText(label, nx, ny + 3);
+          ctx.textAlign = 'left';
+        }
+
+        // Legend
+        const ly = H - 80;
+        ctx.font = '10px monospace';
+        ctx.fillStyle = '#ddaa22'; ctx.beginPath(); ctx.arc(GRAPH_X+22, ly, 5, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle='#aabbcc'; ctx.fillText('Current', GRAPH_X+32, ly+4);
+        ctx.fillStyle='#227744'; ctx.beginPath(); ctx.arc(GRAPH_X+22, ly+18, 5, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle='#aabbcc'; ctx.fillText('Visited', GRAPH_X+32, ly+22);
+        ctx.fillStyle='#222a33'; ctx.beginPath(); ctx.arc(GRAPH_X+22, ly+36, 5, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle='#aabbcc'; ctx.fillText('Unvisited', GRAPH_X+32, ly+40);
+
+        ctx.fillStyle='#667788'; ctx.fillRect(GRAPH_X+120, ly-5, 16, 12);
+        ctx.fillStyle='#aabbcc'; ctx.fillText('= choice', GRAPH_X+140, ly+4);
+        ctx.fillStyle='#667788';
+        ctx.beginPath(); ctx.moveTo(GRAPH_X+128, ly+14); ctx.lineTo(GRAPH_X+138, ly+22); ctx.lineTo(GRAPH_X+133, ly+30); ctx.lineTo(GRAPH_X+123, ly+30); ctx.lineTo(GRAPH_X+118, ly+22); ctx.closePath(); ctx.fill();
+        ctx.fillStyle='#aabbcc'; ctx.fillText('= ending', GRAPH_X+140, ly+25);
+
+        // Flags
+        const fk = Object.keys(flags);
+        if (fk.length > 0) {
+          ctx.fillStyle = '#556677';
+          ctx.font = '10px monospace';
+          ctx.fillText('Flags: ' + fk.join(', '), GRAPH_X + 15, H - 10);
+        }
+      }
+
+      canvas.addEventListener('click', function(e) {
+        const rect = canvas.getBoundingClientRect();
+        const mx = (e.clientX - rect.left) * (W / rect.width);
+        const my = (e.clientY - rect.top) * (H / rect.height);
+
+        const node = story[currentNode];
+        if (node.type === 'ending') {
+          currentNode = 'start';
+          for (const k in visited) delete visited[k];
+          for (const k in flags) delete flags[k];
+          visited['start'] = true;
+          choicePath.length = 0;
+          choicePath.push('start');
+          draw();
+          return;
+        }
+
+        if (mx > STORY_W) return;
+
+        if (node.type === 'text') {
+          if (node.next && story[node.next]) {
+            currentNode = node.next;
+            visited[currentNode] = true;
+            choicePath.push(currentNode);
+            if (story[currentNode].flag) flags[story[currentNode].flag] = true;
+          }
+          draw();
+          return;
+        }
+
+        if (node.type === 'choice') {
+          const textLines = wrapText(node.text, STORY_W - 40);
+          let ty = 60;
+          for (const l of textLines) ty += 22;
+          ty += 40;
+          for (let i = 0; i < node.options.length; i++) {
+            const oy = ty + i * 42;
+            if (mx >= 20 && mx <= STORY_W - 20 && my >= oy && my <= oy + 34) {
+              const opt = node.options[i];
+              if (opt.flag) flags[opt.flag] = true;
+              currentNode = opt.next;
+              visited[currentNode] = true;
+              choicePath.push(currentNode);
+              if (story[currentNode] && story[currentNode].flag) flags[story[currentNode].flag] = true;
+              draw();
+              return;
+            }
+          }
+        }
+      });
+
+      draw();
+    })();
+
+    // Demo 2: Typewriter Text with Character Expressions
+    (function() {
+      const canvas = document.getElementById('demo-typewriter');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width, H = canvas.height;
+      const slider = document.getElementById('speed-slider');
+      const speedLabel = document.getElementById('speed-value');
+
+      const lines = [
+        { speaker: 'Elena', text: 'I was not sure you would come.', expression: 'worried', color: '#7EC8E3' },
+        { speaker: 'Elena', text: 'But here you are. Standing in the rain, like always.', expression: 'neutral', color: '#7EC8E3' },
+        { speaker: 'You', text: 'I got your letter. I had to know what it meant.', expression: 'neutral', color: '#ccddee' },
+        { speaker: 'Elena', text: 'It meant exactly what it said. I am leaving.', expression: 'sad', color: '#7EC8E3' },
+        { speaker: 'You', text: 'You cannot be serious!', expression: 'angry', color: '#ccddee' },
+        { speaker: 'Elena', text: '...I am sorry. Truly.', expression: 'sad', color: '#7EC8E3' },
+        { speaker: 'Elena', text: 'But look -- maybe this is not the end. Maybe it is a new beginning?', expression: 'happy', color: '#7EC8E3' },
+        { speaker: 'You', text: '...Maybe you are right.', expression: 'neutral', color: '#ccddee' },
+      ];
+
+      let currentLine = 0;
+      let charIndex = 0;
+      let timer = 0;
+      let complete = false;
+      let charsPerSecond = 35;
+      let lastTime = performance.now();
+
+      const expressions = {
+        neutral: { eyes: 'open', mouth: 'line', brows: 'normal' },
+        happy:   { eyes: 'open', mouth: 'smile', brows: 'up' },
+        sad:     { eyes: 'half', mouth: 'frown', brows: 'down' },
+        worried: { eyes: 'open', mouth: 'frown', brows: 'down' },
+        angry:   { eyes: 'narrow', mouth: 'frown', brows: 'angry' },
+      };
+
+      function drawCharacter(x, y, expr) {
+        const e = expressions[expr] || expressions.neutral;
+        // Head
+        ctx.fillStyle = '#ddb99a';
+        ctx.beginPath();
+        ctx.ellipse(x, y, 35, 42, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#bb9977';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Hair
+        ctx.fillStyle = '#443322';
+        ctx.beginPath();
+        ctx.ellipse(x, y - 25, 38, 22, 0, Math.PI, 0);
+        ctx.fill();
+
+        // Eyes
+        const eyeY = y - 5;
+        ctx.fillStyle = '#ffffff';
+        if (e.eyes === 'open') {
+          ctx.beginPath(); ctx.ellipse(x - 12, eyeY, 6, 7, 0, 0, Math.PI*2); ctx.fill();
+          ctx.beginPath(); ctx.ellipse(x + 12, eyeY, 6, 7, 0, 0, Math.PI*2); ctx.fill();
+          ctx.fillStyle = '#334455';
+          ctx.beginPath(); ctx.arc(x - 12, eyeY, 3, 0, Math.PI*2); ctx.fill();
+          ctx.beginPath(); ctx.arc(x + 12, eyeY, 3, 0, Math.PI*2); ctx.fill();
+        } else if (e.eyes === 'half') {
+          ctx.beginPath(); ctx.ellipse(x - 12, eyeY + 2, 6, 4, 0, 0, Math.PI*2); ctx.fill();
+          ctx.beginPath(); ctx.ellipse(x + 12, eyeY + 2, 6, 4, 0, 0, Math.PI*2); ctx.fill();
+          ctx.fillStyle = '#334455';
+          ctx.beginPath(); ctx.arc(x - 12, eyeY + 2, 2.5, 0, Math.PI*2); ctx.fill();
+          ctx.beginPath(); ctx.arc(x + 12, eyeY + 2, 2.5, 0, Math.PI*2); ctx.fill();
+        } else if (e.eyes === 'narrow') {
+          ctx.strokeStyle = '#334455';
+          ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.moveTo(x-17, eyeY); ctx.lineTo(x-7, eyeY-1); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(x+7, eyeY-1); ctx.lineTo(x+17, eyeY); ctx.stroke();
+        }
+
+        // Eyebrows
+        ctx.strokeStyle = '#443322';
+        ctx.lineWidth = 2;
+        if (e.brows === 'normal') {
+          ctx.beginPath(); ctx.moveTo(x-18, eyeY-12); ctx.lineTo(x-6, eyeY-13); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(x+6, eyeY-13); ctx.lineTo(x+18, eyeY-12); ctx.stroke();
+        } else if (e.brows === 'up') {
+          ctx.beginPath(); ctx.moveTo(x-18, eyeY-15); ctx.lineTo(x-6, eyeY-17); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(x+6, eyeY-17); ctx.lineTo(x+18, eyeY-15); ctx.stroke();
+        } else if (e.brows === 'down' || e.brows === 'angry') {
+          const dir = e.brows === 'angry' ? 4 : 2;
+          ctx.beginPath(); ctx.moveTo(x-18, eyeY-10-dir); ctx.lineTo(x-6, eyeY-10+dir); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(x+6, eyeY-10+dir); ctx.lineTo(x+18, eyeY-10-dir); ctx.stroke();
+        }
+
+        // Mouth
+        const mouthY = y + 14;
+        ctx.strokeStyle = '#885544';
+        ctx.lineWidth = 2;
+        if (e.mouth === 'line') {
+          ctx.beginPath(); ctx.moveTo(x-8, mouthY); ctx.lineTo(x+8, mouthY); ctx.stroke();
+        } else if (e.mouth === 'smile') {
+          ctx.beginPath(); ctx.arc(x, mouthY - 4, 10, 0.2, Math.PI - 0.2); ctx.stroke();
+        } else if (e.mouth === 'frown') {
+          ctx.beginPath(); ctx.arc(x, mouthY + 10, 10, Math.PI + 0.3, -0.3); ctx.stroke();
+        }
+
+        // Body outline
+        ctx.fillStyle = '#445566';
+        ctx.beginPath();
+        ctx.moveTo(x - 30, y + 42);
+        ctx.quadraticCurveTo(x - 40, y + 80, x - 35, y + 130);
+        ctx.lineTo(x + 35, y + 130);
+        ctx.quadraticCurveTo(x + 40, y + 80, x + 30, y + 42);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, W, H);
+
+        // Background gradient
+        ctx.fillStyle = '#111828';
+        ctx.fillRect(0, 0, W, H);
+
+        // Scene background (simple rain effect)
+        ctx.fillStyle = '#0d1520';
+        ctx.fillRect(0, 0, W, 200);
+        ctx.strokeStyle = 'rgba(100, 130, 180, 0.1)';
+        ctx.lineWidth = 1;
+        const time = performance.now() / 50;
+        for (let i = 0; i < 30; i++) {
+          const rx = (i * 47 + time) % W;
+          const ry = (i * 31 + time * 1.3) % 200;
+          ctx.beginPath();
+          ctx.moveTo(rx, ry);
+          ctx.lineTo(rx - 2, ry + 10);
+          ctx.stroke();
+        }
+
+        const line = lines[currentLine];
+        const isElena = line.speaker === 'Elena';
+
+        // Draw character
+        const charX = isElena ? 100 : 660;
+        drawCharacter(charX, 100, line.expression);
+
+        // Speaker label
+        ctx.fillStyle = '#0d1a2a';
+        ctx.fillRect(0, 230, W, 170);
+        ctx.strokeStyle = '#2a3a5a';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(0, 230); ctx.lineTo(W, 230); ctx.stroke();
+
+        // Name plate
+        ctx.fillStyle = '#1a2a3a';
+        ctx.fillRect(20, 235, 140, 28);
+        ctx.strokeStyle = line.color;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(20, 235, 140, 28);
+        ctx.fillStyle = line.color;
+        ctx.font = 'bold 15px monospace';
+        ctx.fillText(line.speaker, 30, 255);
+
+        // Text with typewriter
+        const visibleText = line.text.substring(0, charIndex);
+        ctx.fillStyle = '#ccddee';
+        ctx.font = '15px monospace';
+        const textLines = [];
+        const words = visibleText.split(' ');
+        let tl = '';
+        for (const w of words) {
+          const test = tl + w + ' ';
+          if (ctx.measureText(test).width > W - 60) {
+            textLines.push(tl.trim());
+            tl = w + ' ';
+          } else {
+            tl = test;
+          }
+        }
+        if (tl.trim()) textLines.push(tl.trim());
+        for (let i = 0; i < textLines.length; i++) {
+          ctx.fillText(textLines[i], 30, 290 + i * 24);
+        }
+
+        // Cursor blink
+        if (!complete) {
+          if (Math.floor(performance.now() / 500) % 2 === 0) {
+            const lastLine = textLines.length > 0 ? textLines[textLines.length-1] : '';
+            const cx = 30 + ctx.measureText(lastLine).width + 2;
+            const cy = 290 + (textLines.length - 1) * 24;
+            ctx.fillStyle = line.color;
+            ctx.fillRect(cx, cy - 14, 8, 18);
+          }
+        }
+
+        // Advance hint
+        if (complete) {
+          ctx.fillStyle = '#556677';
+          ctx.font = '11px monospace';
+          ctx.fillText('Click to ' + (currentLine < lines.length - 1 ? 'advance' : 'restart') + '...', W - 200, 390);
+        }
+
+        // Progress
+        ctx.fillStyle = '#334455';
+        ctx.fillRect(20, 380, W - 40, 4);
+        ctx.fillStyle = '#4488aa';
+        ctx.fillRect(20, 380, (W - 40) * ((currentLine + (complete ? 1 : charIndex / line.text.length)) / lines.length), 4);
+      }
+
+      function update(now) {
+        const dt = (now - lastTime) / 1000;
+        lastTime = now;
+
+        if (!complete) {
+          timer += dt;
+          const interval = 1 / charsPerSecond;
+          while (timer >= interval && !complete) {
+            timer -= interval;
+            charIndex++;
+            const ch = lines[currentLine].text[charIndex - 1];
+            if (ch === '.') timer -= 0.25;
+            else if (ch === ',') timer -= 0.12;
+            else if (ch === '!') timer -= 0.2;
+            else if (ch === '?') timer -= 0.2;
+            if (charIndex >= lines[currentLine].text.length) {
+              complete = true;
+              charIndex = lines[currentLine].text.length;
+            }
+          }
+        }
+
+        draw();
+        requestAnimationFrame(update);
+      }
+
+      canvas.addEventListener('click', function() {
+        if (!complete) {
+          charIndex = lines[currentLine].text.length;
+          complete = true;
+        } else {
+          currentLine++;
+          if (currentLine >= lines.length) currentLine = 0;
+          charIndex = 0;
+          timer = 0;
+          complete = false;
+        }
+      });
+
+      if (slider) {
+        slider.addEventListener('input', function() {
+          charsPerSecond = parseInt(slider.value);
+          if (speedLabel) speedLabel.textContent = charsPerSecond + ' cps';
+        });
+      }
+
+      requestAnimationFrame(update);
+    })();
+  </script>
+</BaseLayout>

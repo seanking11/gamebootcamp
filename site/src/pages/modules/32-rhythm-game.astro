@@ -1,0 +1,868 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 32: Rhythm Game">
+  <div class="container page-content">
+
+    <!-- Module Header -->
+    <div class="module-header">
+      <div class="module-number">Module 32</div>
+      <h1>Rhythm Game</h1>
+      <p class="module-theme">Hit the right note at the right time and feel the music move through your fingers | Beat Lane</p>
+    </div>
+
+    <blockquote>
+      "A rhythm game is a musical instrument where the song plays itself and your only job is to not ruin it."
+    </blockquote>
+
+    <!-- ============================================================ -->
+    <!-- WEEK 1: HISTORY & DESIGN THEORY                              -->
+    <!-- ============================================================ -->
+
+    <h2>Week 1: History &amp; Design Theory</h2>
+
+    <h3>The Origin</h3>
+    <p>
+      In 1996, Masaya Matsuura created <strong>PaRappa the Rapper</strong> and proved that pressing buttons in time with music could be a game. The concept was deceptively simple: a song plays, icons scroll across the screen indicating which button to press and when, and the player presses the matching button in time with the beat. What made PaRappa revolutionary was the feedback loop it created between the player and the music. Hit the notes and the song sounds right; miss them and the track falls apart. Matsuura understood that the joy of a rhythm game is not precision for its own sake but the feeling that you are inside the music.
+    </p>
+
+    <h3>How the Genre Evolved</h3>
+    <p>
+      <strong>PaRappa the Rapper (1996)</strong> &mdash; Established the genre's essential contract: the game provides a song and visual cues for each beat; the player provides the input. The core loop was fully formed: audio plays, visual indicator scrolls, player presses button, game scores the accuracy.
+    </p>
+    <p>
+      <strong>Guitar Hero (2005)</strong> &mdash; Harmonix gave the genre a physical interface: a plastic guitar. The "note highway" &mdash; a scrolling track where colored notes approach a target line &mdash; became the genre's standard visual language. Guitar Hero solved the accessibility problem: Easy used three buttons, Expert used five with complex patterns. The same song was a fundamentally different challenge at each difficulty.
+    </p>
+    <p>
+      <strong>Beat Saber (2018)</strong> &mdash; Beat Games brought rhythm gameplay into VR. Instead of pressing buttons, players slashed colored blocks with lightsabers. The physicality made timing feel visceral. Beat Saber proved the genre was far from exhausted and demonstrated that the core concept adapts to any input modality.
+    </p>
+
+    <h3>What Makes It "Great"</h3>
+    <p>
+      A great rhythm game creates flow state &mdash; where the player stops thinking about which button to press and their hands just move with the music. This requires three things: charting that matches the music, timing windows that are fair but meaningful, and visual/audio feedback that is immediate and satisfying.
+    </p>
+
+    <h3>The Essential Mechanic</h3>
+    <p>
+      <strong>Hitting inputs in time with musical beats</strong> within precise timing windows.
+    </p>
+
+    <hr />
+
+    <!-- ============================================================ -->
+    <!-- WEEK 2: BUILD THE MVP                                        -->
+    <!-- ============================================================ -->
+
+    <h2>Week 2: Build the MVP</h2>
+
+    <h3>What You're Building</h3>
+    <p>
+      A 4-lane note highway rhythm game. Notes scroll down the screen toward a target line at the bottom. When a note reaches the target, the player presses the corresponding key (D, F, J, K). The game scores each input as Perfect, Great, Good, or Miss. Consecutive hits build a combo multiplier. After the song, a results screen shows accuracy and grade.
+    </p>
+
+    <h3>Core Concepts</h3>
+
+    <!-- ==================== CONCEPT 1: AUDIO SYNC ==================== -->
+
+    <h4>1. Audio Synchronization</h4>
+    <p>
+      The entire game is driven by the song's current playback position, not by frame counting. Every frame, the game queries the audio system for the current position in milliseconds and uses that as the single source of truth.
+    </p>
+    <pre is:raw><code>function getSongPosition():
+    return audioEngine.track.getPlaybackPosition() + audioEngine.offset
+
+function gameLoop():
+    songPositionMs = getSongPosition()
+    updateNotes(songPositionMs)
+    checkInputs(songPositionMs)
+    renderFrame(songPositionMs)</code></pre>
+    <p>
+      <strong>Why it matters:</strong> If notes drift even 20 milliseconds from the music, the game feels "off." Frame-based timing accumulates drift over a three-minute song. Audio-position-based timing does not.
+    </p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Timing Window Visualizer</div>
+      <p class="demo-hint">A note scrolls toward the target line. Press <strong>Spacebar</strong> to "hit" when it reaches the line. The display shows your timing offset in milliseconds and the judgment (Perfect/Great/Good/Miss). The colored bar shows the timing windows visually.</p>
+      <canvas id="demo-timing" width="760" height="420"></canvas>
+      <div class="demo-controls">
+        <span class="value-display" id="timing-judgment">Press SPACE when the note reaches the line</span>
+        <span class="value-display" id="timing-offset">Offset: ---</span>
+        <span class="value-display" id="timing-hits">Hits: 0 | Misses: 0</span>
+      </div>
+    </div>
+
+    <!-- ==================== CONCEPT 2: CHART FORMAT ==================== -->
+
+    <h4>2. Note Highway / Chart Format</h4>
+    <p>
+      A song chart lists every note: its timestamp, its lane, and its type. The chart is loaded at song start and notes are spawned as they approach. The chart format is the bridge between the music and the gameplay.
+    </p>
+    <pre is:raw><code>sampleChart = {
+    bpm: 120,
+    notes: [
+        {timeMs: 500,  lane: 0, type: "tap"},
+        {timeMs: 750,  lane: 1, type: "tap"},
+        {timeMs: 1000, lane: 2, type: "tap"},
+        {timeMs: 1000, lane: 3, type: "tap"},   // Chord
+        {timeMs: 1250, lane: 0, type: "tap"}
+    ]
+}
+
+APPROACH_TIME = 1500  // ms before hit time the note appears
+
+function spawnUpcomingNotes(songPositionMs):
+    while nextNoteIndex &lt; chart.notes.length:
+        note = chart.notes[nextNoteIndex]
+        if songPositionMs &gt;= note.timeMs - APPROACH_TIME:
+            activeNotes.add(note)
+            nextNoteIndex++
+        else:
+            break</code></pre>
+    <p>
+      <strong>Why it matters:</strong> The chart is the game's level design. A good chart makes a song feel playable; a bad chart makes it feel random. The data-driven approach means adding new songs requires zero code changes.
+    </p>
+
+    <!-- ==================== CONCEPT 3: TIMING WINDOWS ==================== -->
+
+    <h4>3. Timing Windows</h4>
+    <p>
+      When the player presses a key, the game checks the closest note in that lane. The difference in milliseconds determines the judgment: Perfect (20ms), Great (50ms), Good (100ms), or Miss (beyond 100ms).
+    </p>
+    <pre is:raw><code>TIMING_WINDOWS = {
+    PERFECT: 20,    // +/- 20ms
+    GREAT:   50,    // +/- 50ms
+    GOOD:    100,   // +/- 100ms
+    MISS:    150    // Beyond this = miss
+}
+
+function judgeInput(lane, songPositionMs):
+    closestNote = findClosestUnhitNote(lane)
+    diff = abs(songPositionMs - closestNote.timeMs)
+    if diff &lt;= TIMING_WINDOWS.PERFECT: judgment = "PERFECT"
+    else if diff &lt;= TIMING_WINDOWS.GREAT: judgment = "GREAT"
+    else if diff &lt;= TIMING_WINDOWS.GOOD: judgment = "GOOD"
+    else: return  // too far from any note</code></pre>
+    <p>
+      <strong>Why it matters:</strong> Timing windows are what separate a rhythm game from a reaction-time test. The tiered system rewards precision without requiring perfection.
+    </p>
+
+    <!-- ==================== CONCEPT 4: CALIBRATION ==================== -->
+
+    <h4>4. Input Latency Calibration</h4>
+    <p>
+      Different hardware introduces different delays. The calibration system lets the player adjust an offset (in milliseconds) to compensate.
+    </p>
+    <pre is:raw><code>function calculateCalibration():
+    offsets = []
+    for each tap in calibration.taps:
+        nearestBeat = findNearest(metronomeHits, tap)
+        offsets.add(tap - nearestBeat)
+    calibration.audioOffset = -round(average(offsets))</code></pre>
+    <p>
+      <strong>Why it matters:</strong> A 40ms audio delay means the player hears the beat late, presses late, and gets scored as inaccurate &mdash; even though their timing relative to what they heard was perfect.
+    </p>
+
+    <!-- ==================== CONCEPT 5: COMBO SYSTEM ==================== -->
+
+    <h4>5. Combo and Scoring System</h4>
+    <p>
+      Each hit increments a combo counter. The multiplier increases at 10, 30, and 50 combo. A single Miss resets the combo. The final score, max combo, and hit percentage determine a letter grade.
+    </p>
+    <pre is:raw><code>COMBO_THRESHOLDS = [
+    {combo: 0,  multiplier: 1},
+    {combo: 10, multiplier: 2},
+    {combo: 30, multiplier: 4},
+    {combo: 50, multiplier: 8}
+]
+
+function applyScore(judgment):
+    if judgment != "MISS":
+        scoring.combo += 1
+        scoring.score += SCORE_VALUES[judgment] * getMultiplier()
+    else:
+        scoring.combo = 0</code></pre>
+    <p>
+      <strong>Why it matters:</strong> The combo system transforms "hit notes" into "do not miss a single note." A 200-combo streak means every note matters intensely.
+    </p>
+
+    <!-- ==================== CONCEPT 6: BPM SCHEDULING ==================== -->
+
+    <h4>6. BPM-Based Event Scheduling</h4>
+    <p>
+      Notes are authored at musical positions (beat 1, beat 2.5) and converted to millisecond timestamps using BPM. This allows charts to be authored in musical terms.
+    </p>
+    <pre is:raw><code>function beatToMs(beat, bpm):
+    return (beat / bpm) * 60000
+
+// Scroll speed adjusts visual approach without changing timing
+function getScrollSpeed(baseSpeed, userSpeedMod):
+    return baseSpeed * userSpeedMod</code></pre>
+    <p>
+      <strong>Why it matters:</strong> BPM-based scheduling is what makes charts feel musical. Scroll speed modification is only possible because visual position is derived from BPM timing, not hard-coded.
+    </p>
+
+    <!-- ==================== CONCEPT 7: VISUAL FEEDBACK ==================== -->
+
+    <h4>7. Visual Feedback Synchronized to Music</h4>
+    <p>
+      Hit effects, background pulses, and screen flashes all trigger on beat. The background pulses on every beat (from BPM), hit effects play at the judgment moment. This visual layer is what makes the game feel alive.
+    </p>
+    <pre is:raw><code>function triggerBeatPulse():
+    backgroundFlash.alpha = 0.3
+    backgroundFlash.fadeOut(duration=200)
+    targetLine.scale = 1.1
+    targetLine.tweenTo(scale=1.0, duration=150)
+
+function showJudgmentFeedback(judgment, lane):
+    popup = createText(judgment, lanePositions[lane])
+    popup.color = JUDGMENT_COLORS[judgment]
+    if judgment == "MISS": camera.shake(intensity=3)</code></pre>
+    <p>
+      <strong>Why it matters:</strong> Visual feedback makes a rhythm game feel like a performance rather than a typing test. The hit effects celebrate accuracy and make Perfect feel different from Good in a visceral way.
+    </p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Mini Rhythm Game</div>
+      <p class="demo-hint">4 lanes mapped to <strong>D, F, J, K</strong> keys. Notes scroll down &mdash; press the matching key when they reach the target line. Combo counter and score are shown. This is a visual-only demo (no audio).</p>
+      <canvas id="demo-rhythm" width="760" height="520"></canvas>
+      <div class="demo-controls">
+        <button id="rhythm-start">Start Game</button>
+        <span class="value-display" id="rhythm-score">Score: 0</span>
+        <span class="value-display" id="rhythm-combo">Combo: 0</span>
+        <span class="value-display" id="rhythm-grade">---</span>
+      </div>
+    </div>
+
+    <hr />
+
+    <!-- ==================== STRETCH GOALS ==================== -->
+
+    <h3>Stretch Goals</h3>
+    <ul>
+      <li><strong>Hold notes</strong> &mdash; Press and hold until the note ends.</li>
+      <li><strong>Chart editor</strong> &mdash; Players create their own note charts.</li>
+      <li><strong>Difficulty selection</strong> &mdash; Easy/Normal/Hard with different charts.</li>
+      <li><strong>Health bar</strong> &mdash; Drains on misses and ends the song early.</li>
+    </ul>
+
+    <h3>MVP Spec</h3>
+    <table>
+      <thead>
+        <tr><th>Component</th><th>Minimum Viable Version</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Lanes</td><td>4 lanes (D, F, J, K) with colored indicators</td></tr>
+        <tr><td>Note Highway</td><td>Notes scroll from top to bottom</td></tr>
+        <tr><td>Timing Windows</td><td>Perfect (20ms), Great (50ms), Good (100ms), Miss</td></tr>
+        <tr><td>Scoring</td><td>Points per judgment, combo multiplier at 10/30/50</td></tr>
+        <tr><td>Calibration</td><td>Audio offset setting</td></tr>
+        <tr><td>Visual Feedback</td><td>Beat pulse, hit particles, judgment popups</td></tr>
+        <tr><td>Results Screen</td><td>Score, accuracy %, max combo, letter grade</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliverable</h3>
+    <p>
+      A playable rhythm game where notes scroll down a 4-lane highway. The player presses lane keys in time with the beat and receives millisecond-accurate timing judgments. A combo system multiplies score. Visual feedback reinforces the connection between input and music. The game must feel tight &mdash; inputs should feel connected to the music.
+    </p>
+
+    <hr />
+
+    <!-- ==================== DISCUSSION QUESTIONS ==================== -->
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li><strong>The "Feel" Problem:</strong> Two rhythm games can have identical timing windows yet one feels tight and the other laggy. What contributes to subjective "feel" beyond audio sync?</li>
+      <li><strong>Charting as Level Design:</strong> What makes a good chart? Should every audible sound be a note, or should charts be selective?</li>
+      <li><strong>Accessibility vs. Competitive Depth:</strong> How do you design a system welcoming to newcomers and rewarding for experts?</li>
+      <li><strong>Audio as a Technical Constraint:</strong> Web browsers and Bluetooth audio introduce unpredictable latency. At what point does latency make a rhythm game unplayable?</li>
+    </ol>
+
+    <!-- Module Navigation -->
+    <div class="module-nav">
+      <a href={`${base}modules/31-survival-crafting`}>&larr; Previous Module</a>
+      <a href={`${base}modules/33-survival-horror`}>Next Module &rarr;</a>
+    </div>
+
+  </div>
+</BaseLayout>
+
+<script>
+// ============================================================
+// DEMO 1: TIMING WINDOW VISUALIZER
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-timing');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const judgmentEl = document.getElementById('timing-judgment');
+  const offsetEl = document.getElementById('timing-offset');
+  const hitsEl = document.getElementById('timing-hits');
+
+  const TARGET_Y = H - 80;
+  const NOTE_TRAVEL_TIME = 2000; // ms
+  const NOTE_SPAWN_INTERVAL = 2200; // ms
+
+  let notes = [];
+  let time = 0;
+  let lastSpawn = -NOTE_SPAWN_INTERVAL;
+  let hits = 0;
+  let misses = 0;
+  let lastJudgment = '';
+  let lastOffset = null;
+  let judgmentTimer = 0;
+  let flashAlpha = 0;
+
+  const WINDOWS = {
+    PERFECT: { ms: 30, color: '#f59e0b', label: 'PERFECT' },
+    GREAT: { ms: 60, color: '#22c55e', label: 'GREAT' },
+    GOOD: { ms: 100, color: '#3b82f6', label: 'GOOD' },
+    MISS: { ms: 150, color: '#ef4444', label: 'MISS' }
+  };
+
+  function spawnNote() {
+    notes.push({
+      spawnTime: time,
+      targetTime: time + NOTE_TRAVEL_TIME,
+      hit: false,
+      missed: false,
+      y: 0
+    });
+  }
+
+  document.addEventListener('keydown', function(e) {
+    if (e.code !== 'Space') return;
+    e.preventDefault();
+
+    let closest = null;
+    let closestDiff = Infinity;
+
+    for (const n of notes) {
+      if (n.hit || n.missed) continue;
+      const diff = Math.abs(time - n.targetTime);
+      if (diff < closestDiff) {
+        closestDiff = diff;
+        closest = n;
+      }
+    }
+
+    if (!closest || closestDiff > WINDOWS.MISS.ms) return;
+
+    closest.hit = true;
+    lastOffset = time - closest.targetTime;
+
+    if (closestDiff <= WINDOWS.PERFECT.ms) {
+      lastJudgment = 'PERFECT';
+      hits++;
+    } else if (closestDiff <= WINDOWS.GREAT.ms) {
+      lastJudgment = 'GREAT';
+      hits++;
+    } else if (closestDiff <= WINDOWS.GOOD.ms) {
+      lastJudgment = 'GOOD';
+      hits++;
+    } else {
+      lastJudgment = 'MISS';
+      misses++;
+    }
+    judgmentTimer = 60;
+    flashAlpha = 0.3;
+  });
+
+  function draw() {
+    const dt = 1000 / 60;
+    time += dt;
+    ctx.clearRect(0, 0, W, H);
+
+    // Flash effect
+    if (flashAlpha > 0) {
+      const jColor = lastJudgment === 'PERFECT' ? '#f59e0b' : lastJudgment === 'GREAT' ? '#22c55e' : lastJudgment === 'GOOD' ? '#3b82f6' : '#ef4444';
+      ctx.fillStyle = jColor + Math.floor(flashAlpha * 255).toString(16).padStart(2, '0');
+      ctx.fillRect(0, 0, W, H);
+      flashAlpha -= 0.015;
+    }
+
+    // Spawn notes
+    if (time - lastSpawn >= NOTE_SPAWN_INTERVAL) {
+      spawnNote();
+      lastSpawn = time;
+    }
+
+    // Update notes
+    for (const n of notes) {
+      const progress = (time - n.spawnTime) / NOTE_TRAVEL_TIME;
+      n.y = progress * TARGET_Y;
+
+      // Auto-miss if past target
+      if (!n.hit && !n.missed && time - n.targetTime > WINDOWS.MISS.ms) {
+        n.missed = true;
+        misses++;
+        lastJudgment = 'MISS';
+        lastOffset = null;
+        judgmentTimer = 60;
+      }
+    }
+
+    // Remove old notes
+    notes = notes.filter(n => n.y < H + 50);
+
+    // Draw timing window bar at bottom
+    const barY = H - 30;
+    const barH = 20;
+    const barCenterX = W / 2;
+    const msPerPx = 2.5;
+
+    // Window regions
+    const windowOrder = [
+      { ...WINDOWS.GOOD, w: WINDOWS.GOOD.ms },
+      { ...WINDOWS.GREAT, w: WINDOWS.GREAT.ms },
+      { ...WINDOWS.PERFECT, w: WINDOWS.PERFECT.ms }
+    ];
+
+    for (const w of windowOrder) {
+      const halfW = w.w / msPerPx;
+      ctx.fillStyle = w.color + '33';
+      ctx.fillRect(barCenterX - halfW, barY, halfW * 2, barH);
+      ctx.strokeStyle = w.color + '66';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(barCenterX - halfW, barY, halfW * 2, barH);
+    }
+
+    // Labels on bar
+    ctx.font = '500 8px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    for (const [key, w] of Object.entries(WINDOWS)) {
+      if (key === 'MISS') continue;
+      const halfW = w.ms / msPerPx;
+      ctx.fillStyle = w.color;
+      ctx.fillText(w.label, barCenterX, barY - 4);
+    }
+    ctx.fillStyle = '#22c55e';
+    ctx.fillText('GOOD', barCenterX - WINDOWS.GOOD.ms / msPerPx + 20, barY + 14);
+    ctx.fillStyle = '#3b82f6';
+    ctx.fillText('GREAT', barCenterX - WINDOWS.GREAT.ms / msPerPx + 20, barY + 14);
+    ctx.fillStyle = '#f59e0b';
+    ctx.fillText('PERFECT', barCenterX, barY + 14);
+
+    // Mark last hit offset on bar
+    if (lastOffset !== null && judgmentTimer > 0) {
+      const ox = barCenterX + lastOffset / msPerPx;
+      ctx.beginPath();
+      ctx.moveTo(ox, barY - 2);
+      ctx.lineTo(ox, barY + barH + 2);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // Draw target line
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(W / 2 - 60, TARGET_Y);
+    ctx.lineTo(W / 2 + 60, TARGET_Y);
+    ctx.stroke();
+
+    // Draw lane
+    ctx.strokeStyle = '#1e1e22';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(W / 2, 0);
+    ctx.lineTo(W / 2, TARGET_Y - 10);
+    ctx.stroke();
+
+    // Draw notes
+    for (const n of notes) {
+      if (n.hit) continue;
+      const alpha = n.missed ? 0.3 : 1;
+      ctx.beginPath();
+      ctx.arc(W / 2, n.y, 14, 0, Math.PI * 2);
+      ctx.fillStyle = n.missed ? 'rgba(239,68,68,0.3)' : 'rgba(59,130,246,0.8)';
+      ctx.fill();
+      if (!n.missed) {
+        ctx.beginPath();
+        ctx.arc(W / 2, n.y, 18, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(59,130,246,0.15)';
+        ctx.fill();
+      }
+    }
+
+    // Judgment display
+    if (judgmentTimer > 0) {
+      judgmentTimer--;
+      const jColors = { PERFECT: '#f59e0b', GREAT: '#22c55e', GOOD: '#3b82f6', MISS: '#ef4444' };
+      ctx.fillStyle = jColors[lastJudgment] || '#71717a';
+      ctx.font = '800 32px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(lastJudgment, W / 2, TARGET_Y - 40);
+
+      if (lastOffset !== null) {
+        const sign = lastOffset >= 0 ? '+' : '';
+        ctx.font = '600 14px "JetBrains Mono", monospace';
+        ctx.fillText(sign + Math.round(lastOffset) + 'ms', W / 2, TARGET_Y - 15);
+      }
+    }
+
+    // HUD
+    hitsEl.textContent = 'Hits: ' + hits + ' | Misses: ' + misses;
+    if (lastOffset !== null) {
+      offsetEl.textContent = 'Offset: ' + (lastOffset >= 0 ? '+' : '') + Math.round(lastOffset) + 'ms';
+    }
+    if (lastJudgment) {
+      judgmentEl.textContent = lastJudgment + (lastOffset !== null ? ' (' + (lastOffset >= 0 ? '+' : '') + Math.round(lastOffset) + 'ms)' : '');
+    }
+
+    // Instructions
+    ctx.fillStyle = '#71717a';
+    ctx.font = '500 12px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Press SPACEBAR when the note reaches the target line', W / 2, 25);
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+
+// ============================================================
+// DEMO 2: MINI RHYTHM GAME (4 lanes, D F J K)
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-rhythm');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const startBtn = document.getElementById('rhythm-start');
+  const scoreEl = document.getElementById('rhythm-score');
+  const comboEl = document.getElementById('rhythm-combo');
+  const gradeEl = document.getElementById('rhythm-grade');
+
+  const LANES = 4;
+  const LANE_W = 60;
+  const LANE_GAP = 10;
+  const TOTAL_LANE_W = LANES * LANE_W + (LANES - 1) * LANE_GAP;
+  const LANE_START_X = (W - TOTAL_LANE_W) / 2;
+  const TARGET_Y = H - 80;
+  const NOTE_R = 20;
+  const APPROACH_TIME = 1800;
+
+  const LANE_COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b'];
+  const LANE_KEYS = ['D', 'F', 'J', 'K'];
+  const KEY_CODES = ['KeyD', 'KeyF', 'KeyJ', 'KeyK'];
+
+  let gameState = 'idle';
+  let gameTime = 0;
+  let chart = [];
+  let activeNotes = [];
+  let nextNoteIdx = 0;
+  let score = 0;
+  let combo = 0;
+  let maxCombo = 0;
+  let totalNotes = 0;
+  let hitNotes = 0;
+  let judgments = { PERFECT: 0, GREAT: 0, GOOD: 0, MISS: 0 };
+  let feedbacks = [];
+  let laneFlash = [0, 0, 0, 0];
+  let beatPulse = 0;
+
+  const BPM = 130;
+  const BEAT_MS = 60000 / BPM;
+
+  function generateChart() {
+    chart = [];
+    // Generate a simple beat pattern
+    const patterns = [
+      [0], [2], [1], [3],
+      [0, 2], [1, 3],
+      [0], [1], [2], [3],
+      [1], [0], [3], [2],
+      [0, 3], [1, 2],
+      [0], [2], [1], [3],
+      [0], [1], [2], [3],
+      [3], [2], [1], [0],
+      [0, 1], [2, 3],
+      [0], [2], [0], [2],
+      [1], [3], [1], [3],
+      [0, 1, 2, 3],
+      [0], [1], [2], [3],
+      [2], [0], [3], [1],
+      [0, 2], [1, 3], [0, 2], [1, 3],
+      [0], [1], [2], [3]
+    ];
+
+    let t = 1000; // Start after 1 second
+    const halfBeat = BEAT_MS / 2;
+    for (const p of patterns) {
+      for (const lane of p) {
+        chart.push({ timeMs: t, lane: lane });
+      }
+      t += halfBeat;
+    }
+    totalNotes = chart.length;
+  }
+
+  function startGame() {
+    generateChart();
+    activeNotes = [];
+    nextNoteIdx = 0;
+    score = 0;
+    combo = 0;
+    maxCombo = 0;
+    hitNotes = 0;
+    judgments = { PERFECT: 0, GREAT: 0, GOOD: 0, MISS: 0 };
+    feedbacks = [];
+    gameTime = 0;
+    gameState = 'playing';
+    gradeEl.textContent = '---';
+  }
+
+  startBtn.addEventListener('click', startGame);
+
+  document.addEventListener('keydown', function(e) {
+    const laneIdx = KEY_CODES.indexOf(e.code);
+    if (laneIdx === -1 || gameState !== 'playing') return;
+    e.preventDefault();
+
+    laneFlash[laneIdx] = 10;
+
+    // Find closest note in this lane
+    let closest = null;
+    let closestDiff = Infinity;
+
+    for (const n of activeNotes) {
+      if (n.hit || n.missed || n.lane !== laneIdx) continue;
+      const diff = Math.abs(gameTime - n.timeMs);
+      if (diff < closestDiff) {
+        closestDiff = diff;
+        closest = n;
+      }
+    }
+
+    if (!closest || closestDiff > 150) return;
+
+    closest.hit = true;
+    let judgment;
+    if (closestDiff <= 25) { judgment = 'PERFECT'; score += 300; }
+    else if (closestDiff <= 60) { judgment = 'GREAT'; score += 200; }
+    else if (closestDiff <= 100) { judgment = 'GOOD'; score += 100; }
+    else { judgment = 'MISS'; }
+
+    if (judgment !== 'MISS') {
+      combo++;
+      hitNotes++;
+      if (combo >= 50) score += (judgment === 'PERFECT' ? 300 : judgment === 'GREAT' ? 200 : 100) * 7;
+      else if (combo >= 30) score += (judgment === 'PERFECT' ? 300 : judgment === 'GREAT' ? 200 : 100) * 3;
+      else if (combo >= 10) score += (judgment === 'PERFECT' ? 300 : judgment === 'GREAT' ? 200 : 100);
+      maxCombo = Math.max(maxCombo, combo);
+    } else {
+      combo = 0;
+    }
+    judgments[judgment]++;
+
+    feedbacks.push({
+      judgment, lane: laneIdx, timer: 40,
+      x: LANE_START_X + laneIdx * (LANE_W + LANE_GAP) + LANE_W / 2,
+      y: TARGET_Y - 30
+    });
+  });
+
+  function draw() {
+    if (gameState === 'playing') {
+      gameTime += 1000 / 60;
+
+      // Spawn notes
+      while (nextNoteIdx < chart.length) {
+        const note = chart[nextNoteIdx];
+        if (gameTime >= note.timeMs - APPROACH_TIME) {
+          activeNotes.push({ ...note, hit: false, missed: false });
+          nextNoteIdx++;
+        } else break;
+      }
+
+      // Check missed notes
+      for (const n of activeNotes) {
+        if (!n.hit && !n.missed && gameTime - n.timeMs > 150) {
+          n.missed = true;
+          combo = 0;
+          judgments.MISS++;
+          feedbacks.push({
+            judgment: 'MISS', lane: n.lane, timer: 40,
+            x: LANE_START_X + n.lane * (LANE_W + LANE_GAP) + LANE_W / 2,
+            y: TARGET_Y - 30
+          });
+        }
+      }
+
+      // Remove old notes
+      activeNotes = activeNotes.filter(n => gameTime - n.timeMs < 500);
+
+      // Check if song is over
+      if (nextNoteIdx >= chart.length && activeNotes.length === 0) {
+        gameState = 'results';
+        const acc = totalNotes > 0 ? (hitNotes / totalNotes * 100) : 0;
+        const perfPct = totalNotes > 0 ? (judgments.PERFECT / totalNotes * 100) : 0;
+        let grade = 'D';
+        if (acc >= 95 && perfPct >= 80) grade = 'S';
+        else if (acc >= 90) grade = 'A';
+        else if (acc >= 80) grade = 'B';
+        else if (acc >= 70) grade = 'C';
+        gradeEl.textContent = 'Grade: ' + grade + ' | Acc: ' + acc.toFixed(1) + '%';
+      }
+
+      // Beat pulse
+      if (gameTime % BEAT_MS < 1000 / 60) {
+        beatPulse = 8;
+      }
+    }
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Background beat pulse
+    if (beatPulse > 0) {
+      ctx.fillStyle = 'rgba(59,130,246,' + (beatPulse / 80) + ')';
+      ctx.fillRect(0, 0, W, H);
+      beatPulse -= 0.5;
+    }
+
+    // Draw lanes
+    for (let i = 0; i < LANES; i++) {
+      const lx = LANE_START_X + i * (LANE_W + LANE_GAP);
+
+      // Lane background
+      ctx.fillStyle = laneFlash[i] > 0 ? LANE_COLORS[i] + '22' : '#0a0a0f';
+      ctx.fillRect(lx, 0, LANE_W, H);
+
+      // Lane borders
+      ctx.strokeStyle = '#1e1e22';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(lx, 0, LANE_W, H);
+
+      // Target zone
+      ctx.fillStyle = LANE_COLORS[i] + '33';
+      ctx.fillRect(lx, TARGET_Y - NOTE_R, LANE_W, NOTE_R * 2);
+
+      // Key label
+      ctx.fillStyle = LANE_COLORS[i];
+      ctx.font = '700 18px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(LANE_KEYS[i], lx + LANE_W / 2, H - 20);
+
+      if (laneFlash[i] > 0) laneFlash[i]--;
+    }
+
+    // Target line
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(LANE_START_X - 5, TARGET_Y);
+    ctx.lineTo(LANE_START_X + TOTAL_LANE_W + 5, TARGET_Y);
+    ctx.stroke();
+
+    // Draw notes
+    for (const n of activeNotes) {
+      if (n.hit) continue;
+      const progress = (gameTime - (n.timeMs - APPROACH_TIME)) / APPROACH_TIME;
+      const y = progress * TARGET_Y;
+      const lx = LANE_START_X + n.lane * (LANE_W + LANE_GAP) + LANE_W / 2;
+
+      if (n.missed) {
+        ctx.globalAlpha = 0.3;
+      }
+
+      ctx.beginPath();
+      ctx.arc(lx, y, NOTE_R - 2, 0, Math.PI * 2);
+      ctx.fillStyle = LANE_COLORS[n.lane];
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(lx, y, NOTE_R + 2, 0, Math.PI * 2);
+      ctx.fillStyle = LANE_COLORS[n.lane] + '33';
+      ctx.fill();
+
+      ctx.globalAlpha = 1;
+    }
+
+    // Draw feedbacks
+    const jColors = { PERFECT: '#f59e0b', GREAT: '#22c55e', GOOD: '#3b82f6', MISS: '#ef4444' };
+    for (let i = feedbacks.length - 1; i >= 0; i--) {
+      const fb = feedbacks[i];
+      fb.timer--;
+      fb.y -= 0.8;
+
+      ctx.fillStyle = jColors[fb.judgment];
+      ctx.font = '700 14px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.globalAlpha = fb.timer / 40;
+      ctx.fillText(fb.judgment, fb.x, fb.y);
+      ctx.globalAlpha = 1;
+
+      if (fb.timer <= 0) feedbacks.splice(i, 1);
+    }
+
+    // Score/Combo HUD
+    scoreEl.textContent = 'Score: ' + score;
+    comboEl.textContent = 'Combo: ' + combo + (maxCombo > 0 ? ' (Max: ' + maxCombo + ')' : '');
+
+    // Combo display
+    if (combo >= 5) {
+      ctx.fillStyle = combo >= 50 ? '#f59e0b' : combo >= 30 ? '#a855f7' : combo >= 10 ? '#22c55e' : '#71717a';
+      ctx.font = '700 ' + Math.min(28, 16 + combo / 5) + 'px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(combo + ' COMBO', W / 2, 50);
+
+      if (combo >= 10) {
+        const mult = combo >= 50 ? '8x' : combo >= 30 ? '4x' : '2x';
+        ctx.font = '600 14px "JetBrains Mono", monospace';
+        ctx.fillText(mult, W / 2, 70);
+      }
+    }
+
+    // Idle state message
+    if (gameState === 'idle') {
+      ctx.fillStyle = '#a1a1aa';
+      ctx.font = '600 18px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Click "Start Game" to play', W / 2, H / 2 - 20);
+      ctx.font = '400 13px Inter, sans-serif';
+      ctx.fillText('Use D, F, J, K keys to hit the notes', W / 2, H / 2 + 10);
+    }
+
+    // Results overlay
+    if (gameState === 'results') {
+      ctx.fillStyle = 'rgba(10,10,11,0.8)';
+      ctx.fillRect(0, 0, W, H);
+
+      ctx.fillStyle = '#f59e0b';
+      ctx.font = '700 28px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Results', W / 2, H / 2 - 80);
+
+      ctx.font = '600 16px "JetBrains Mono", monospace';
+      ctx.fillStyle = '#a1a1aa';
+      ctx.fillText('Score: ' + score, W / 2, H / 2 - 40);
+      ctx.fillText('Max Combo: ' + maxCombo, W / 2, H / 2 - 15);
+      ctx.fillText('Accuracy: ' + (totalNotes > 0 ? (hitNotes / totalNotes * 100).toFixed(1) : 0) + '%', W / 2, H / 2 + 10);
+
+      ctx.font = '500 13px "JetBrains Mono", monospace';
+      ctx.fillStyle = '#f59e0b';
+      ctx.fillText('Perfect: ' + judgments.PERFECT, W / 2 - 100, H / 2 + 45);
+      ctx.fillStyle = '#22c55e';
+      ctx.fillText('Great: ' + judgments.GREAT, W / 2, H / 2 + 45);
+      ctx.fillStyle = '#3b82f6';
+      ctx.fillText('Good: ' + judgments.GOOD, W / 2 + 80, H / 2 + 45);
+      ctx.fillStyle = '#ef4444';
+      ctx.fillText('Miss: ' + judgments.MISS, W / 2 + 160, H / 2 + 45);
+
+      ctx.fillStyle = '#71717a';
+      ctx.font = '500 14px Inter, sans-serif';
+      ctx.fillText('Click "Start Game" to play again', W / 2, H / 2 + 80);
+    }
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+</script>

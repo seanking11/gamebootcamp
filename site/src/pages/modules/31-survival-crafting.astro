@@ -1,0 +1,693 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 31: Survival / Crafting">
+  <div class="container page-content">
+
+    <!-- Module Header -->
+    <div class="module-header">
+      <div class="module-number">Module 31</div>
+      <h1>Survival / Crafting</h1>
+      <p class="module-theme">Dropped into a hostile world with nothing &mdash; gather, craft, and build your way to survival | Wilderness Survival</p>
+    </div>
+
+    <blockquote>
+      "The genius of survival games is that a wooden door feels like a fortress when you built it yourself from trees you chopped with an axe you made from sticks you picked up off the ground."
+    </blockquote>
+
+    <!-- ============================================================ -->
+    <!-- WEEK 1: HISTORY & DESIGN THEORY                              -->
+    <!-- ============================================================ -->
+
+    <h2>Week 1: History &amp; Design Theory</h2>
+
+    <h3>The Origin</h3>
+    <p>
+      <strong>Minecraft</strong> did not invent the survival game, but it defined the modern template when Markus "Notch" Persson released the alpha in 2009. The concept was disarmingly simple: you spawn in a procedurally generated world made of blocks. You can break any block. Breaking a tree gives wood. Wood becomes planks, planks become sticks, sticks and planks become a pickaxe. The pickaxe breaks stone faster. Stone makes better tools. And then night falls, and monsters come. Minecraft's genius was the crafting tree &mdash; every material led to something that led to something else, and the survival pressure provided just enough motivation to keep climbing the tech tree without dictating how.
+    </p>
+
+    <h3>How the Genre Evolved</h3>
+    <p>
+      <strong>Minecraft (2011)</strong> &mdash; Established the core loop: punch tree, get wood, craft tools, mine deeper, build shelter, survive the night. The procedural world meant every player's experience was unique. Proved that gathering and crafting are inherently satisfying even without traditional goals.
+    </p>
+    <p>
+      <strong>Don't Starve (2013)</strong> &mdash; Klei Entertainment dialed up the consequence. Death was permanent. The game tracked hunger, health, and sanity &mdash; three stats that all drained simultaneously. Night was lethal without a light source. Don't Starve proved that multiple competing survival stats created more interesting decisions than a single health bar.
+    </p>
+    <p>
+      <strong>Valheim (2021)</strong> &mdash; Iron Gate Studio added progression that felt like an adventure. Valheim structured its crafting tree around boss fights &mdash; each boss unlocked tools for the next biome. The building system was physics-based. It showed that the survival loop was not just a solo experience but a social one.
+    </p>
+
+    <h3>What Makes It "Great"</h3>
+    <p>
+      A great survival game makes the player feel like they earned every inch of safety. The world starts hostile and stays hostile &mdash; the key is that the player's relationship to that hostility changes. On night one, a dark cave is terrifying. By night twenty, the player has a walled base with torches, a furnace, and iron tools. The world did not get easier; the player got more capable, and every piece of that capability was built by hand.
+    </p>
+
+    <h3>The Essential Mechanic</h3>
+    <p>
+      <strong>The gather-craft-survive loop</strong> &mdash; turning raw materials into tools that enable gathering better materials.
+    </p>
+
+    <hr />
+
+    <!-- ============================================================ -->
+    <!-- WEEK 2: BUILD THE MVP                                        -->
+    <!-- ============================================================ -->
+
+    <h2>Week 2: Build the MVP</h2>
+
+    <h3>What You're Building</h3>
+    <p>
+      A top-down survival game on a grid-based world. The player spawns with nothing in a world containing trees, rocks, bushes, and ore deposits. They gather raw materials, craft tools and structures, manage hunger/thirst/health stats, and build shelter to survive nightly enemy waves. Each night is harder than the last.
+    </p>
+
+    <h3>Core Concepts</h3>
+
+    <!-- ==================== CONCEPT 1: GATHERING ==================== -->
+
+    <h4>1. Resource Gathering Loop</h4>
+    <p>
+      The player interacts with world objects to harvest raw materials. Each object yields specific resources and has durability. Some objects require specific tools &mdash; bare hands can gather wood, but stone requires a pickaxe.
+    </p>
+    <pre is:raw><code>WORLD_OBJECTS = {
+    "tree":     {resource: "wood",  amount: 3, hitsToBreak: 5, requiresTool: null},
+    "rock":     {resource: "stone", amount: 2, hitsToBreak: 8, requiresTool: "pickaxe"},
+    "bush":     {resource: "berry", amount: 2, hitsToBreak: 1, requiresTool: null},
+    "ore_vein": {resource: "iron",  amount: 1, hitsToBreak: 12, requiresTool: "iron_pickaxe"}
+}
+
+function gatherResource(player, worldObject):
+    objData = WORLD_OBJECTS[worldObject.type]
+    if objData.requiresTool and not player.hasEquipped(objData.requiresTool):
+        return "Requires " + objData.requiresTool
+    worldObject.durability -= getToolDamage(player.equippedTool)
+    if worldObject.durability &lt;= 0:
+        player.inventory.add(objData.resource, objData.amount)</code></pre>
+    <p>
+      <strong>Why it matters:</strong> The gathering loop is the foundation everything else is built on. The tool-gating system creates natural progression tiers that guide the player without a tutorial.
+    </p>
+
+    <!-- ==================== CONCEPT 2: CRAFTING TREE ==================== -->
+
+    <h4>2. Crafting Tree</h4>
+    <p>
+      Recipes form a dependency tree: raw materials produce basic tools, basic tools enable access to better materials, better materials produce advanced tools and structures. The crafting tree IS the progression system.
+    </p>
+    <pre is:raw><code>RECIPES = {
+    // Tier 1
+    "wood_axe":     {ingredients: {"wood": 3, "stone": 2}, tier: 1},
+    "wood_pickaxe": {ingredients: {"wood": 3, "stone": 2}, tier: 1},
+    "campfire":     {ingredients: {"wood": 5, "stone": 3}, tier: 1},
+    // Tier 2
+    "furnace":      {ingredients: {"stone": 10}, tier: 2, requires: "wood_pickaxe"},
+    // Tier 3
+    "iron_pickaxe": {ingredients: {"wood": 2, "iron": 3}, tier: 3, requires: "furnace"}
+}</code></pre>
+    <p>
+      <strong>Why it matters:</strong> There are no experience points, no skill trees, no level-ups. You progress by crafting better things. The tree structure means the player always has a visible next goal.
+    </p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Crafting Dependency Tree</div>
+      <p class="demo-hint">A visual dependency tree showing raw materials at the bottom, intermediate items in the middle, and advanced items at the top. Click any item to see its recipe and highlight the raw materials needed.</p>
+      <canvas id="demo-craft-tree" width="760" height="500"></canvas>
+      <div class="demo-controls">
+        <span class="value-display" id="craft-info">Click an item to see its recipe</span>
+      </div>
+    </div>
+
+    <!-- ==================== CONCEPT 3: SURVIVAL STATS ==================== -->
+
+    <h4>3. Hunger / Thirst / Health Drain</h4>
+    <p>
+      Three stats drain over time. Hunger and thirst decrease steadily; if either hits zero, health drains. Eating food restores hunger, drinking water restores thirst. The player must continuously gather and consume resources just to stay alive.
+    </p>
+    <pre is:raw><code>function updateSurvivalStats(player, deltaTime):
+    player.hunger -= HUNGER_DRAIN * deltaTime
+    player.thirst -= THIRST_DRAIN * deltaTime
+    if player.hunger &lt;= 0:
+        player.health -= HEALTH_DRAIN * deltaTime
+    if player.thirst &lt;= 0:
+        player.health -= HEALTH_DRAIN * deltaTime
+    if player.health &lt;= 0:
+        triggerDeath(player)</code></pre>
+    <p>
+      <strong>Why it matters:</strong> Multiple draining stats create competing priorities. The interplay between stats creates interesting decisions: eat the berries now, or save them for the dangerous area ahead?
+    </p>
+
+    <!-- ==================== CONCEPT 4: DAY/NIGHT ==================== -->
+
+    <h4>4. Day/Night Cycle</h4>
+    <p>
+      A continuous clock cycles between day and night. During the day, the world is lit and enemies do not spawn. At night, visibility drops and hostile enemies spawn at map edges and move toward the player. Each successive night is longer or spawns more enemies.
+    </p>
+    <pre is:raw><code>DAY_NIGHT_CONFIG = {
+    dayDuration: 180,       // seconds
+    nightDuration: 120,
+    playerLightRadius: 3,   // tiles visible at night
+    campfireLightRadius: 6
+}
+
+function spawnNightEnemies():
+    if phase != "night": return
+    count = BASE_ENEMIES + (dayCount * ESCALATION_PER_NIGHT)
+    for i in range(count):
+        enemy = createEnemy("hostile", getRandomEdgePosition())
+        enemy.target = player</code></pre>
+    <p>
+      <strong>Why it matters:</strong> The day/night cycle creates the fundamental rhythm: gather during the day, survive at night. It gives the crafting system purpose (you build shelter because night is coming) and makes light a gameplay mechanic.
+    </p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Day/Night Cycle</div>
+      <p class="demo-hint">Watch a scene transition from day to night. During the day, resources (green dots) spawn. At night, the world darkens and enemies (red dots) approach from the edges. A countdown shows time until dawn.</p>
+      <canvas id="demo-day-night" width="760" height="460"></canvas>
+      <div class="demo-controls">
+        <span class="value-display" id="dn-phase">Day</span>
+        <span class="value-display" id="dn-time">Time: 0s</span>
+        <span class="value-display" id="dn-day">Day 1</span>
+        <span class="value-display" id="dn-enemies">Enemies: 0</span>
+      </div>
+    </div>
+
+    <!-- ==================== CONCEPT 5: BASE BUILDING ==================== -->
+
+    <h4>5. Base Building / Structure Placement</h4>
+    <p>
+      The player places crafted structures (walls, doors, campfires) onto the grid. Walls block enemy pathfinding, doors can be opened by the player but not enemies, and campfires provide light and enable cooking.
+    </p>
+    <pre is:raw><code>STRUCTURE_DATA = {
+    "wood_wall":  {durability: 50, blocksEnemies: true, lightRadius: 0},
+    "wood_door":  {durability: 30, blocksEnemies: true, lightRadius: 0},
+    "campfire":   {durability: 100, blocksEnemies: false, lightRadius: 6},
+    "furnace":    {durability: 200, blocksEnemies: true, lightRadius: 2}
+}</code></pre>
+    <p>
+      <strong>Why it matters:</strong> Base building transforms the survival experience from reactive to proactive. The base is the player's home, and defending it creates emotional investment that pure combat cannot match.
+    </p>
+
+    <!-- ==================== CONCEPT 6: WORLD PERSISTENCE ==================== -->
+
+    <h4>6. World Persistence</h4>
+    <p>
+      The entire world state &mdash; every gathered resource, placed structure, and entity position &mdash; must be serializable and loadable. Persistence is what allows the player to build something over time.
+    </p>
+    <pre is:raw><code>function saveGame(world, player):
+    saveData = {
+        dayCount: dayNightClock.dayCount,
+        player: {position, health, hunger, thirst, inventory},
+        grid: [modified tiles only],
+        entities: [all entity states]
+    }
+    writeToFile("save.json", serialize(saveData))</code></pre>
+    <p>
+      <strong>Why it matters:</strong> A survival game without persistence is a roguelike. Persistence lets the player build a base that grows night by night, a stockpile that accumulates, a world that bears the marks of their decisions.
+    </p>
+
+    <!-- ==================== CONCEPT 7: THREAT ESCALATION ==================== -->
+
+    <h4>7. Threat Escalation</h4>
+    <p>
+      Each night is harder. More enemies spawn, and after certain day thresholds, tougher enemy types appear. This creates a soft timer &mdash; the player must progress through the crafting tree fast enough to handle the escalating threat.
+    </p>
+    <pre is:raw><code>ENEMY_TYPES = {
+    "zombie":      {health: 20, damage: 5, speed: 1.0, spawnAfterDay: 1},
+    "fast_zombie": {health: 15, damage: 8, speed: 2.0, spawnAfterDay: 4},
+    "brute":       {health: 60, damage: 15, speed: 0.7, spawnAfterDay: 7}
+}</code></pre>
+    <p>
+      <strong>Why it matters:</strong> Without escalation, survival games stagnate. Once the player has food and shelter, there is no reason to keep playing. Escalation is why you need iron tools, not just stone ones.
+    </p>
+
+    <hr />
+
+    <!-- ==================== STRETCH GOALS ==================== -->
+
+    <h3>Stretch Goals</h3>
+    <ul>
+      <li><strong>Biomes</strong> &mdash; Forest, desert, snow with unique resources and hazards.</li>
+      <li><strong>Temperature system</strong> &mdash; Cold at night, hot in desert, clothing provides insulation.</li>
+      <li><strong>Simple farming</strong> &mdash; Plant seeds, wait for crops, sustain food supply.</li>
+      <li><strong>Multiplayer</strong> &mdash; Two players share the same world.</li>
+    </ul>
+
+    <h3>MVP Spec</h3>
+    <table>
+      <thead>
+        <tr><th>Component</th><th>Minimum Viable Version</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>World</td><td>32x32 tile grid with trees, rocks, bushes, ore veins</td></tr>
+        <tr><td>Gathering</td><td>Interact with objects to collect wood, stone, berries, iron</td></tr>
+        <tr><td>Crafting</td><td>10 recipes across 3 tiers</td></tr>
+        <tr><td>Survival Stats</td><td>Health, hunger, thirst</td></tr>
+        <tr><td>Day/Night</td><td>3-minute day, 2-minute night, visual darkness</td></tr>
+        <tr><td>Enemies</td><td>Spawn at night, pathfind toward player</td></tr>
+        <tr><td>Base Building</td><td>Walls, doors, campfires</td></tr>
+        <tr><td>Escalation</td><td>More enemies per night, tougher types after days 4 and 7</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliverable</h3>
+    <p>
+      A playable survival game where the player gathers resources, crafts tools and structures through a tiered recipe system, manages survival stats, builds a base to defend against nightly enemy waves, and survives as long as possible against escalating threats.
+    </p>
+
+    <hr />
+
+    <!-- ==================== DISCUSSION QUESTIONS ==================== -->
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li><strong>The Crafting Tree as Implicit Tutorial:</strong> Minecraft never tells you to make a pickaxe before mining stone &mdash; the crafting tree forces it. How does designing a dependency graph replace traditional tutorials?</li>
+      <li><strong>Balancing Scarcity:</strong> Don't Starve is punishing; Minecraft on easy mode is forgiving. How do you tune drain rates, enemy difficulty, and resource availability?</li>
+      <li><strong>Persistence and Consequence:</strong> How does the death penalty change how players engage with crafting and building?</li>
+      <li><strong>The Late-Game Problem:</strong> Most survival games become trivially easy once the player has the top crafting tier. How do you keep the game interesting?</li>
+    </ol>
+
+    <!-- Module Navigation -->
+    <div class="module-nav">
+      <a href={`${base}modules/30-farming-life-sim`}>&larr; Previous Module</a>
+      <a href={`${base}modules/32-rhythm-game`}>Next Module &rarr;</a>
+    </div>
+
+  </div>
+</BaseLayout>
+
+<script>
+// ============================================================
+// DEMO 1: CRAFTING DEPENDENCY TREE
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-craft-tree');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const infoEl = document.getElementById('craft-info');
+
+  // Nodes in the crafting tree
+  const nodes = [
+    // Raw materials (bottom row, tier 0)
+    { id: 'wood', label: 'Wood', tier: 0, x: 100, y: 420, color: '#8B6914', raw: true },
+    { id: 'stone', label: 'Stone', tier: 0, x: 270, y: 420, color: '#71717a', raw: true },
+    { id: 'berry', label: 'Berry', tier: 0, x: 440, y: 420, color: '#ef4444', raw: true },
+    { id: 'iron', label: 'Iron Ore', tier: 0, x: 610, y: 420, color: '#a1a1aa', raw: true },
+
+    // Tier 1 (middle row)
+    { id: 'axe', label: 'Wood Axe', tier: 1, x: 100, y: 280, color: '#f59e0b', recipe: { wood: 3, stone: 2 } },
+    { id: 'pickaxe', label: 'Pickaxe', tier: 1, x: 270, y: 280, color: '#3b82f6', recipe: { wood: 3, stone: 2 } },
+    { id: 'campfire', label: 'Campfire', tier: 1, x: 440, y: 280, color: '#ef4444', recipe: { wood: 5, stone: 3 } },
+    { id: 'wall', label: 'Wood Wall', tier: 1, x: 610, y: 280, color: '#8B6914', recipe: { wood: 4 } },
+
+    // Tier 2 (upper middle)
+    { id: 'furnace', label: 'Furnace', tier: 2, x: 190, y: 150, color: '#ef4444', recipe: { stone: 10 }, requires: 'pickaxe' },
+    { id: 'stone_axe', label: 'Stone Axe', tier: 2, x: 400, y: 150, color: '#71717a', recipe: { wood: 2, stone: 5 }, requires: 'pickaxe' },
+
+    // Tier 3 (top)
+    { id: 'iron_pick', label: 'Iron Pickaxe', tier: 3, x: 300, y: 40, color: '#a855f7', recipe: { wood: 2, iron: 3 }, requires: 'furnace' }
+  ];
+
+  // Edges
+  const edges = [
+    // Raw -> Tier 1
+    { from: 'wood', to: 'axe' }, { from: 'stone', to: 'axe' },
+    { from: 'wood', to: 'pickaxe' }, { from: 'stone', to: 'pickaxe' },
+    { from: 'wood', to: 'campfire' }, { from: 'stone', to: 'campfire' },
+    { from: 'wood', to: 'wall' },
+    // Tier 1 -> Tier 2
+    { from: 'pickaxe', to: 'furnace' }, { from: 'stone', to: 'furnace' },
+    { from: 'pickaxe', to: 'stone_axe' }, { from: 'wood', to: 'stone_axe' }, { from: 'stone', to: 'stone_axe' },
+    // Tier 2 -> Tier 3
+    { from: 'furnace', to: 'iron_pick' }, { from: 'wood', to: 'iron_pick' }, { from: 'iron', to: 'iron_pick' }
+  ];
+
+  const nodeMap = {};
+  for (const n of nodes) nodeMap[n.id] = n;
+
+  let selectedNode = null;
+  let highlightedNodes = new Set();
+
+  function getNodeAt(mx, my) {
+    for (const n of nodes) {
+      const dx = mx - n.x;
+      const dy = my - n.y;
+      if (Math.sqrt(dx * dx + dy * dy) < 30) return n;
+    }
+    return null;
+  }
+
+  function getIngredientNodes(node) {
+    const result = new Set();
+    if (!node.recipe) return result;
+    for (const ing of Object.keys(node.recipe)) {
+      result.add(ing);
+    }
+    if (node.requires) result.add(node.requires);
+    // Recurse into required items
+    for (const id of [...result]) {
+      const n = nodeMap[id];
+      if (n && n.recipe) {
+        for (const sub of getIngredientNodes(n)) {
+          result.add(sub);
+        }
+      }
+    }
+    return result;
+  }
+
+  canvas.addEventListener('click', function(e) {
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) * (W / rect.width);
+    const my = (e.clientY - rect.top) * (H / rect.height);
+    const node = getNodeAt(mx, my);
+
+    if (node) {
+      selectedNode = node;
+      highlightedNodes = getIngredientNodes(node);
+      highlightedNodes.add(node.id);
+
+      if (node.recipe) {
+        const parts = Object.entries(node.recipe).map(([k, v]) => v + 'x ' + k);
+        infoEl.textContent = node.label + ': requires ' + parts.join(', ') + (node.requires ? ' (needs ' + node.requires + ')' : '');
+      } else {
+        infoEl.textContent = node.label + ': raw material (gathered from the world)';
+      }
+    } else {
+      selectedNode = null;
+      highlightedNodes = new Set();
+      infoEl.textContent = 'Click an item to see its recipe';
+    }
+  });
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Tier labels
+    const tierLabels = ['Raw Materials', 'Basic Tools', 'Advanced', 'Iron Tier'];
+    const tierYs = [420, 280, 150, 40];
+    for (let i = 0; i < tierLabels.length; i++) {
+      ctx.fillStyle = '#27272a';
+      ctx.font = '500 10px "JetBrains Mono", monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText('TIER ' + i, 50, tierYs[i] + 4);
+    }
+
+    // Draw edges
+    for (const e of edges) {
+      const from = nodeMap[e.from];
+      const to = nodeMap[e.to];
+      const highlighted = highlightedNodes.has(e.from) && highlightedNodes.has(e.to);
+
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x, to.y);
+      ctx.strokeStyle = highlighted ? '#f59e0b44' : '#1e1e22';
+      ctx.lineWidth = highlighted ? 2.5 : 1;
+      ctx.stroke();
+    }
+
+    // Draw nodes
+    for (const n of nodes) {
+      const isHighlighted = highlightedNodes.has(n.id);
+      const isSelected = selectedNode && selectedNode.id === n.id;
+      const radius = isSelected ? 28 : 24;
+
+      // Glow for highlighted
+      if (isHighlighted) {
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, radius + 6, 0, Math.PI * 2);
+        ctx.fillStyle = n.color + '22';
+        ctx.fill();
+      }
+
+      // Circle
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = isHighlighted ? n.color + '33' : '#111114';
+      ctx.fill();
+      ctx.strokeStyle = isHighlighted ? n.color : '#3f3f46';
+      ctx.lineWidth = isSelected ? 3 : 1.5;
+      ctx.stroke();
+
+      // Icon/label
+      ctx.fillStyle = isHighlighted ? n.color : '#71717a';
+      ctx.font = (isSelected ? '700' : '600') + ' 10px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(n.label, n.x, n.y + 3);
+
+      // Raw material indicator
+      if (n.raw) {
+        ctx.fillStyle = '#3f3f46';
+        ctx.font = '500 8px "JetBrains Mono", monospace';
+        ctx.fillText('RAW', n.x, n.y + radius + 14);
+      }
+    }
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+
+// ============================================================
+// DEMO 2: DAY/NIGHT CYCLE
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-day-night');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const phaseEl = document.getElementById('dn-phase');
+  const timeEl = document.getElementById('dn-time');
+  const dayEl = document.getElementById('dn-day');
+  const enemiesEl = document.getElementById('dn-enemies');
+
+  const DAY_DURATION = 8; // seconds (fast for demo)
+  const NIGHT_DURATION = 6;
+  const CYCLE = DAY_DURATION + NIGHT_DURATION;
+
+  let time = 0;
+  let dayCount = 1;
+  let resources = [];
+  let enemies = [];
+  let player = { x: W / 2, y: H / 2 };
+  let lastSpawnTime = 0;
+
+  // Spawn initial resources
+  for (let i = 0; i < 20; i++) {
+    resources.push({
+      x: 40 + Math.random() * (W - 80),
+      y: 40 + Math.random() * (H - 80),
+      size: 3 + Math.random() * 4,
+      type: Math.random() < 0.5 ? 'tree' : 'rock'
+    });
+  }
+
+  function getPhase() {
+    const cycleTime = time % CYCLE;
+    if (cycleTime < DAY_DURATION) return 'day';
+    if (cycleTime < DAY_DURATION + 1) return 'dusk';
+    return 'night';
+  }
+
+  function getNightProgress() {
+    const cycleTime = time % CYCLE;
+    if (cycleTime < DAY_DURATION) return 0;
+    return (cycleTime - DAY_DURATION) / NIGHT_DURATION;
+  }
+
+  function getTimeUntilDawn() {
+    const cycleTime = time % CYCLE;
+    if (cycleTime < DAY_DURATION) return 0;
+    return CYCLE - cycleTime;
+  }
+
+  function draw() {
+    const dt = 1 / 60;
+    time += dt;
+
+    const phase = getPhase();
+    const nightProg = getNightProgress();
+    const oldDay = dayCount;
+    dayCount = Math.floor(time / CYCLE) + 1;
+
+    // Spawn resources during day
+    if (phase === 'day' && resources.length < 25 && Math.random() < 0.02) {
+      resources.push({
+        x: 40 + Math.random() * (W - 80),
+        y: 40 + Math.random() * (H - 80),
+        size: 3 + Math.random() * 4,
+        type: Math.random() < 0.5 ? 'tree' : 'rock'
+      });
+    }
+
+    // Spawn enemies at night
+    if (phase === 'night' && time - lastSpawnTime > 1.5) {
+      lastSpawnTime = time;
+      const count = Math.min(dayCount, 5);
+      for (let i = 0; i < count; i++) {
+        const side = Math.floor(Math.random() * 4);
+        let ex, ey;
+        switch (side) {
+          case 0: ex = Math.random() * W; ey = -10; break;
+          case 1: ex = W + 10; ey = Math.random() * H; break;
+          case 2: ex = Math.random() * W; ey = H + 10; break;
+          default: ex = -10; ey = Math.random() * H; break;
+        }
+        enemies.push({ x: ex, y: ey, speed: 0.8 + Math.random() * 0.4 });
+      }
+    }
+
+    // Remove enemies at dawn
+    if (phase === 'day') {
+      enemies = [];
+    }
+
+    // Move enemies toward player
+    for (const e of enemies) {
+      const dx = player.x - e.x;
+      const dy = player.y - e.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > 5) {
+        e.x += (dx / dist) * e.speed;
+        e.y += (dy / dist) * e.speed;
+      }
+    }
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Sky color based on phase
+    let skyColor;
+    if (phase === 'day') {
+      skyColor = '#1a2a1a';
+    } else if (phase === 'dusk') {
+      skyColor = '#1a1a0a';
+    } else {
+      skyColor = '#0a0a0f';
+    }
+    ctx.fillStyle = skyColor;
+    ctx.fillRect(0, 0, W, H);
+
+    // Ground
+    ctx.fillStyle = phase === 'night' ? '#0a0f0a' : '#121f12';
+    ctx.fillRect(0, 0, W, H);
+
+    // Resources
+    for (const r of resources) {
+      if (r.type === 'tree') {
+        ctx.fillStyle = phase === 'night' ? '#0a2a0a' : '#1a5a1a';
+        ctx.beginPath();
+        ctx.arc(r.x, r.y, r.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = phase === 'night' ? '#1a3a1a' : '#22c55e';
+        ctx.beginPath();
+        ctx.arc(r.x, r.y, r.size * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.fillStyle = phase === 'night' ? '#1a1a1a' : '#3f3f46';
+        ctx.beginPath();
+        ctx.arc(r.x, r.y, r.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // Player
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, 8, 0, Math.PI * 2);
+    ctx.fillStyle = '#3b82f6';
+    ctx.fill();
+
+    // Player light at night
+    if (phase === 'night' || phase === 'dusk') {
+      const lightR = 60;
+      const gradient = ctx.createRadialGradient(player.x, player.y, 0, player.x, player.y, lightR);
+      gradient.addColorStop(0, 'rgba(255,200,100,0.15)');
+      gradient.addColorStop(1, 'rgba(255,200,100,0)');
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(player.x, player.y, lightR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Enemies
+    for (const e of enemies) {
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, 5, 0, Math.PI * 2);
+      ctx.fillStyle = '#ef4444';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, 8, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(239,68,68,0.2)';
+      ctx.fill();
+    }
+
+    // Darkness overlay at night
+    if (phase === 'night') {
+      ctx.fillStyle = 'rgba(0,0,0,' + (0.5 + nightProg * 0.2) + ')';
+      ctx.fillRect(0, 0, W, H);
+
+      // Cut out light around player
+      ctx.save();
+      ctx.globalCompositeOperation = 'destination-out';
+      const grad = ctx.createRadialGradient(player.x, player.y, 0, player.x, player.y, 70);
+      grad.addColorStop(0, 'rgba(0,0,0,0.8)');
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(player.x, player.y, 70, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // Dawn countdown
+      const dawn = getTimeUntilDawn();
+      ctx.fillStyle = '#f59e0b';
+      ctx.font = '700 16px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('Dawn in ' + dawn.toFixed(1) + 's', W / 2, 30);
+    }
+
+    // Phase indicator
+    const phaseColors = { day: '#22c55e', dusk: '#f59e0b', night: '#a855f7' };
+    ctx.fillStyle = phaseColors[phase] || '#71717a';
+    ctx.font = '700 14px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(phase.toUpperCase(), 15, 25);
+
+    // Sun/moon indicator
+    const cycleTime = time % CYCLE;
+    const sunX = (cycleTime / CYCLE) * (W - 40) + 20;
+    if (phase === 'day') {
+      ctx.beginPath();
+      ctx.arc(sunX, 45, 8, 0, Math.PI * 2);
+      ctx.fillStyle = '#f59e0b';
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.arc(sunX, 45, 6, 0, Math.PI * 2);
+      ctx.fillStyle = '#a1a1aa';
+      ctx.fill();
+    }
+
+    // Timeline bar
+    ctx.fillStyle = '#1e1e22';
+    ctx.fillRect(20, 55, W - 40, 6);
+    ctx.fillStyle = '#22c55e';
+    ctx.fillRect(20, 55, (W - 40) * (DAY_DURATION / CYCLE), 6);
+    ctx.fillStyle = '#a855f7';
+    ctx.fillRect(20 + (W - 40) * (DAY_DURATION / CYCLE), 55, (W - 40) * (NIGHT_DURATION / CYCLE), 6);
+    // Current position marker
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(20 + (W - 40) * (cycleTime / CYCLE) - 1, 52, 3, 12);
+
+    phaseEl.textContent = phase.charAt(0).toUpperCase() + phase.slice(1);
+    timeEl.textContent = 'Cycle: ' + (cycleTime).toFixed(1) + 's';
+    dayEl.textContent = 'Day ' + dayCount;
+    enemiesEl.textContent = 'Enemies: ' + enemies.length;
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+</script>

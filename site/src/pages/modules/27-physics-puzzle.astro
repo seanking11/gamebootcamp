@@ -1,0 +1,875 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 27: Physics Puzzle">
+  <div class="container page-content">
+    <div class="module-header">
+      <div class="module-number">Module 27</div>
+      <h1>Physics Puzzle</h1>
+      <p class="module-theme">Design the cause, let physics deliver the effect &mdash; Chain Reaction</p>
+    </div>
+
+    <blockquote>
+      <p>"You don't solve a physics puzzle. You set up the conditions for it to solve itself."</p>
+    </blockquote>
+
+    <hr />
+
+    <h2>Prerequisites</h2>
+    <table>
+      <thead>
+        <tr><th>Module</th><th>What You Used From It</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Module 2 - Platformer</td><td>Basic physics: gravity, velocity, acceleration, collision detection, fixed timestep physics loops</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h2>Week 1: History &amp; Design Theory</h2>
+
+    <h3>The Origin</h3>
+    <p>Physics puzzles became a mainstream genre with the release of Angry Birds in 2009, but the lineage runs deeper. The Incredible Machine (1993) let players build Rube Goldberg contraptions from gears, ropes, and trampolines. Crush the Castle (2009) pioneered the slingshot-and-destruction formula that Angry Birds would refine into a cultural phenomenon. What all these games share is a design philosophy: the player sets up conditions, then watches physics resolve the outcome. The satisfaction comes not from precise execution but from prediction and surprise &mdash; you think you know what will happen when you launch that projectile, and then the structure collapses in a way that is completely logical but not quite what you expected.</p>
+
+    <h3>How the Genre Evolved</h3>
+    <p><strong>World of Goo (2D Boy, 2008):</strong> A construction-based physics puzzle where you build structures from living goo balls that serve as both building material and structural joints. It proved that physics puzzles could be artistic, emotional, and mechanically deep simultaneously.</p>
+    <p><strong>Angry Birds (Rovio, 2009):</strong> Simplified the physics puzzle to its most accessible form: aim a slingshot, launch a bird, destroy a structure full of pigs. It became one of the best-selling mobile games in history by making physics intuitive and the feedback loop immediate.</p>
+    <p><strong>Cut the Rope (ZeptoLab, 2010):</strong> Inverted the typical physics puzzle by giving the player a tool of subtraction rather than addition. Instead of launching something, you cut ropes and let gravity plus momentum do the rest.</p>
+    <p><strong>Human: Fall Flat (No Brakes Games, 2016):</strong> Brought physics puzzles into 3D with a wobbly ragdoll character whose imprecise controls are the point. It proved that physics-based interaction does not need to be precise to be engaging.</p>
+
+    <h3>What Makes It "Great"</h3>
+    <p>A great physics puzzle trusts its physics engine. The player should be able to look at a level, form a hypothesis about what will happen if they take an action, and then test that hypothesis. When the result matches their prediction, they feel smart. When it surprises them, the surprise should be explainable. The best physics puzzles embrace the emergent chaos: no two attempts play out identically because tiny differences cascade into different results.</p>
+
+    <h3>The Essential Mechanic</h3>
+    <p>Setting up conditions and letting physics resolve the outcome &mdash; the player designs the cause, physics delivers the effect.</p>
+
+    <hr />
+
+    <h2>Week 2: Build the MVP</h2>
+
+    <h3>What You're Building</h3>
+    <p>An Angry Birds-style physics puzzle game where the player launches projectiles from a slingshot at destructible structures. The game uses a physics simulation for rigid bodies, collisions, and destruction. Levels consist of structures made from blocks of different materials (wood, stone, ice) that break apart when hit with enough force.</p>
+
+    <h3>Core Concepts (Must Implement)</h3>
+
+    <h4>1. Physics Engine Integration</h4>
+    <p>A physics engine handles rigid body simulation: objects have mass, velocity, and angular velocity. They collide with each other, stack under gravity, and respond to applied forces.</p>
+    <pre is:raw><code>function create_physics_world():
+    world = PhysicsWorld(gravity={x: 0, y: -9.81})
+    return world
+
+function create_block(world, x, y, width, height, material):
+    body = world.create_body(
+        type: DYNAMIC,
+        position: {x, y},
+        shape: Rectangle(width, height),
+        density: material.density,
+        friction: material.friction,
+        restitution: material.bounciness
+    )
+    body.material = material
+    body.health = material.health
+    return body
+
+materials = {
+    "wood":  {density: 0.5, friction: 0.6, bounciness: 0.1, health: 50},
+    "stone": {density: 2.0, friction: 0.8, bounciness: 0.05, health: 150},
+    "ice":   {density: 0.3, friction: 0.1, bounciness: 0.2, health: 25}
+}</code></pre>
+    <p><strong>Why it matters:</strong> The physics engine is the core of the entire game. You are not writing collision detection from scratch &mdash; you are using an existing engine as a tool. Understanding how to configure rigid bodies is the fundamental skill.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Trajectory Prediction &amp; Slingshot</div>
+      <p class="demo-hint">Click and drag from the slingshot (left side) to aim. A dotted trajectory arc shows where the ball will go. Release to launch. The ball arcs under gravity and hits the stacked blocks on the right. Click "Reset" to try again.</p>
+      <canvas id="demo-slingshot" width="760" height="420"></canvas>
+      <div class="demo-controls">
+        <button id="sling-reset-btn">Reset</button>
+        <span class="value-display" id="sling-shots">Shots: 0</span>
+        <span class="value-display" id="sling-status">Drag from slingshot to aim</span>
+      </div>
+    </div>
+
+    <h4>2. Trajectory Prediction / Aiming Arc</h4>
+    <p>Before the player releases the slingshot, the game shows a predicted trajectory as a dotted line. This helps the player aim without guessing.</p>
+    <pre is:raw><code>PREDICTION_STEPS = 60
+PREDICTION_TIMESTEP = 0.05
+
+function calculate_trajectory(launch_position, launch_velocity):
+    points = []
+    pos = launch_position.copy()
+    vel = launch_velocity.copy()
+
+    for i in 0..PREDICTION_STEPS:
+        points.append(pos.copy())
+        vel.y += GRAVITY * PREDICTION_TIMESTEP
+        pos.x += vel.x * PREDICTION_TIMESTEP
+        pos.y += vel.y * PREDICTION_TIMESTEP
+        if pos.y <= GROUND_Y:
+            points.append({pos.x, GROUND_Y})
+            break
+    return points
+
+function draw_trajectory(points):
+    for i in 0..points.length:
+        if i % 3 == 0:
+            draw_circle(points[i], radius=2, color=WHITE, alpha=0.5)</code></pre>
+    <p><strong>Why it matters:</strong> The aiming arc bridges the gap between the player's intent and the physics simulation. Without it, aiming is pure guesswork. The prediction only simulates gravity (not collisions), so the player knows where the projectile will go but not exactly what happens on impact &mdash; preserving the surprise that makes physics puzzles satisfying.</p>
+
+    <h4>3. Destructible Structures</h4>
+    <p>Blocks have a health value. When a collision applies enough force, the block takes damage. If health reaches zero, it breaks. Different materials have different thresholds.</p>
+    <pre is:raw><code>function on_collision(body_a, body_b, collision_info):
+    impact_force = collision_info.impulse_magnitude
+    for body in [body_a, body_b]:
+        if body.has("health"):
+            damage = calculate_damage(impact_force, body.material)
+            body.health -= damage
+            if body.health <= 0:
+                destroy_block(body)
+            else:
+                crack_level = 1.0 - (body.health / body.material.max_health)
+                update_crack_sprite(body, crack_level)
+
+function destroy_block(body):
+    spawn_debris_particles(body.position, body.material)
+    physics_world.remove_body(body)</code></pre>
+    <p><strong>Why it matters:</strong> Destructible structures turn a projectile launcher into a puzzle game. The player must read the structure: stone blocks at the base are hard to destroy directly, but if you can knock out the wooden supports, gravity will collapse everything.</p>
+
+    <h4>4. Material Properties</h4>
+    <p>Different materials behave differently under physics simulation. Wood is light and breaks easily. Stone is heavy and durable but devastating when it falls. Ice is fragile and slippery. These properties are data-driven.</p>
+    <pre is:raw><code>material_definitions = {
+    "wood": {
+        density: 0.5, friction: 0.6, restitution: 0.1,
+        health: 50, damage_threshold: 10, damage_multiplier: 1.0,
+        color: BROWN, debris_count: 4
+    },
+    "stone": {
+        density: 2.0, friction: 0.8, restitution: 0.05,
+        health: 150, damage_threshold: 40, damage_multiplier: 0.5,
+        color: GRAY, debris_count: 6
+    },
+    "ice": {
+        density: 0.3, friction: 0.1, restitution: 0.2,
+        health: 25, damage_threshold: 5, damage_multiplier: 2.0,
+        color: LIGHT_BLUE, debris_count: 8
+    }
+}</code></pre>
+    <p><strong>Why it matters:</strong> Data-driven material properties mean you can tune the entire game's feel by changing numbers, not code. This approach makes it trivial to add new materials without writing new collision logic.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Material Properties</div>
+      <p class="demo-hint">Three columns of blocks: wood (brown, light), stone (gray, heavy), and ice (blue, fragile). Click "Drop Ball" to drop a ball on each column. Adjust density and health sliders to see how materials react differently. Wood breaks easily, stone barely moves, ice shatters.</p>
+      <canvas id="demo-materials" width="760" height="420"></canvas>
+      <div class="demo-controls">
+        <button id="mat-drop-btn">Drop Ball</button>
+        <button id="mat-reset-btn">Reset</button>
+        <label>Ball Force: <input type="range" id="mat-force" min="1" max="10" value="5" /></label>
+        <span class="value-display" id="mat-force-val">5</span>
+      </div>
+    </div>
+
+    <h4>5. Scoring Based on Efficiency</h4>
+    <p>The player earns a score based on how efficiently they complete each level. Fewer projectiles used means a higher score. Star ratings provide clear goals.</p>
+    <pre is:raw><code>function calculate_score(level, projectiles_used, targets_destroyed, total_targets):
+    if targets_destroyed < total_targets:
+        return {score: 0, stars: 0}
+    base_score = 1000
+    unused = level.max_projectiles - projectiles_used
+    projectile_bonus = unused * 500
+    destruction_bonus = blocks_destroyed * 50
+    total = base_score + projectile_bonus + destruction_bonus
+    return {score: total, stars: calculate_stars(projectiles_used, level)}</code></pre>
+    <p><strong>Why it matters:</strong> Scoring transforms a binary puzzle into a spectrum of mastery. The star rating system provides a clear, universal language for quality of solution.</p>
+
+    <h4>6. Level Clear Detection</h4>
+    <p>The game must determine when a level is complete: all targets are destroyed and the physics simulation has settled.</p>
+    <pre is:raw><code>SETTLE_VELOCITY_THRESHOLD = 0.1
+
+function is_physics_settled(world):
+    for body in world.dynamic_bodies:
+        speed = body.velocity.magnitude()
+        if speed > SETTLE_VELOCITY_THRESHOLD:
+            return false
+    return true
+
+function check_level_clear(world, level):
+    if not is_physics_settled(world):
+        return PENDING
+    remaining_targets = world.bodies.filter(b => b.tag == "target" AND b.alive)
+    if len(remaining_targets) == 0:
+        return VICTORY
+    elif player.projectiles_remaining == 0:
+        return DEFEAT
+    else:
+        return PENDING</code></pre>
+    <p><strong>Why it matters:</strong> Level clear detection must be patient. If you check immediately after impact, the structure might still be collapsing. The settled-check pattern is a common technique in physics-based games.</p>
+
+    <h4>7. Slingshot / Launch Mechanic</h4>
+    <p>The player drags backward from the slingshot to set the angle and power. The drag distance and direction map directly to the launch force vector.</p>
+    <pre is:raw><code>SLINGSHOT_POSITION = {x: 100, y: 300}
+MAX_PULL_DISTANCE = 150
+LAUNCH_FORCE_MULTIPLIER = 10.0
+
+function on_pointer_down(position):
+    if distance(position, slingshot.anchor) < GRAB_RADIUS:
+        slingshot.is_aiming = true
+
+function on_pointer_move(position):
+    if not slingshot.is_aiming: return
+    pull = slingshot.anchor - position
+    if pull.magnitude() > MAX_PULL_DISTANCE:
+        pull = pull.normalized() * MAX_PULL_DISTANCE
+    slingshot.pull_vector = pull
+    launch_velocity = pull * LAUNCH_FORCE_MULTIPLIER
+    trajectory = calculate_trajectory(slingshot.anchor, launch_velocity)
+    draw_trajectory(trajectory)
+
+function on_pointer_release():
+    if not slingshot.is_aiming: return
+    slingshot.is_aiming = false
+    launch_velocity = slingshot.pull_vector * LAUNCH_FORCE_MULTIPLIER
+    slingshot.current_projectile.apply_impulse(launch_velocity)</code></pre>
+    <p><strong>Why it matters:</strong> The slingshot mechanic is the player's only point of interaction. The drag-and-release input maps human gesture to physics force in a way that feels natural: pull back farther for more power, change the angle by dragging in a different direction.</p>
+
+    <hr />
+
+    <h3>Stretch Goals</h3>
+    <ul>
+      <li><strong>Multiple projectile types:</strong> Different projectiles with unique abilities (one that splits, one that explodes, one that accelerates).</li>
+      <li><strong>Joints and constraints:</strong> Connect blocks with breakable joints so structures sway and deform before breaking.</li>
+      <li><strong>Slow-motion replay:</strong> After each shot, offer a slow-motion replay of the destruction.</li>
+      <li><strong>Level editor:</strong> Let the player place blocks, targets, and the slingshot to create custom levels.</li>
+    </ul>
+
+    <h3>MVP Spec</h3>
+    <table>
+      <thead><tr><th>Element</th><th>Scope</th></tr></thead>
+      <tbody>
+        <tr><td>Physics</td><td>Rigid body simulation with gravity, collision, and friction</td></tr>
+        <tr><td>Slingshot</td><td>Drag-and-release input with visual pull-back feedback</td></tr>
+        <tr><td>Trajectory</td><td>Dotted-line preview of projectile path during aiming</td></tr>
+        <tr><td>Materials</td><td>3 types: wood (light, weak), stone (heavy, strong), ice (light, fragile)</td></tr>
+        <tr><td>Destruction</td><td>Health-based block breaking on collision impact</td></tr>
+        <tr><td>Scoring</td><td>Star rating based on projectiles used</td></tr>
+        <tr><td>Clear detection</td><td>Wait for physics to settle, then check targets</td></tr>
+        <tr><td>Projectiles</td><td>3-5 projectiles per level</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliverable</h3>
+    <p>A playable physics puzzle game with 5-8 levels where the player launches projectiles from a slingshot at destructible structures. The game must use a physics simulation, include at least three material types, show a trajectory preview while aiming, detect level completion only after physics settles, and display a star rating based on efficiency.</p>
+
+    <hr />
+
+    <h2>Analogies by Background</h2>
+
+    <h3>For Backend Developers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Physics Engine</td><td>Like using a database engine &mdash; you configure schemas (bodies), set properties, and let the engine handle queries (collisions, forces).</td></tr>
+        <tr><td>Trajectory Prediction</td><td>Like a dry-run mode for migrations &mdash; simulate without committing to see the result.</td></tr>
+        <tr><td>Destructible Structures</td><td>Like cascading deletes in a relational database &mdash; removing one entity causes dependents to collapse.</td></tr>
+        <tr><td>Material Properties</td><td>Like configuration profiles for different environments &mdash; the same code behaves differently based on config.</td></tr>
+        <tr><td>Level Clear Detection</td><td>Like eventual consistency checks &mdash; you poll until the system quiesces, then read the final state.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Frontend Developers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Physics Engine</td><td>Like using a layout engine (Flexbox, CSS Grid) &mdash; you declare what you want and the engine calculates positions.</td></tr>
+        <tr><td>Trajectory Prediction</td><td>Like a live preview in a WYSIWYG editor &mdash; the preview updates in real time before you commit.</td></tr>
+        <tr><td>Destructible Structures</td><td>Like a DOM tree where removing a parent causes children to reflow and cascade.</td></tr>
+        <tr><td>Material Properties</td><td>Like design tokens &mdash; centralized values controlling how components look and behave.</td></tr>
+        <tr><td>Slingshot Mechanic</td><td>Like a drag-and-drop interaction &mdash; grab, drag to set direction, release to trigger.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Data / ML Engineers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Physics Engine</td><td>Like using a numerical solver (SciPy) &mdash; define the system of equations and the solver computes the next state.</td></tr>
+        <tr><td>Trajectory Prediction</td><td>Like forward-propagating without backprop &mdash; run inference to see output without committing.</td></tr>
+        <tr><td>Destructible Structures</td><td>Like pruning a neural network &mdash; removing nodes causes dependent connections to collapse.</td></tr>
+        <tr><td>Material Properties</td><td>Like hyperparameter configs &mdash; the same architecture produces different behaviors based on parameters.</td></tr>
+        <tr><td>Level Clear Detection</td><td>Like waiting for distributed training to synchronize before evaluating.</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li><strong>Determinism vs. Chaos:</strong> Physics engines can produce slightly different results from the same initial conditions. Should a physics puzzle be perfectly deterministic?</li>
+      <li><strong>Readability of Failure:</strong> When a player's shot fails, they need to understand why. How do you design visual feedback so the player can read what happened?</li>
+      <li><strong>The Tutorial Problem:</strong> Physics puzzles seem intuitive but players often struggle with the force-drag relationship. How would you teach through level design rather than text?</li>
+      <li><strong>Physics as Content:</strong> In a physics puzzle, the engine generates emergent outcomes the designer did not script. How does this change the designer's role?</li>
+    </ol>
+
+    <nav class="module-nav">
+      <a href={`${base}modules/26-sokoban/`}>&larr; Module 26: Sokoban</a>
+      <a href={`${base}modules/28-sandbox/`}>Module 28: Sandbox &rarr;</a>
+    </nav>
+  </div>
+</BaseLayout>
+
+<script>
+// ==================== Demo 1: Slingshot & Trajectory ====================
+(function() {
+  const canvas = document.getElementById('demo-slingshot');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const resetBtn = document.getElementById('sling-reset-btn');
+  const shotsDisplay = document.getElementById('sling-shots');
+  const statusDisplay = document.getElementById('sling-status');
+
+  const GRAVITY = 400;
+  const GROUND_Y = 380;
+  const SLING_X = 100, SLING_Y = 300;
+  const MAX_PULL = 120;
+  const FORCE_MULT = 4.5;
+
+  let aiming = false;
+  let pullX = 0, pullY = 0;
+  let balls = [];
+  let blocks = [];
+  let debris = [];
+  let shots = 0;
+
+  function createBlocks() {
+    blocks = [];
+    const baseX = 520, baseY = GROUND_Y;
+    const bw = 30, bh = 30;
+    const materials = [
+      { type: 'wood', color: '#8d6e63', health: 40, maxHealth: 40, density: 0.5 },
+      { type: 'stone', color: '#78909c', health: 120, maxHealth: 120, density: 2.0 },
+      { type: 'ice', color: '#80deea', health: 20, maxHealth: 20, density: 0.3 },
+    ];
+
+    // Tower structure
+    const layout = [
+      { x: 0, y: 0, mat: 0 }, { x: 1, y: 0, mat: 0 }, { x: 2, y: 0, mat: 0 },
+      { x: 0, y: 1, mat: 1 }, { x: 2, y: 1, mat: 1 },
+      { x: 0, y: 2, mat: 0 }, { x: 1, y: 2, mat: 2 }, { x: 2, y: 2, mat: 0 },
+      { x: 0.5, y: 3, mat: 2 }, { x: 1.5, y: 3, mat: 2 },
+      { x: 1, y: 4, mat: 1 },
+    ];
+
+    for (const l of layout) {
+      const m = materials[l.mat];
+      blocks.push({
+        x: baseX + l.x * (bw + 2),
+        y: baseY - (l.y + 1) * (bh + 1),
+        w: bw, h: bh,
+        vx: 0, vy: 0,
+        health: m.health, maxHealth: m.maxHealth,
+        color: m.color, type: m.type, density: m.density,
+        grounded: true
+      });
+    }
+  }
+
+  function reset() {
+    balls = [];
+    debris = [];
+    shots = 0;
+    createBlocks();
+    shotsDisplay.textContent = 'Shots: 0';
+    statusDisplay.textContent = 'Drag from slingshot to aim';
+  }
+  reset();
+  resetBtn.addEventListener('click', reset);
+
+  canvas.addEventListener('mousedown', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const dx = mx - SLING_X, dy = my - SLING_Y;
+    if (Math.sqrt(dx*dx + dy*dy) < 50) {
+      aiming = true;
+      statusDisplay.textContent = 'Drag to aim, release to fire';
+    }
+  });
+
+  canvas.addEventListener('mousemove', (e) => {
+    if (!aiming) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    pullX = SLING_X - mx;
+    pullY = SLING_Y - my;
+    const mag = Math.sqrt(pullX*pullX + pullY*pullY);
+    if (mag > MAX_PULL) {
+      pullX = (pullX / mag) * MAX_PULL;
+      pullY = (pullY / mag) * MAX_PULL;
+    }
+  });
+
+  canvas.addEventListener('mouseup', () => {
+    if (!aiming) return;
+    aiming = false;
+    const vx = pullX * FORCE_MULT;
+    const vy = pullY * FORCE_MULT;
+    if (Math.sqrt(vx*vx + vy*vy) > 20) {
+      balls.push({ x: SLING_X, y: SLING_Y, vx, vy, radius: 10, active: true });
+      shots++;
+      shotsDisplay.textContent = 'Shots: ' + shots;
+      statusDisplay.textContent = 'Ball launched!';
+    }
+    pullX = 0; pullY = 0;
+  });
+
+  let lastTime = performance.now();
+
+  function update() {
+    const now = performance.now();
+    const dt = Math.min((now - lastTime) / 1000, 0.05);
+    lastTime = now;
+
+    // Update balls
+    for (const ball of balls) {
+      if (!ball.active) continue;
+      ball.vy += GRAVITY * dt;
+      ball.x += ball.vx * dt;
+      ball.y += ball.vy * dt;
+
+      // Ground
+      if (ball.y + ball.radius > GROUND_Y) {
+        ball.y = GROUND_Y - ball.radius;
+        ball.vy *= -0.3;
+        ball.vx *= 0.8;
+        if (Math.abs(ball.vy) < 10) { ball.vy = 0; ball.active = false; }
+      }
+
+      // Collision with blocks
+      for (let i = blocks.length - 1; i >= 0; i--) {
+        const b = blocks[i];
+        const closestX = Math.max(b.x, Math.min(ball.x, b.x + b.w));
+        const closestY = Math.max(b.y, Math.min(ball.y, b.y + b.h));
+        const dx = ball.x - closestX, dy = ball.y - closestY;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist < ball.radius) {
+          const speed = Math.sqrt(ball.vx*ball.vx + ball.vy*ball.vy);
+          const damage = speed * 0.15;
+          b.health -= damage;
+          // Push block
+          b.vx = (b.vx || 0) + ball.vx * 0.3 / Math.max(1, b.density);
+          b.vy = (b.vy || 0) + ball.vy * 0.3 / Math.max(1, b.density);
+          b.grounded = false;
+          // Bounce ball
+          if (Math.abs(dx) > Math.abs(dy)) ball.vx *= -0.5;
+          else ball.vy *= -0.5;
+          ball.x += (dx / (dist || 1)) * (ball.radius - dist);
+          ball.y += (dy / (dist || 1)) * (ball.radius - dist);
+
+          if (b.health <= 0) {
+            for (let p = 0; p < 6; p++) {
+              debris.push({ x: b.x + b.w/2, y: b.y + b.h/2, vx: (Math.random()-0.5) * 200, vy: -(Math.random()*150), life: 1.5, color: b.color, size: 3 + Math.random()*4 });
+            }
+            blocks.splice(i, 1);
+          }
+        }
+      }
+
+      // Off screen
+      if (ball.x > canvas.width + 50 || ball.x < -50) ball.active = false;
+    }
+
+    // Update blocks physics (simplified)
+    for (const b of blocks) {
+      if (!b.grounded) {
+        b.vy = (b.vy || 0) + GRAVITY * dt * 0.5;
+        b.x += (b.vx || 0) * dt;
+        b.y += (b.vy || 0) * dt;
+        if (b.y + b.h > GROUND_Y) {
+          b.y = GROUND_Y - b.h;
+          b.vy = 0;
+          b.vx = (b.vx || 0) * 0.5;
+          if (Math.abs(b.vx) < 5) { b.vx = 0; b.grounded = true; }
+          // Impact damage
+          const impact = Math.abs(b.vy || 0) * 0.05;
+          b.health -= impact;
+        }
+      }
+    }
+    // Remove dead blocks
+    for (let i = blocks.length - 1; i >= 0; i--) {
+      if (blocks[i].health <= 0) {
+        const b = blocks[i];
+        for (let p = 0; p < 5; p++) {
+          debris.push({ x: b.x + b.w/2, y: b.y + b.h/2, vx: (Math.random()-0.5)*150, vy: -(Math.random()*100), life: 1, color: b.color, size: 2 + Math.random()*3 });
+        }
+        blocks.splice(i, 1);
+      }
+    }
+
+    // Update debris
+    debris = debris.filter(d => {
+      d.vy += GRAVITY * dt;
+      d.x += d.vx * dt;
+      d.y += d.vy * dt;
+      d.life -= dt;
+      return d.life > 0 && d.y < canvas.height + 20;
+    });
+
+    // Draw
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Sky gradient
+    const grad = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
+    grad.addColorStop(0, '#1a1a3e');
+    grad.addColorStop(1, '#2a2a4a');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, canvas.width, GROUND_Y);
+
+    // Ground
+    ctx.fillStyle = '#4a6741';
+    ctx.fillRect(0, GROUND_Y, canvas.width, canvas.height - GROUND_Y);
+
+    // Slingshot
+    ctx.fillStyle = '#6d4c41';
+    ctx.fillRect(SLING_X - 4, SLING_Y - 40, 8, 50);
+    ctx.fillRect(SLING_X - 20, SLING_Y - 45, 40, 8);
+    // Fork
+    ctx.fillRect(SLING_X - 22, SLING_Y - 65, 6, 25);
+    ctx.fillRect(SLING_X + 16, SLING_Y - 65, 6, 25);
+
+    // Elastic band and ball while aiming
+    if (aiming) {
+      const bx = SLING_X - pullX;
+      const by = SLING_Y - pullY;
+      ctx.strokeStyle = '#8d6e63';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(SLING_X - 19, SLING_Y - 55);
+      ctx.lineTo(bx, by);
+      ctx.lineTo(SLING_X + 19, SLING_Y - 55);
+      ctx.stroke();
+      // Ball at pull position
+      ctx.fillStyle = '#e53935';
+      ctx.beginPath();
+      ctx.arc(bx, by, 10, 0, Math.PI * 2);
+      ctx.fill();
+      // Trajectory prediction
+      const vx = pullX * FORCE_MULT;
+      const vy = pullY * FORCE_MULT;
+      let px = SLING_X, py = SLING_Y;
+      let pvx = vx, pvy = vy;
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      for (let i = 0; i < 60; i++) {
+        pvy += GRAVITY * 0.03;
+        px += pvx * 0.03;
+        py += pvy * 0.03;
+        if (py > GROUND_Y) break;
+        if (i % 3 === 0) {
+          ctx.beginPath();
+          ctx.arc(px, py, 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    } else {
+      // Resting elastic
+      ctx.strokeStyle = '#8d6e63';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(SLING_X - 19, SLING_Y - 55);
+      ctx.lineTo(SLING_X, SLING_Y - 45);
+      ctx.lineTo(SLING_X + 19, SLING_Y - 55);
+      ctx.stroke();
+    }
+
+    // Blocks
+    for (const b of blocks) {
+      const dmgPct = 1 - b.health / b.maxHealth;
+      ctx.fillStyle = b.color;
+      ctx.fillRect(b.x, b.y, b.w, b.h);
+      ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(b.x, b.y, b.w, b.h);
+      // Crack overlay
+      if (dmgPct > 0.3) {
+        ctx.strokeStyle = 'rgba(0,0,0,' + (dmgPct * 0.5) + ')';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(b.x + b.w * 0.3, b.y);
+        ctx.lineTo(b.x + b.w * 0.6, b.y + b.h);
+        ctx.stroke();
+      }
+      // Material label
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.font = '7px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(b.type[0].toUpperCase(), b.x + b.w/2, b.y + b.h/2 + 3);
+      ctx.textAlign = 'left';
+    }
+
+    // Balls
+    for (const ball of balls) {
+      ctx.fillStyle = '#e53935';
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#b71c1c';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+
+    // Debris
+    for (const d of debris) {
+      ctx.globalAlpha = d.life;
+      ctx.fillStyle = d.color;
+      ctx.fillRect(d.x - d.size/2, d.y - d.size/2, d.size, d.size);
+      ctx.globalAlpha = 1;
+    }
+
+    requestAnimationFrame(update);
+  }
+  update();
+})();
+
+// ==================== Demo 2: Material Properties ====================
+(function() {
+  const canvas = document.getElementById('demo-materials');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dropBtn = document.getElementById('mat-drop-btn');
+  const resetBtn = document.getElementById('mat-reset-btn');
+  const forceSlider = document.getElementById('mat-force');
+  const forceVal = document.getElementById('mat-force-val');
+
+  forceSlider.addEventListener('input', () => { forceVal.textContent = forceSlider.value; });
+
+  const GRAVITY = 400;
+  const GROUND_Y = 360;
+  const COL_WIDTH = 220;
+
+  const MATERIALS = [
+    { name: 'Wood', color: '#8d6e63', health: 40, density: 0.5, label: 'Light, breaks easily' },
+    { name: 'Stone', color: '#78909c', health: 120, density: 2.0, label: 'Heavy, very durable' },
+    { name: 'Ice', color: '#80deea', health: 18, density: 0.3, label: 'Fragile, shatters' },
+  ];
+
+  let columns = [];
+  let balls = [];
+  let debris = [];
+
+  function createColumns() {
+    columns = [];
+    balls = [];
+    debris = [];
+    for (let ci = 0; ci < 3; ci++) {
+      const mat = MATERIALS[ci];
+      const baseX = 60 + ci * COL_WIDTH;
+      const col = [];
+      for (let row = 0; row < 3; row++) {
+        for (let bx = 0; bx < 2; bx++) {
+          col.push({
+            x: baseX + bx * 42,
+            y: GROUND_Y - (row + 1) * 32,
+            w: 38, h: 28,
+            vx: 0, vy: 0,
+            health: mat.health, maxHealth: mat.health,
+            color: mat.color, name: mat.name, density: mat.density,
+            grounded: true
+          });
+        }
+      }
+      columns.push(col);
+    }
+  }
+  createColumns();
+
+  resetBtn.addEventListener('click', createColumns);
+
+  dropBtn.addEventListener('click', () => {
+    const force = parseInt(forceSlider.value);
+    for (let ci = 0; ci < 3; ci++) {
+      const baseX = 60 + ci * COL_WIDTH + 20;
+      balls.push({
+        x: baseX + 15,
+        y: 30,
+        vx: 0, vy: force * 40,
+        radius: 14,
+        active: true,
+        force: force
+      });
+    }
+  });
+
+  let lastTime = performance.now();
+
+  function update() {
+    const now = performance.now();
+    const dt = Math.min((now - lastTime) / 1000, 0.05);
+    lastTime = now;
+
+    // Update balls
+    for (const ball of balls) {
+      if (!ball.active) continue;
+      ball.vy += GRAVITY * dt;
+      ball.x += ball.vx * dt;
+      ball.y += ball.vy * dt;
+
+      if (ball.y + ball.radius > GROUND_Y) {
+        ball.y = GROUND_Y - ball.radius;
+        ball.vy *= -0.3;
+        if (Math.abs(ball.vy) < 10) ball.active = false;
+      }
+
+      // Hit blocks
+      for (const col of columns) {
+        for (let i = col.length - 1; i >= 0; i--) {
+          const b = col[i];
+          const closestX = Math.max(b.x, Math.min(ball.x, b.x + b.w));
+          const closestY = Math.max(b.y, Math.min(ball.y, b.y + b.h));
+          const dx = ball.x - closestX, dy = ball.y - closestY;
+          const dist = Math.sqrt(dx*dx + dy*dy);
+          if (dist < ball.radius) {
+            const speed = Math.sqrt(ball.vx*ball.vx + ball.vy*ball.vy);
+            const damage = speed * 0.12 * ball.force * 0.4;
+            b.health -= damage;
+            b.vx += ball.vx * 0.15 / Math.max(0.5, b.density);
+            b.vy += ball.vy * 0.15 / Math.max(0.5, b.density);
+            b.grounded = false;
+            ball.vy *= -0.4;
+            ball.y = closestY - ball.radius - 1;
+
+            if (b.health <= 0) {
+              for (let p = 0; p < 8; p++) {
+                debris.push({ x: b.x + b.w/2, y: b.y + b.h/2, vx: (Math.random()-0.5)*200, vy: -(Math.random()*150), life: 1.2, color: b.color, size: 2 + Math.random()*4 });
+              }
+              col.splice(i, 1);
+            }
+          }
+        }
+      }
+    }
+
+    // Block physics
+    for (const col of columns) {
+      for (let i = col.length - 1; i >= 0; i--) {
+        const b = col[i];
+        if (!b.grounded) {
+          b.vy += GRAVITY * dt * 0.5;
+          b.x += b.vx * dt;
+          b.y += b.vy * dt;
+          if (b.y + b.h > GROUND_Y) {
+            b.y = GROUND_Y - b.h;
+            const impact = Math.abs(b.vy) * 0.04;
+            b.health -= impact;
+            b.vy = 0;
+            b.vx *= 0.3;
+            if (Math.abs(b.vx) < 3) { b.vx = 0; b.grounded = true; }
+          }
+          if (b.health <= 0) {
+            for (let p = 0; p < 6; p++) {
+              debris.push({ x: b.x + b.w/2, y: b.y + b.h/2, vx: (Math.random()-0.5)*100, vy: -(Math.random()*80), life: 0.8, color: b.color, size: 2 + Math.random()*3 });
+            }
+            col.splice(i, 1);
+          }
+        }
+      }
+    }
+
+    // Debris
+    debris = debris.filter(d => {
+      d.vy += GRAVITY * dt;
+      d.x += d.vx * dt;
+      d.y += d.vy * dt;
+      d.life -= dt;
+      return d.life > 0;
+    });
+
+    // Draw
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Ground
+    ctx.fillStyle = '#3a3a5a';
+    ctx.fillRect(0, GROUND_Y, canvas.width, canvas.height - GROUND_Y);
+
+    // Column labels
+    for (let ci = 0; ci < 3; ci++) {
+      const mat = MATERIALS[ci];
+      const baseX = 60 + ci * COL_WIDTH;
+      ctx.fillStyle = mat.color;
+      ctx.font = 'bold 14px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(mat.name, baseX + 40, 25);
+      ctx.font = '10px monospace';
+      ctx.fillStyle = '#aaa';
+      ctx.fillText(mat.label, baseX + 40, 42);
+      ctx.fillText('HP:' + mat.health + ' Density:' + mat.density, baseX + 40, 56);
+    }
+    ctx.textAlign = 'left';
+
+    // Blocks
+    for (const col of columns) {
+      for (const b of col) {
+        const dmgPct = 1 - b.health / b.maxHealth;
+        ctx.fillStyle = b.color;
+        ctx.fillRect(b.x, b.y, b.w, b.h);
+        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(b.x, b.y, b.w, b.h);
+        if (dmgPct > 0.2) {
+          ctx.strokeStyle = 'rgba(0,0,0,' + (dmgPct * 0.6) + ')';
+          ctx.beginPath();
+          ctx.moveTo(b.x + b.w * 0.2, b.y);
+          ctx.lineTo(b.x + b.w * 0.7, b.y + b.h);
+          ctx.stroke();
+          if (dmgPct > 0.5) {
+            ctx.beginPath();
+            ctx.moveTo(b.x + b.w * 0.6, b.y);
+            ctx.lineTo(b.x + b.w * 0.3, b.y + b.h);
+            ctx.stroke();
+          }
+        }
+        // HP bar
+        ctx.fillStyle = '#333';
+        ctx.fillRect(b.x, b.y - 4, b.w, 3);
+        ctx.fillStyle = dmgPct > 0.6 ? '#f44336' : dmgPct > 0.3 ? '#ffb74d' : '#4caf50';
+        ctx.fillRect(b.x, b.y - 4, b.w * (1 - dmgPct), 3);
+      }
+    }
+
+    // Balls
+    for (const ball of balls) {
+      ctx.fillStyle = '#e53935';
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#b71c1c';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+
+    // Debris
+    for (const d of debris) {
+      ctx.globalAlpha = d.life;
+      ctx.fillStyle = d.color;
+      ctx.fillRect(d.x - d.size/2, d.y - d.size/2, d.size, d.size);
+      ctx.globalAlpha = 1;
+    }
+
+    // Dividers
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(COL_WIDTH + 30, 70); ctx.lineTo(COL_WIDTH + 30, GROUND_Y);
+    ctx.moveTo(COL_WIDTH * 2 + 30, 70); ctx.lineTo(COL_WIDTH * 2 + 30, GROUND_Y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    requestAnimationFrame(update);
+  }
+  update();
+})();
+</script>

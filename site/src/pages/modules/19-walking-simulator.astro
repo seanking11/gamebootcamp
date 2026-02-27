@@ -1,0 +1,684 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 19: Walking Simulator / Exploration Game">
+  <div class="container page-content">
+    <div class="module-header">
+      <div class="module-number">Module 19</div>
+      <h1>Walking Simulator / Exploration Game</h1>
+      <p class="module-theme">Narrative through environment, not combat &mdash; the space is the story.</p>
+    </div>
+
+    <blockquote>"The world is full of obvious things which nobody by any chance ever observes." &mdash; Arthur Conan Doyle</blockquote>
+
+    <hr />
+
+    <h2>Prerequisites</h2>
+    <table>
+      <thead>
+        <tr><th>Module</th><th>What You Used From It</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Module 01 - Pong</td><td>Core game loop, input handling, rendering basics</td></tr>
+        <tr><td>Module 11 - FPS (Optional)</td><td>If building in 3D, first-person camera and movement help. A 2D top-down version works fine.</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h2>Week 1: History &amp; Design Theory</h2>
+
+    <h3>The Origin</h3>
+    <p>The walking simulator emerged from a provocative question: what happens when you strip combat, scores, and fail states from a first-person game? Early experiments like Dear Esther (2012) proved that simply moving through a carefully crafted space could be emotionally powerful. The genre challenged assumptions about what "gameplay" means, arguing that exploration, discovery, and atmosphere are mechanics in their own right.</p>
+
+    <h3>How the Genre Evolved</h3>
+    <p><strong>Gone Home (2013):</strong> Fullbright's debut placed the player in an empty house, piecing together a family's story through letters, objects, and environmental clues. It proved that domestic spaces could be as compelling as alien worlds, and that the player's imagination &mdash; filling in gaps between discovered artifacts &mdash; was a more powerful storytelling tool than cutscenes.</p>
+
+    <p><strong>Firewatch (2016):</strong> Campo Santo expanded the genre's emotional range by adding a real-time conversation system between the player and a voice on a walkie-talkie. Set in the Wyoming wilderness, Firewatch demonstrated that walking simulators could sustain tension and mystery without combat.</p>
+
+    <p><strong>What Remains of Edith Finch (2017):</strong> Giant Sparrow took environmental storytelling to its furthest extreme. Each room in the Finch family house became a completely different gameplay vignette &mdash; a comic book, a dream sequence, a bath scene &mdash; all unified by the act of walking through a single home.</p>
+
+    <h3>What Makes a Walking Simulator "Great"</h3>
+    <p>A great walking simulator rewards curiosity. Every object the player chooses to examine, every room they enter in a particular order, every ambient sound they pause to listen to &mdash; all of it feels intentional. The best entries create a sense of <strong>presence</strong> so strong that the player forgets they are "playing" and begins to feel they are "inhabiting." This requires extraordinary attention to environmental detail, precise pacing, and trust &mdash; trusting the player to look, to wonder, and to draw their own conclusions.</p>
+
+    <h3>The Essential Mechanic</h3>
+    <p><strong>Moving through a space and discovering narrative through the environment.</strong></p>
+
+    <hr />
+
+    <h2>Week 2: Build the MVP</h2>
+
+    <h3>What You're Building</h3>
+    <p>A small explorable environment (a house, an apartment, a campsite) where the player moves freely and discovers a short story by examining objects, entering rooms, and triggering audio or text events. There are no enemies, no health bars, no scores &mdash; just a space with a story hidden inside it.</p>
+
+    <h3>Core Concepts (Must Implement)</h3>
+
+    <h4>1. Environmental Storytelling</h4>
+    <p>Conveying narrative through object placement and level design rather than dialog or cutscenes. A half-eaten meal on a table, a packed suitcase by the door, a child's drawing on the fridge &mdash; these tell a story without a single word of exposition.</p>
+    <pre is:raw><code>scene_objects = [
+    { type: "note", position: [3, 1], content: "I'll be back before midnight." },
+    { type: "suitcase", position: [5, 2], state: "packed" },
+    { type: "photo_frame", position: [2, 4], state: "face_down" },
+    { type: "calendar", position: [1, 3], marked_date: "March 15" }
+]
+# Objects don't need explicit narration — their placement IS the narrative</code></pre>
+    <p><strong>Why it matters:</strong> Every object is a sentence in a story the player assembles themselves, creating a more personal and memorable narrative than pre-scripted dialog.</p>
+
+    <h4>2. Trigger Zones for Narrative Beats</h4>
+    <p>Invisible regions in the world that fire events &mdash; voiceover, music changes, UI prompts &mdash; when the player enters them. These are the backbone of pacing in an exploration game.</p>
+    <pre is:raw><code>trigger_zones = [
+    { id: "front_door", bounds: { x: 0, y: 0, w: 2, h: 2 },
+      on_enter: play_audio("welcome_home.wav"), once: true },
+    { id: "bedroom_hall", bounds: { x: 5, y: 3, w: 1, h: 3 },
+      on_enter: set_music("tense_theme"), once: true },
+    { id: "ending_zone", bounds: { x: 8, y: 7, w: 2, h: 2 },
+      on_enter: start_ending_sequence(), once: true }
+]
+
+function check_triggers(player_position):
+    for zone in trigger_zones:
+        if not zone.triggered and point_in_rect(player_position, zone.bounds):
+            zone.on_enter()
+            if zone.once:
+                zone.triggered = true</code></pre>
+    <p><strong>Why it matters:</strong> Trigger zones let the designer control pacing without taking control away from the player. The player feels free, but the designer is quietly orchestrating the emotional arc.</p>
+
+    <!-- Demo 1: Trigger Zone Demo -->
+    <div class="demo-container">
+      <div class="demo-label">Demo: Trigger Zones &amp; Narrative Beats</div>
+      <p class="demo-hint">Use arrow keys or WASD to move the character through the house. Walk through invisible trigger zones to activate narrative text and audio cues. Zones flash briefly when triggered. Explore every room to piece together the story!</p>
+      <canvas id="demo-triggers" width="760" height="460"></canvas>
+    </div>
+
+    <h4>3. Audio as Narrative Tool</h4>
+    <p>Using ambient sound, music cues, and voiceover triggered by location to build atmosphere and deliver story.</p>
+    <pre is:raw><code>audio_layers = {
+    ambient: { track: "rain_on_roof.wav", volume: 0.3, loop: true },
+    music: { track: null, volume: 0.0 },
+    voiceover: { track: null, volume: 1.0 }
+}
+
+function transition_music(new_track, fade_duration):
+    old_volume = audio_layers.music.volume
+    for t in 0 to fade_duration:
+        progress = t / fade_duration
+        audio_layers.music.volume = old_volume * (1 - progress)
+    audio_layers.music.track = new_track
+    for t in 0 to fade_duration:
+        progress = t / fade_duration
+        audio_layers.music.volume = 0.6 * progress</code></pre>
+    <p><strong>Why it matters:</strong> In a game with no combat or score, audio carries an enormous share of the emotional weight. A creaking floorboard, a distant phone ringing, a shift from silence to a minor-key piano &mdash; these are the "mechanics" of tension and release.</p>
+
+    <h4>4. Non-Combat Movement</h4>
+    <p>Exploration-focused movement without threat. The player walks, looks around, and interacts &mdash; but there is nothing chasing them.</p>
+    <pre is:raw><code>WALK_SPEED = 3.0        # Deliberately slower than an FPS
+LOOK_SPEED = 0.002
+INTERACT_RANGE = 1.5
+
+function update_movement(dt):
+    move_input = get_input_vector()
+    player.position += move_input * WALK_SPEED * dt
+    look_delta = get_look_input()
+    player.facing += look_delta * LOOK_SPEED
+    if input_pressed("interact"):
+        target = find_nearest_interactable(player.position, player.facing, INTERACT_RANGE)
+        if target:
+            target.interact()
+# Note: No sprint. No jump. Slower speed encourages looking.</code></pre>
+    <p><strong>Why it matters:</strong> The walk speed IS a design decision. Walking simulators are deliberately slow because the designer wants the player to look, not rush.</p>
+
+    <h4>5. Object Inspection System</h4>
+    <p>The ability to pick up objects, rotate them, read notes, and examine details up close. This transforms passive observation into active investigation.</p>
+    <pre is:raw><code>inspecting = null
+
+function start_inspection(object):
+    inspecting = object
+    inspecting.original_position = object.position
+    inspecting.position = screen_center()
+    inspecting.scale = 2.0
+    disable_player_movement()
+
+function update_inspection(dt):
+    if inspecting == null: return
+    rotation_input = get_look_input()
+    inspecting.rotation_y += rotation_input.x * 2.0
+    inspecting.rotation_x += rotation_input.y * 2.0
+    if inspecting.has_detail and facing_detail_side(inspecting):
+        show_detail_text(inspecting.detail_text)
+    if input_pressed("cancel"):
+        end_inspection()</code></pre>
+    <p><strong>Why it matters:</strong> Inspection turns the player from a passive viewer into an active detective. The act of physically rotating an object and discovering hidden text creates a moment of personal discovery.</p>
+
+    <!-- Demo 2: Object Inspection -->
+    <div class="demo-container">
+      <div class="demo-label">Demo: Object Inspection</div>
+      <p class="demo-hint">Click on the highlighted objects in the scene to "pick them up." The object zooms to the center for inspection. Drag to rotate it. Some objects have hidden details on their back side. Press Escape or click the X button to put the object back.</p>
+      <canvas id="demo-inspect" width="760" height="420"></canvas>
+    </div>
+
+    <h4>6. Narrative Pacing Through Level Design</h4>
+    <p>Using the physical layout of the space to gate discovery and create a rhythm of quiet moments and emotional peaks.</p>
+    <pre is:raw><code>rooms = {
+    "foyer":    { connects_to: ["living_room", "hallway"], locked: false },
+    "hallway":  { connects_to: ["bedroom", "bathroom"], locked: false },
+    "bedroom":  { contains: ["key_item"], locked: false },
+    "basement_door": { connects_to: ["basement"], locked: true,
+                       unlock_condition: "found_key_in_bedroom" },
+    "basement":  { contains: ["final_revelation"], locked: false }
+}
+# The player MUST go through bedroom before basement
+# This ensures they discover context before the climax</code></pre>
+    <p><strong>Why it matters:</strong> In a game without combat encounters to pace the action, the level layout itself becomes the pacing tool. A long, narrow corridor after an emotional discovery gives the player time to process.</p>
+
+    <hr />
+
+    <h3>Stretch Goals</h3>
+    <ul>
+      <li><strong>Dynamic lighting shifts:</strong> Change lighting color/intensity based on narrative progress.</li>
+      <li><strong>Player journal/inventory:</strong> Collected notes appear in a journal the player can re-read.</li>
+      <li><strong>Multiple discovery orders:</strong> Track which objects the player found first and subtly adjust text.</li>
+      <li><strong>Ending variation:</strong> The final scene changes based on how thoroughly the player explored.</li>
+    </ul>
+
+    <h3>MVP Spec</h3>
+    <table>
+      <thead><tr><th>Element</th><th>Minimum Viable Version</th></tr></thead>
+      <tbody>
+        <tr><td>Environment</td><td>4-6 interconnected rooms (can be 2D top-down with tile walls)</td></tr>
+        <tr><td>Interactable Objects</td><td>6-8 objects the player can examine</td></tr>
+        <tr><td>Trigger Zones</td><td>3-4 invisible zones that fire audio or text events</td></tr>
+        <tr><td>Audio</td><td>Ambient background loop + 2-3 triggered audio/text events</td></tr>
+        <tr><td>Narrative</td><td>A simple 3-beat story (setup, complication, revelation)</td></tr>
+        <tr><td>Movement</td><td>WASD or arrow key movement, interaction with a key press</td></tr>
+        <tr><td>Inspection</td><td>Click on an object to see its description</td></tr>
+        <tr><td>Gating</td><td>At least 1 locked door that requires finding an item</td></tr>
+        <tr><td>Win Condition</td><td>Reaching the final room after discovering key objects</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliverable</h3>
+    <p>A playable exploration game where the player moves through a small environment and pieces together a short story. There should be no enemies, no health, and no score. The story should be discoverable in 3-5 minutes of exploration.</p>
+
+    <hr />
+
+    <h2>Analogies by Background</h2>
+    <blockquote><p>These analogies map game dev concepts to patterns you already know.</p></blockquote>
+
+    <h3>For Backend Developers</h3>
+    <table>
+      <thead><tr><th>Core Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Environmental Storytelling</td><td>Like structured logging &mdash; you place breadcrumbs (log entries) throughout a system, and the reader reconstructs what happened by examining them in context</td></tr>
+        <tr><td>Trigger Zones</td><td>Like webhook endpoints &mdash; a region of space is "subscribed" to player entry, and when the event fires, it executes a handler</td></tr>
+        <tr><td>Audio as Narrative Tool</td><td>Like monitoring alerts with severity levels &mdash; ambient sound is INFO, music shifts are WARN, voiceover is CRITICAL</td></tr>
+        <tr><td>Non-Combat Movement</td><td>Like a read-only API &mdash; the player can GET information from the world but never POST, PUT, or DELETE</td></tr>
+        <tr><td>Object Inspection</td><td>Like a detailed GET endpoint &mdash; the player requests more data about a specific resource</td></tr>
+        <tr><td>Narrative Pacing via Level Design</td><td>Like rate limiting and request ordering &mdash; the architecture ensures consumers receive information in a sequence that makes sense</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Frontend Developers</h3>
+    <table>
+      <thead><tr><th>Core Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Environmental Storytelling</td><td>Like progressive disclosure in UI design &mdash; context is revealed through interaction and exploration</td></tr>
+        <tr><td>Trigger Zones</td><td>Like Intersection Observer &mdash; define a boundary, and when the player element walks into it, a callback fires</td></tr>
+        <tr><td>Audio as Narrative Tool</td><td>Like animation and transition states in a UI &mdash; they convey meaning beyond what visual content alone communicates</td></tr>
+        <tr><td>Non-Combat Movement</td><td>Like a documentation site &mdash; the user browses at their own pace with no time pressure</td></tr>
+        <tr><td>Object Inspection</td><td>Like a modal or detail panel &mdash; clicking an item expands it to show more information</td></tr>
+        <tr><td>Narrative Pacing via Level Design</td><td>Like a multi-step onboarding flow &mdash; the layout guides the user through information in the intended order</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Data / ML Engineers</h3>
+    <table>
+      <thead><tr><th>Core Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Environmental Storytelling</td><td>Like feature engineering &mdash; the raw data (objects in a room) is meaningless until placed in context</td></tr>
+        <tr><td>Trigger Zones</td><td>Like threshold-based alerts in a monitoring pipeline &mdash; when a metric crosses a boundary, an action triggers</td></tr>
+        <tr><td>Audio as Narrative Tool</td><td>Like data sonification &mdash; translating non-visual information into sound</td></tr>
+        <tr><td>Non-Combat Movement</td><td>Like exploratory data analysis &mdash; no hypothesis to prove, just wandering through data looking for patterns</td></tr>
+        <tr><td>Object Inspection</td><td>Like drilling down in a dashboard &mdash; clicking an aggregate reveals underlying records</td></tr>
+        <tr><td>Narrative Pacing via Level Design</td><td>Like a DAG in a pipeline &mdash; tasks have dependencies and the architecture ensures correct order</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li>Walking simulators are often criticized as "not real games." What is the minimum interaction required for something to feel like a game versus a passive experience?</li>
+      <li>In Gone Home, the player can go almost anywhere in any order, yet most players experience the story in roughly the same emotional arc. How does level design create a "guided freedom"?</li>
+      <li>If you removed all audio from a walking simulator, how much narrative can the environment alone carry?</li>
+      <li>Walking simulators rely on the player choosing to engage. What design techniques can you use to make a player <em>want</em> to pick up and examine an object?</li>
+    </ol>
+
+    <nav class="module-nav">
+      <a href={`${base}modules/18-visual-novel/`}>&larr; Module 18: Visual Novel</a>
+      <a href={`${base}modules/20-turn-based-rpg/`}>Module 20: Turn-Based RPG &rarr;</a>
+    </nav>
+  </div>
+
+  <script>
+    // Demo 1: Trigger Zones & Narrative Beats
+    (function() {
+      const canvas = document.getElementById('demo-triggers');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width, H = canvas.height;
+
+      const TILE = 40;
+      const player = { x: 100, y: 360, r: 10, speed: 2.5, dir: 0 };
+      const keys = {};
+
+      // Room layout: 1=wall, 0=floor
+      const map = [
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+        [1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,1],
+        [1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,1],
+        [1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1],
+        [1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1],
+        [1,1,1,0,1,1,0,0,0,0,1,1,1,0,1,1,1,1,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,0,0,0,0,1,1,0,1,1,0,0,0,0,0,0,0,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      ];
+
+      const roomLabels = [
+        { name: 'Living Room', x: 60, y: 60 },
+        { name: 'Kitchen', x: 260, y: 60 },
+        { name: 'Bedroom', x: 500, y: 60 },
+        { name: 'Hallway', x: 260, y: 260 },
+        { name: 'Study', x: 60, y: 300 },
+        { name: 'Basement Entry', x: 500, y: 300 },
+      ];
+
+      const triggers = [
+        { id:'entry', x:60, y:260, w:80, h:60, triggered:false, flash:0,
+          text:'"Home at last. Everything looks... the same."', icon:'speech' },
+        { id:'kitchen', x:240, y:60, w:120, h:100, triggered:false, flash:0,
+          text:'"A half-eaten meal. Two plates, but one chair is pushed back."', icon:'note' },
+        { id:'photo', x:480, y:60, w:100, h:80, triggered:false, flash:0,
+          text:'"The photo on the nightstand is face-down. I turn it over... it is us. Before."', icon:'music' },
+        { id:'study', x:60, y:280, w:100, h:80, triggered:false, flash:0,
+          text:'"Her desk. A letter, unsealed. Addressed to me."', icon:'speech' },
+        { id:'basement', x:500, y:300, w:120, h:60, triggered:false, flash:0,
+          text:'"The basement door is open. It is never open. I descend the stairs..."', icon:'music' },
+      ];
+
+      let narrativeText = 'Move through the rooms to discover the story...';
+      let narrativeFade = 1;
+      let triggerCount = 0;
+
+      function tileAt(px, py) {
+        const tx = Math.floor(px / TILE);
+        const ty = Math.floor(py / TILE);
+        if (ty < 0 || ty >= map.length || tx < 0 || tx >= map[0].length) return 1;
+        return map[ty][tx];
+      }
+
+      function update() {
+        let dx = 0, dy = 0;
+        if (keys['ArrowLeft'] || keys['KeyA']) dx -= 1;
+        if (keys['ArrowRight'] || keys['KeyD']) dx += 1;
+        if (keys['ArrowUp'] || keys['KeyW']) dy -= 1;
+        if (keys['ArrowDown'] || keys['KeyS']) dy += 1;
+        if (dx || dy) {
+          const len = Math.hypot(dx, dy);
+          dx = (dx / len) * player.speed;
+          dy = (dy / len) * player.speed;
+          player.dir = Math.atan2(dy, dx);
+
+          const nx = player.x + dx;
+          const ny = player.y + dy;
+          // Check wall collision
+          if (tileAt(nx - player.r, player.y) === 0 && tileAt(nx + player.r, player.y) === 0) {
+            player.x = nx;
+          }
+          if (tileAt(player.x, ny - player.r) === 0 && tileAt(player.x, ny + player.r) === 0) {
+            player.y = ny;
+          }
+        }
+
+        // Check triggers
+        for (const t of triggers) {
+          if (!t.triggered && player.x >= t.x && player.x <= t.x + t.w && player.y >= t.y && player.y <= t.y + t.h) {
+            t.triggered = true;
+            t.flash = 30;
+            narrativeText = t.text;
+            narrativeFade = 1;
+            triggerCount++;
+          }
+          if (t.flash > 0) t.flash--;
+        }
+        if (narrativeFade > 0) narrativeFade -= 0.003;
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, W, H);
+        ctx.fillStyle = '#0a0e14';
+        ctx.fillRect(0, 0, W, H);
+
+        // Draw map
+        for (let y = 0; y < map.length; y++) {
+          for (let x = 0; x < map[y].length; x++) {
+            if (map[y][x] === 1) {
+              ctx.fillStyle = '#2a3040';
+              ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
+              ctx.strokeStyle = '#3a4050';
+              ctx.lineWidth = 1;
+              ctx.strokeRect(x * TILE, y * TILE, TILE, TILE);
+            } else {
+              ctx.fillStyle = '#151a24';
+              ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
+            }
+          }
+        }
+
+        // Room labels
+        ctx.fillStyle = 'rgba(100, 120, 140, 0.4)';
+        ctx.font = '11px monospace';
+        for (const r of roomLabels) {
+          ctx.fillText(r.name, r.x, r.y);
+        }
+
+        // Draw trigger zone flashes
+        for (const t of triggers) {
+          if (t.flash > 0) {
+            ctx.fillStyle = 'rgba(255, 220, 100, ' + (t.flash / 30 * 0.3) + ')';
+            ctx.fillRect(t.x, t.y, t.w, t.h);
+          }
+          if (t.triggered) {
+            // Small icon
+            ctx.fillStyle = 'rgba(100, 200, 150, 0.5)';
+            ctx.font = '10px monospace';
+            ctx.fillText(t.icon === 'music' ? '~' : t.icon === 'note' ? 'i' : '"', t.x + t.w/2 - 3, t.y + t.h/2 + 3);
+          }
+        }
+
+        // Player (arrow shape showing direction)
+        ctx.save();
+        ctx.translate(player.x, player.y);
+        ctx.rotate(player.dir);
+        ctx.fillStyle = '#4488ff';
+        ctx.beginPath();
+        ctx.moveTo(player.r, 0);
+        ctx.lineTo(-player.r * 0.7, -player.r * 0.7);
+        ctx.lineTo(-player.r * 0.3, 0);
+        ctx.lineTo(-player.r * 0.7, player.r * 0.7);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+
+        // Glow around player
+        const grad = ctx.createRadialGradient(player.x, player.y, 0, player.x, player.y, 60);
+        grad.addColorStop(0, 'rgba(68, 136, 255, 0.08)');
+        grad.addColorStop(1, 'rgba(68, 136, 255, 0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(player.x - 60, player.y - 60, 120, 120);
+
+        // Narrative text panel
+        if (narrativeFade > 0) {
+          const panelY = H - 70;
+          ctx.fillStyle = 'rgba(10, 14, 20, ' + Math.min(narrativeFade, 0.85) + ')';
+          ctx.fillRect(10, panelY, W - 20, 55);
+          ctx.strokeStyle = 'rgba(100, 180, 200, ' + Math.min(narrativeFade, 0.5) + ')';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(10, panelY, W - 20, 55);
+          ctx.fillStyle = 'rgba(200, 220, 240, ' + Math.min(narrativeFade, 1) + ')';
+          ctx.font = '13px monospace';
+          // Word wrap
+          const words = narrativeText.split(' ');
+          let line = '';
+          let ly = panelY + 20;
+          for (const w of words) {
+            const test = line + w + ' ';
+            if (ctx.measureText(test).width > W - 50) {
+              ctx.fillText(line, 25, ly);
+              line = w + ' ';
+              ly += 18;
+            } else {
+              line = test;
+            }
+          }
+          ctx.fillText(line, 25, ly);
+        }
+
+        // Counter
+        ctx.fillStyle = '#556677';
+        ctx.font = '11px monospace';
+        ctx.fillText('Discoveries: ' + triggerCount + ' / ' + triggers.length, W - 160, 18);
+      }
+
+      function loop() { update(); draw(); requestAnimationFrame(loop); }
+
+      window.addEventListener('keydown', function(e) {
+        keys[e.code] = true;
+        if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
+      });
+      window.addEventListener('keyup', function(e) { keys[e.code] = false; });
+      loop();
+    })();
+
+    // Demo 2: Object Inspection
+    (function() {
+      const canvas = document.getElementById('demo-inspect');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width, H = canvas.height;
+
+      const objects = [
+        { id: 'letter', name: 'Sealed Letter', x: 100, y: 200, w: 60, h: 45, color: '#ccbb88',
+          frontText: 'A sealed envelope. The handwriting is familiar.',
+          backText: 'On the back: "Open only when you are ready. -M"',
+          rotation: 0 },
+        { id: 'photo', name: 'Old Photograph', x: 300, y: 150, w: 70, h: 55, color: '#998877',
+          frontText: 'A faded photo. Two people smiling at a beach.',
+          backText: 'Written on the back: "Summer 1998. Our last good day."',
+          rotation: 0 },
+        { id: 'watch', name: 'Pocket Watch', x: 520, y: 220, w: 45, h: 45, color: '#ddaa44',
+          frontText: 'A brass pocket watch. The hands are stopped at 11:47.',
+          backText: 'Engraved: "For every minute, I miss you."',
+          rotation: 0 },
+        { id: 'key', name: 'Rusted Key', x: 660, y: 180, w: 35, h: 50, color: '#887766',
+          frontText: 'A rusted iron key. Too large for any door in this house.',
+          backText: 'The teeth of the key form a pattern... like a word.',
+          rotation: 0 },
+      ];
+
+      let inspecting = null;
+      let dragStart = null;
+      let inspectRotation = 0;
+
+      function drawScene() {
+        // Room background
+        ctx.fillStyle = '#1a2030';
+        ctx.fillRect(0, 0, W, H);
+
+        // Shelf
+        ctx.fillStyle = '#332a22';
+        ctx.fillRect(50, 280, W - 100, 8);
+        // Table
+        ctx.fillStyle = '#2a2420';
+        ctx.fillRect(200, 330, 360, 12);
+
+        // Wall texture
+        ctx.strokeStyle = '#222830';
+        for (let i = 0; i < W; i += 60) {
+          ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 140); ctx.stroke();
+        }
+
+        // Floor
+        ctx.fillStyle = '#181c22';
+        ctx.fillRect(0, 340, W, H - 340);
+
+        if (inspecting) {
+          // Dimmed background
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+          ctx.fillRect(0, 0, W, H);
+
+          // Inspection view
+          const obj = inspecting;
+          const cx = W / 2, cy = H / 2 - 20;
+          const scale = 3.5;
+          const showBack = Math.abs(((inspectRotation % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) - Math.PI) < Math.PI / 2;
+
+          ctx.save();
+          ctx.translate(cx, cy);
+          const scaleX = Math.cos(inspectRotation) * scale;
+          ctx.scale(scaleX === 0 ? 0.01 : scaleX, scale);
+
+          ctx.fillStyle = obj.color;
+          ctx.fillRect(-obj.w / 2, -obj.h / 2, obj.w, obj.h);
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 0.5;
+          ctx.strokeRect(-obj.w / 2, -obj.h / 2, obj.w, obj.h);
+
+          // Detail marks
+          if (showBack) {
+            ctx.fillStyle = '#443322';
+            ctx.font = '6px monospace';
+            ctx.fillText('~text~', -obj.w/4, 0);
+          } else {
+            ctx.fillStyle = 'rgba(255,255,255,0.3)';
+            ctx.font = '5px monospace';
+            ctx.fillText(obj.name, -obj.w/3, -obj.h/4);
+          }
+          ctx.restore();
+
+          // Text
+          const text = showBack ? obj.backText : obj.frontText;
+          ctx.fillStyle = '#0d1520';
+          ctx.fillRect(60, H - 100, W - 120, 60);
+          ctx.strokeStyle = '#3a5a7a';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(60, H - 100, W - 120, 60);
+          ctx.fillStyle = showBack ? '#ffcc66' : '#ccddee';
+          ctx.font = '14px monospace';
+          // Word wrap
+          const words = text.split(' ');
+          let line = '';
+          let ly = H - 78;
+          for (const w of words) {
+            const test = line + w + ' ';
+            if (ctx.measureText(test).width > W - 160) {
+              ctx.fillText(line, 80, ly);
+              line = w + ' ';
+              ly += 20;
+            } else {
+              line = test;
+            }
+          }
+          ctx.fillText(line, 80, ly);
+
+          if (showBack) {
+            ctx.fillStyle = '#ffcc66';
+            ctx.font = 'bold 11px monospace';
+            ctx.fillText('BACK SIDE', cx - 30, cy - obj.h * scale / 2 - 20);
+          }
+
+          // Close button
+          ctx.fillStyle = '#442222';
+          ctx.fillRect(W - 50, 10, 30, 30);
+          ctx.strokeStyle = '#ff6644';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(W - 50, 10, 30, 30);
+          ctx.strokeStyle = '#ff6644';
+          ctx.beginPath();
+          ctx.moveTo(W - 43, 17); ctx.lineTo(W - 27, 33);
+          ctx.moveTo(W - 27, 17); ctx.lineTo(W - 43, 33);
+          ctx.stroke();
+
+          // Hint
+          ctx.fillStyle = '#667788';
+          ctx.font = '11px monospace';
+          ctx.fillText('Drag left/right to rotate. Some objects have hidden text on the back!', 60, H - 8);
+        } else {
+          // Draw objects in scene
+          for (const obj of objects) {
+            ctx.fillStyle = obj.color;
+            ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
+
+            // Highlight border
+            ctx.strokeStyle = '#ffdd88';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 3]);
+            ctx.strokeRect(obj.x - 3, obj.y - 3, obj.w + 6, obj.h + 6);
+            ctx.setLineDash([]);
+
+            // Label
+            ctx.fillStyle = '#aabbcc';
+            ctx.font = '11px monospace';
+            ctx.fillText(obj.name, obj.x, obj.y - 8);
+
+            // Click to inspect hint icon
+            ctx.fillStyle = 'rgba(255,220,130,0.6)';
+            ctx.font = '14px monospace';
+            ctx.fillText('+', obj.x + obj.w - 10, obj.y + 14);
+          }
+
+          ctx.fillStyle = '#556677';
+          ctx.font = '12px monospace';
+          ctx.fillText('Click on any highlighted object to inspect it.', 20, H - 15);
+        }
+      }
+
+      canvas.addEventListener('click', function(e) {
+        const rect = canvas.getBoundingClientRect();
+        const mx = (e.clientX - rect.left) * (W / rect.width);
+        const my = (e.clientY - rect.top) * (H / rect.height);
+
+        if (inspecting) {
+          // Close button
+          if (mx >= W - 50 && mx <= W - 20 && my >= 10 && my <= 40) {
+            inspecting = null;
+            inspectRotation = 0;
+            drawScene();
+          }
+          return;
+        }
+
+        for (const obj of objects) {
+          if (mx >= obj.x - 3 && mx <= obj.x + obj.w + 3 && my >= obj.y - 3 && my <= obj.y + obj.h + 3) {
+            inspecting = obj;
+            inspectRotation = 0;
+            drawScene();
+            return;
+          }
+        }
+      });
+
+      canvas.addEventListener('mousedown', function(e) {
+        if (inspecting) {
+          dragStart = e.offsetX;
+        }
+      });
+
+      canvas.addEventListener('mousemove', function(e) {
+        if (inspecting && dragStart !== null) {
+          const dx = e.offsetX - dragStart;
+          inspectRotation += dx * 0.02;
+          dragStart = e.offsetX;
+          drawScene();
+        }
+      });
+
+      canvas.addEventListener('mouseup', function() { dragStart = null; });
+      canvas.addEventListener('mouseleave', function() { dragStart = null; });
+
+      window.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && inspecting) {
+          inspecting = null;
+          inspectRotation = 0;
+          drawScene();
+        }
+      });
+
+      drawScene();
+    })();
+  </script>
+</BaseLayout>

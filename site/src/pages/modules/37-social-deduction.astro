@@ -1,0 +1,847 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 37: Social Deduction">
+  <div class="container page-content">
+    <div class="module-header">
+      <div class="module-number">Module 37</div>
+      <h1>Social Deduction</h1>
+      <p class="module-theme">Build a game where trust is a weapon and suspicion is a strategy | Who Among Us?</p>
+    </div>
+
+    <blockquote>
+      "In a game of perfect information, the best player wins. In a game of hidden information, the best liar wins."
+    </blockquote>
+
+    <hr />
+
+    <h2>Prerequisites</h2>
+    <table>
+      <thead>
+        <tr><th>Module</th><th>What You Used From It</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Module 01 - Pong</td><td>A working game loop and basic input handling.</td></tr>
+        <tr><td>Module 35 - Party Game</td><td>Multiplayer input handling, lobby/join systems, and round-based game structure. Social deduction builds on the party game framework with hidden roles and asymmetric information.</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h2>Week 1: History &amp; Design Theory</h2>
+
+    <h3>The Origin</h3>
+    <p>The social deduction genre was invented in the psychology department of Moscow State University. In 1986, Dimitry Davidoff created <strong>Mafia</strong> as a classroom exercise exploring the tension between an informed minority and an uninformed majority. The rules were elegant: a small group of "mafia" members secretly chose someone to eliminate each night, while the larger group of "townspeople" debated during the day about who to vote out. No board, no cards, no technology &mdash; just people, deception, and the human inability to reliably detect lies. Mafia spread virally through campuses and social circles across the Soviet Union and eventually worldwide. It proved that the most compelling game mechanic is not any system a designer can build but rather the human instinct to read faces, challenge stories, and construct theories about who is lying.</p>
+
+    <h3>How the Genre Evolved</h3>
+    <p><strong>Mafia / Werewolf (Dimitry Davidoff, 1986; Andrew Plotkin, 1997)</strong> &mdash; Mafia established the genre's DNA: hidden roles, day/night cycles, group discussion, and elimination voting. Andrew Plotkin's re-skin as "Werewolf" in 1997 added thematic flavor and made the game more accessible to Western audiences. The core insight was that the game needed no referee AI, no complex rules, and no technology &mdash; just a social contract where some players lie and others try to catch them.</p>
+
+    <p><strong>Town of Salem (BlankMediaGames, 2014)</strong> &mdash; Brought social deduction to the browser with dozens of unique roles (Sheriff, Doctor, Serial Killer, Jester), text-based chat for discussion, and automated night phases. Town of Salem proved the genre could work digitally without voice chat or physical presence. The Jester role &mdash; a player who wins by tricking others into voting them out &mdash; showed that asymmetric win conditions create emergent gameplay.</p>
+
+    <p><strong>Among Us (InnerSloth, 2018/2020)</strong> &mdash; Replaced the text-based discussion format with real-time spatial gameplay. Crewmates walk around a map completing tasks while impostors sabotage and kill. The genius of Among Us was giving players physical alibis: "I was in Medbay doing the scan" is verifiable if someone else was there too. Among Us became a global phenomenon during 2020 by combining accessible controls, short game sessions, and the irresistible drama of accusing friends of murder.</p>
+
+    <h3>What Makes It "Great"</h3>
+    <p>A great social deduction game creates genuine tension from asymmetric knowledge. The impostors know everything; the crew knows almost nothing. This imbalance generates the core emotions: paranoia for the crew, exhilaration for the impostors, and mounting dread for everyone as the player count shrinks. The discussion phase is where the game truly lives &mdash; accusation, defense, alliance, and betrayal all happen through conversation, making every group's experience unique. The best games give both sides meaningful actions so that no one is ever just waiting. And the moment of truth &mdash; the vote that eliminates a player, the reveal of whether they were innocent or guilty &mdash; must land with weight.</p>
+
+    <h3>The Essential Mechanic</h3>
+    <p>Deception and detection &mdash; game mechanics create structured social interaction where lying is a core strategy.</p>
+
+    <hr />
+
+    <h2>Week 2: Build the MVP</h2>
+
+    <h3>What You're Building</h3>
+    <p>A social deduction game for 4-8 players where one or two players are secretly assigned the "impostor" role while the rest are "crew." Crew members complete tasks to win. Impostors fake tasks and eliminate crew members. When a body is found or an emergency meeting is called, all players discuss and vote to eliminate a suspect. The game ends when all impostors are eliminated (crew wins) or impostors equal or outnumber crew (impostor wins).</p>
+
+    <h3>Core Concepts</h3>
+
+    <h4>1. Hidden Role Assignment</h4>
+    <p>At game start, roles are secretly assigned. Each player knows their own role but does not know the roles of others (except impostors, who know each other). The assignment must be random, fair, and provably hidden from other players.</p>
+    <pre is:raw><code>function assignRoles(players, impostorCount):
+    assert impostorCount < players.length / 2
+    shuffled = shuffleArray(copyOf(players))
+    roles = {}
+    for i in range(shuffled.length):
+        if i < impostorCount:
+            roles[shuffled[i].id] = IMPOSTOR
+        else:
+            roles[shuffled[i].id] = CREW
+    // Notify each player privately
+    for each player in players:
+        player.role = roles[player.id]
+        showRoleReveal(player, roles[player.id])
+
+// For shared-screen play: sequential role reveal
+function sequentialRoleReveal(players, roles):
+    for each player in players:
+        showScreen("Pass the device to " + player.name)
+        waitForConfirm()
+        showScreen("Your role: " + roles[player.id], duration: 3 seconds)</code></pre>
+    <p><strong>Why it matters:</strong> The entire game rests on role secrecy. If a player's role is leaked &mdash; through a screen reflection, a tell in the UI, or a bug in the assignment &mdash; the game is ruined. The reveal sequence must be designed for the physical context and must feel dramatic, not administrative.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Hidden Role Reveal</div>
+      <p class="demo-hint">Click "Assign Roles" for a group of 6 players. Click each player card to peek at their role (impostor or crew). Cards flip with animation. Impostors show red, crew shows blue &mdash; only visible when peeked. Click again to hide.</p>
+      <canvas id="demo-roles" width="760" height="420"></canvas>
+      <div class="demo-controls">
+        <button id="roles-assign">Assign Roles</button>
+        <button id="roles-reveal-all">Reveal All</button>
+        <button id="roles-hide-all">Hide All</button>
+        <span class="value-display" id="roles-status">Click "Assign Roles" to begin</span>
+      </div>
+    </div>
+
+    <h4>2. Voting / Accusation System</h4>
+    <p>During discussion phases, players nominate suspects and vote to eliminate someone. The player with the most votes is removed from the game. Ties and abstentions must be handled.</p>
+    <pre is:raw><code>class VotingSystem:
+    nominations = {}
+    votes = {}
+    alivePlayers = []
+    phase = DISCUSSION
+
+    function castVote(voterId, targetId):
+        if voterId in votes: return
+        if voterId NOT in alivePlayers: return
+        votes[voterId] = targetId
+        if votes.length == alivePlayers.length: resolveVote()
+
+    function resolveVote():
+        tallies = countVotes(votes)
+        skipVotes = tallies.get(SKIP, 0)
+        maxVotes = max(tallies.values())
+        playersWithMax = [p for p, count in tallies if count == maxVotes AND p != SKIP]
+        if skipVotes >= maxVotes OR playersWithMax.length > 1:
+            showResult("No one was ejected. (Tie/Skip)")
+        else:
+            eliminated = playersWithMax[0]
+            eliminatePlayer(eliminated)
+            showResult(eliminated.name + " was ejected. They were " + eliminated.role)</code></pre>
+    <p><strong>Why it matters:</strong> The vote is the moment where social pressure becomes game mechanics. A wrong vote eliminates an innocent player and brings the impostors closer to victory. A correct vote removes a threat. Allowing "skip" prevents the crew from being forced into blind guesses.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Voting System</div>
+      <p class="demo-hint">6 player cards with hidden roles. Click a player to nominate them, then click "Vote" to cast votes. Majority rules &mdash; ties mean no elimination. After elimination, the player's role is revealed. Was it crew or impostor?</p>
+      <canvas id="demo-voting" width="760" height="420"></canvas>
+      <div class="demo-controls">
+        <button id="vote-new-game">New Game</button>
+        <button id="vote-skip">Skip Vote</button>
+        <button id="vote-cast">Cast Votes</button>
+        <span class="value-display" id="vote-status">Click "New Game" to start</span>
+      </div>
+    </div>
+
+    <h4>3. Phase-based Gameplay</h4>
+    <p>The game alternates between distinct phases: a free-roam/task phase where players move and act, and a discussion/voting phase triggered by events.</p>
+    <pre is:raw><code>GAME_PHASES:
+    ROLE_REVEAL -> FREE_ROAM -> BODY_FOUND -> DISCUSSION -> VOTING -> VOTE_RESULT -> GAME_OVER
+
+class GamePhaseManager:
+    currentPhase = ROLE_REVEAL
+
+    function update(deltaTime):
+        switch currentPhase:
+            case FREE_ROAM:
+                updatePlayerMovement()
+                updateTasks()
+                updateImpostorActions()
+                if bodyReported OR emergencyMeetingCalled:
+                    transitionTo(BODY_FOUND)
+            case DISCUSSION:
+                timer -= deltaTime
+                if timer <= 0: transitionTo(VOTING)
+            case VOTING:
+                if timer <= 0: autoSkipRemainingVoters()
+            case VOTE_RESULT:
+                showEjectionAnimation()
+                if checkWinCondition(): transitionTo(GAME_OVER)</code></pre>
+    <p><strong>Why it matters:</strong> Phase separation creates rhythm. Free-roam is tense and quiet. Discussion is loud and chaotic. The shift between these modes creates an emotional roller coaster that a single-phase game cannot match.</p>
+
+    <h4>4. Task / Objective System</h4>
+    <p>Crew members have a secondary win condition: complete all tasks. Tasks give crew members a reason to move around the map and create alibis.</p>
+    <pre is:raw><code>class TaskSystem:
+    totalTaskSteps = 0
+    completedTaskSteps = 0
+
+    function completeTask(player, task):
+        task.completed = true
+        completedTaskSteps += 1
+        updateTaskBar(completedTaskSteps / totalTaskSteps)
+        if completedTaskSteps >= totalTaskSteps:
+            triggerCrewWin("All tasks completed!")</code></pre>
+    <p><strong>Why it matters:</strong> Tasks serve three design purposes simultaneously. First, they are an alternative win condition. Second, they force movement, which creates encounters and alibis. Third, the task bar is a visible clock: if the impostors do not act fast enough, the crew will simply complete all tasks and win.</p>
+
+    <h4>5. Kill / Sabotage Mechanics</h4>
+    <p>Impostors can eliminate crew members and sabotage systems. Both actions must be performed without being seen.</p>
+    <pre is:raw><code>class ImpostorActions:
+    killCooldown = 30
+    killRange = 1.5
+    timeSinceLastKill = 30
+
+    function attemptKill(impostor, target):
+        if NOT canKill(): return false
+        if distance(impostor.position, target.position) > killRange: return false
+        if target.role == IMPOSTOR: return false
+        target.alive = false
+        spawnBody(target.deathPosition, target.id)
+        timeSinceLastKill = 0
+        return true</code></pre>
+    <p><strong>Why it matters:</strong> The kill cooldown is the impostor's core tension: you can only act every 30 seconds, so timing and positioning matter enormously. Sabotage adds a strategic layer &mdash; calling lights off creates cover for a kill.</p>
+
+    <h4>6. Information Asymmetry</h4>
+    <p>The fundamental mechanic of social deduction is that different players have different information. Impostors know who each other are; crew members know only their own role.</p>
+    <pre is:raw><code>INFORMATION_RULES:
+    CREW:
+        knows: [own_role, own_tasks, task_bar_progress, who_is_alive]
+        does_not_know: [other_roles, who_killed_whom]
+    IMPOSTOR:
+        knows: [own_role, other_impostors, all_crew_knows]
+        sees: [sabotage_options]</code></pre>
+    <p><strong>Why it matters:</strong> Information asymmetry IS social deduction. Every design decision must be evaluated through the lens of "what does each player know?" The sweet spot is where crew members have enough partial information to construct theories but not enough to be certain.</p>
+
+    <h4>7. Proximity / Visibility Mechanics</h4>
+    <p>Who can see what &mdash; and who was near the body &mdash; drives spatial deduction. Vision range, line of sight, and movement tracking create physical alibis and evidence that fuel discussion.</p>
+    <pre is:raw><code>VISION_CONFIG:
+    CREW_NORMAL:     range = 5.0
+    CREW_LIGHTS_OFF: range = 2.0
+    IMPOSTOR:        range = 7.0
+    GHOST:           range = INFINITE</code></pre>
+    <p><strong>Why it matters:</strong> Physical space turns abstract suspicion into concrete evidence. "I saw Red walk toward Electrical, and then the lights went off" is a deduction based on proximity and timing. The map is not just a play space &mdash; it is an information environment.</p>
+
+    <hr />
+
+    <h3>Stretch Goals</h3>
+    <ol>
+      <li>Add unique crew roles with special abilities (Scanner who can confirm one player, Medic who can protect one player per night).</li>
+      <li>Implement vent/shortcut system for impostors to move unseen.</li>
+      <li>Add a "ghost task" system so eliminated players can still contribute.</li>
+      <li>Create a post-game replay showing all player movements.</li>
+      <li>Add emergency meeting cooldowns and limits.</li>
+      <li>Implement a text chat or voice proximity chat system.</li>
+    </ol>
+
+    <h3>MVP Spec</h3>
+    <table>
+      <thead>
+        <tr><th>Element</th><th>Scope</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Players</td><td>4-8 players (networked or hot-seat with hidden role screens)</td></tr>
+        <tr><td>Roles</td><td>2 roles: Crew and Impostor (1-2 impostors depending on player count)</td></tr>
+        <tr><td>Map</td><td>Single 2D map with 4-6 rooms connected by hallways</td></tr>
+        <tr><td>Tasks</td><td>3-5 simple tasks per crew member</td></tr>
+        <tr><td>Kill</td><td>Impostors can eliminate adjacent crew members with a cooldown</td></tr>
+        <tr><td>Report</td><td>Players can report bodies they find, triggering a meeting</td></tr>
+        <tr><td>Discussion</td><td>Timed discussion phase (60-90 seconds)</td></tr>
+        <tr><td>Voting</td><td>Each player votes to eliminate or skips, majority rules, ties = no elimination</td></tr>
+        <tr><td>Win conditions</td><td>Crew wins by completing all tasks or ejecting all impostors; Impostors win when they equal remaining crew</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliverable</h3>
+    <p>A playable social deduction game where players are assigned hidden roles, move around a 2D map, complete tasks or perform kills, report bodies to trigger discussion phases, and vote to eliminate suspects. The game must support at least 4 players with functional win conditions for both sides. A playtest session should produce genuine accusations, defenses, and the satisfying reveal of whether the voted player was crew or impostor.</p>
+
+    <hr />
+
+    <h2>Analogies by Background</h2>
+
+    <blockquote>
+      <p>These analogies map game dev concepts to patterns you already know. Find your background below.</p>
+    </blockquote>
+
+    <h3>For Backend Developers</h3>
+    <table>
+      <thead>
+        <tr><th>Concept</th><th>Analogy</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Hidden role assignment</td><td>Like secrets management &mdash; each service receives its own credentials at startup, and leaking any secret compromises the system</td></tr>
+        <tr><td>Voting / accusation system</td><td>Like distributed consensus with Byzantine fault tolerance &mdash; the majority must agree while some nodes are actively lying</td></tr>
+        <tr><td>Phase-based gameplay</td><td>Like a state machine in a workflow engine &mdash; each phase has entry/exit conditions and allowed actions</td></tr>
+        <tr><td>Task / objective system</td><td>Like background worker jobs &mdash; tasks run independently and report completion to a shared tracker</td></tr>
+        <tr><td>Kill / sabotage mechanics</td><td>Like a security breach simulation &mdash; an attacker operates within the system, exploiting cooldown windows</td></tr>
+        <tr><td>Information asymmetry</td><td>Like role-based access control (RBAC) &mdash; each user sees only what their permissions allow</td></tr>
+        <tr><td>Proximity / visibility</td><td>Like network topology and service discovery &mdash; services can only see others within their subnet</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Frontend Developers</h3>
+    <table>
+      <thead>
+        <tr><th>Concept</th><th>Analogy</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Hidden role assignment</td><td>Like personalized UI rendering &mdash; each user sees a different version based on their role</td></tr>
+        <tr><td>Voting / accusation system</td><td>Like a poll component with real-time results &mdash; users submit choices and the aggregated result is revealed</td></tr>
+        <tr><td>Phase-based gameplay</td><td>Like a multi-step form wizard with conditional routing</td></tr>
+        <tr><td>Task / objective system</td><td>Like a progress tracker in an onboarding flow &mdash; individual steps complete independently</td></tr>
+        <tr><td>Kill / sabotage mechanics</td><td>Like destructive UI actions behind confirmation gates &mdash; powerful, rate-limited, context-dependent</td></tr>
+        <tr><td>Information asymmetry</td><td>Like conditional rendering based on user role &mdash; admin sees more than regular users</td></tr>
+        <tr><td>Proximity / visibility</td><td>Like viewport-based lazy loading &mdash; only render elements within the visible area</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Data / ML Engineers</h3>
+    <table>
+      <thead>
+        <tr><th>Concept</th><th>Analogy</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Hidden role assignment</td><td>Like train/test split labels &mdash; each data point has a hidden label, and label leakage invalidates the experiment</td></tr>
+        <tr><td>Voting / accusation system</td><td>Like ensemble model voting for classification &mdash; each model casts a vote and majority determines the output</td></tr>
+        <tr><td>Phase-based gameplay</td><td>Like alternating training phases (e.g., GAN training) &mdash; different objectives and update rules alternate</td></tr>
+        <tr><td>Task / objective system</td><td>Like a distributed training job with a shared loss metric</td></tr>
+        <tr><td>Kill / sabotage mechanics</td><td>Like adversarial attacks on a model &mdash; injecting perturbations while trying to remain undetected</td></tr>
+        <tr><td>Information asymmetry</td><td>Like the explore/exploit tradeoff in multi-armed bandits</td></tr>
+        <tr><td>Proximity / visibility</td><td>Like spatial locality in graph neural networks &mdash; a node can only aggregate from neighbors within a radius</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li><strong>Designing for deception:</strong> Most games penalize dishonesty. Social deduction games require and reward it. How does designing a system where lying is valid change your approach to game rules and community management?</li>
+      <li><strong>The spectator problem:</strong> Eliminated players must wait until the game ends. Among Us partially solved this with ghost tasks. What other approaches could keep eliminated players engaged?</li>
+      <li><strong>Scaling trust:</strong> Mafia works with 7+ players in a room. Among Us works with 4-10 online. How does player count change the social dynamics? At what point is the group too small or too large?</li>
+      <li><strong>Asymmetric fun:</strong> Is it more fun to be the impostor or the crew? Most players prefer impostor, but crew outnumbers impostors 3-to-1. How do you make the crew role compelling?</li>
+    </ol>
+
+    <nav class="module-nav">
+      <a href={`${base}modules/36-trivia/`}>&larr; Module 36: Trivia</a>
+      <a href={`${base}modules/38-sandbox/`}>Module 38: Sandbox &rarr;</a>
+    </nav>
+  </div>
+</BaseLayout>
+
+<script>
+// ============================================================
+// DEMO 1: Hidden Role Reveal
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-roles');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const CARD_W = 100, CARD_H = 140, GAP = 20;
+  const PLAYER_NAMES = ['Alice', 'Bob', 'Carol', 'Dave', 'Eve', 'Frank'];
+  const PLAYER_COLORS = ['#ff6b6b', '#4e9af5', '#6bcb77', '#ffd93d', '#a78bfa', '#f97316'];
+
+  let players = [];
+  let rolesAssigned = false;
+
+  function assignRoles() {
+    const shuffled = [...Array(6).keys()];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    players = PLAYER_NAMES.map((name, i) => ({
+      name,
+      color: PLAYER_COLORS[i],
+      role: shuffled.indexOf(i) < 2 ? 'Impostor' : 'Crew',
+      revealed: false,
+      flipProgress: 0,
+      flipDirection: 0, // 0 = idle, 1 = flipping to reveal, -1 = flipping to hide
+      alive: true
+    }));
+    rolesAssigned = true;
+  }
+
+  function getCardRect(i) {
+    const totalW = 6 * CARD_W + 5 * GAP;
+    const startX = (W - totalW) / 2;
+    return {
+      x: startX + i * (CARD_W + GAP),
+      y: (H - CARD_H) / 2 - 20,
+      w: CARD_W,
+      h: CARD_H
+    };
+  }
+
+  canvas.addEventListener('click', (e) => {
+    if (!rolesAssigned) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) * (W / rect.width);
+    const my = (e.clientY - rect.top) * (H / rect.height);
+
+    for (let i = 0; i < players.length; i++) {
+      const cr = getCardRect(i);
+      if (mx >= cr.x && mx <= cr.x + cr.w && my >= cr.y && my <= cr.y + cr.h) {
+        if (players[i].flipDirection === 0) {
+          players[i].flipDirection = players[i].revealed ? -1 : 1;
+        }
+        break;
+      }
+    }
+  });
+
+  document.getElementById('roles-assign').addEventListener('click', assignRoles);
+  document.getElementById('roles-reveal-all').addEventListener('click', () => {
+    for (const p of players) {
+      if (!p.revealed && p.flipDirection === 0) p.flipDirection = 1;
+    }
+  });
+  document.getElementById('roles-hide-all').addEventListener('click', () => {
+    for (const p of players) {
+      if (p.revealed && p.flipDirection === 0) p.flipDirection = -1;
+    }
+  });
+
+  let lastTime = performance.now();
+  function update(now) {
+    const dt = (now - lastTime) / 1000;
+    lastTime = now;
+
+    for (const p of players) {
+      if (p.flipDirection === 1) {
+        p.flipProgress += dt * 3;
+        if (p.flipProgress >= 1) {
+          p.flipProgress = 1;
+          p.revealed = true;
+          p.flipDirection = 0;
+        }
+      } else if (p.flipDirection === -1) {
+        p.flipProgress -= dt * 3;
+        if (p.flipProgress <= 0) {
+          p.flipProgress = 0;
+          p.revealed = false;
+          p.flipDirection = 0;
+        }
+      }
+    }
+
+    const impostors = players.filter(p => p.revealed && p.role === 'Impostor').length;
+    const crew = players.filter(p => p.revealed && p.role === 'Crew').length;
+    document.getElementById('roles-status').textContent = rolesAssigned
+      ? 'Revealed: ' + impostors + ' impostors, ' + crew + ' crew (click cards to peek)'
+      : 'Click "Assign Roles" to begin';
+
+    draw();
+    requestAnimationFrame(update);
+  }
+
+  function draw() {
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, W, H);
+
+    if (!rolesAssigned) {
+      ctx.fillStyle = '#e0e0e0';
+      ctx.font = 'bold 24px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Hidden Role Assignment', W / 2, H / 2 - 20);
+      ctx.font = '16px Inter, sans-serif';
+      ctx.fillStyle = '#888888';
+      ctx.fillText('Click "Assign Roles" to secretly assign 2 impostors among 6 players', W / 2, H / 2 + 15);
+      return;
+    }
+
+    // Title
+    ctx.fillStyle = '#e0e0e0';
+    ctx.font = 'bold 16px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Click a card to peek at their role', W / 2, 25);
+
+    // Draw cards
+    for (let i = 0; i < players.length; i++) {
+      const p = players[i];
+      const cr = getCardRect(i);
+
+      // Flip animation using scale transform
+      const flipPhase = p.flipProgress;
+      const scaleX = Math.abs(Math.cos(flipPhase * Math.PI));
+      const showBack = flipPhase > 0.5;
+
+      ctx.save();
+      ctx.translate(cr.x + cr.w / 2, cr.y + cr.h / 2);
+      ctx.scale(scaleX, 1);
+
+      if (showBack) {
+        // Show role (revealed side)
+        const roleColor = p.role === 'Impostor' ? '#c0392b' : '#2980b9';
+        ctx.fillStyle = roleColor;
+        ctx.beginPath();
+        const r = 8;
+        ctx.moveTo(-cr.w / 2 + r, -cr.h / 2);
+        ctx.lineTo(cr.w / 2 - r, -cr.h / 2);
+        ctx.quadraticCurveTo(cr.w / 2, -cr.h / 2, cr.w / 2, -cr.h / 2 + r);
+        ctx.lineTo(cr.w / 2, cr.h / 2 - r);
+        ctx.quadraticCurveTo(cr.w / 2, cr.h / 2, cr.w / 2 - r, cr.h / 2);
+        ctx.lineTo(-cr.w / 2 + r, cr.h / 2);
+        ctx.quadraticCurveTo(-cr.w / 2, cr.h / 2, -cr.w / 2, cr.h / 2 - r);
+        ctx.lineTo(-cr.w / 2, -cr.h / 2 + r);
+        ctx.quadraticCurveTo(-cr.w / 2, -cr.h / 2, -cr.w / 2 + r, -cr.h / 2);
+        ctx.fill();
+
+        // Role icon
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 36px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(p.role === 'Impostor' ? '!' : 'C', 0, 5);
+
+        ctx.font = 'bold 14px Inter, sans-serif';
+        ctx.fillText(p.role, 0, 30);
+
+        ctx.font = '12px Inter, sans-serif';
+        ctx.fillStyle = '#ffffffaa';
+        ctx.fillText(p.name, 0, -cr.h / 2 + 18);
+      } else {
+        // Show back (hidden side)
+        ctx.fillStyle = '#2a2a4e';
+        ctx.beginPath();
+        const r = 8;
+        ctx.moveTo(-cr.w / 2 + r, -cr.h / 2);
+        ctx.lineTo(cr.w / 2 - r, -cr.h / 2);
+        ctx.quadraticCurveTo(cr.w / 2, -cr.h / 2, cr.w / 2, -cr.h / 2 + r);
+        ctx.lineTo(cr.w / 2, cr.h / 2 - r);
+        ctx.quadraticCurveTo(cr.w / 2, cr.h / 2, cr.w / 2 - r, cr.h / 2);
+        ctx.lineTo(-cr.w / 2 + r, cr.h / 2);
+        ctx.quadraticCurveTo(-cr.w / 2, cr.h / 2, -cr.w / 2, cr.h / 2 - r);
+        ctx.lineTo(-cr.w / 2, -cr.h / 2 + r);
+        ctx.quadraticCurveTo(-cr.w / 2, -cr.h / 2, -cr.w / 2 + r, -cr.h / 2);
+        ctx.fill();
+
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(-cr.w / 2 + 4, -cr.h / 2 + 4, cr.w - 8, cr.h - 8);
+
+        ctx.fillStyle = p.color;
+        ctx.font = 'bold 16px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(p.name, 0, -10);
+
+        ctx.fillStyle = '#888888';
+        ctx.font = '28px Inter, sans-serif';
+        ctx.fillText('?', 0, 25);
+
+        ctx.font = '11px Inter, sans-serif';
+        ctx.fillStyle = '#666688';
+        ctx.fillText('click to peek', 0, cr.h / 2 - 12);
+      }
+
+      ctx.restore();
+    }
+
+    // Legend
+    ctx.font = '13px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#888888';
+    ctx.fillText('2 Impostors (red) hidden among 4 Crew (blue)', W / 2, H - 25);
+  }
+
+  requestAnimationFrame(update);
+})();
+
+// ============================================================
+// DEMO 2: Voting System
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-voting');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const NAMES = ['Alice', 'Bob', 'Carol', 'Dave', 'Eve', 'Frank'];
+  const COLORS = ['#ff6b6b', '#4e9af5', '#6bcb77', '#ffd93d', '#a78bfa', '#f97316'];
+
+  let players = [];
+  let nominated = -1;
+  let votes = {}; // voterId -> targetId or 'skip'
+  let phase = 'idle'; // idle, nominating, voting, result
+  let eliminationLog = [];
+  let resultText = '';
+  let resultTimer = 0;
+
+  function newGame() {
+    const shuffled = [...Array(6).keys()];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    players = NAMES.map((name, i) => ({
+      id: i,
+      name,
+      color: COLORS[i],
+      role: shuffled.indexOf(i) < 2 ? 'Impostor' : 'Crew',
+      alive: true,
+      voted: false
+    }));
+    nominated = -1;
+    votes = {};
+    phase = 'nominating';
+    eliminationLog = [];
+    resultText = '';
+  }
+
+  function getCardRect(i) {
+    const cols = 3;
+    const CARD_W = 120, CARD_H = 100, GAP = 15;
+    const row = Math.floor(i / cols);
+    const col = i % cols;
+    const totalW = cols * CARD_W + (cols - 1) * GAP;
+    const startX = (W - totalW) / 2;
+    return {
+      x: startX + col * (CARD_W + GAP),
+      y: 60 + row * (CARD_H + GAP),
+      w: CARD_W,
+      h: CARD_H
+    };
+  }
+
+  canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) * (W / rect.width);
+    const my = (e.clientY - rect.top) * (H / rect.height);
+
+    if (phase === 'nominating') {
+      for (let i = 0; i < players.length; i++) {
+        if (!players[i].alive) continue;
+        const cr = getCardRect(i);
+        if (mx >= cr.x && mx <= cr.x + cr.w && my >= cr.y && my <= cr.y + cr.h) {
+          nominated = i;
+          break;
+        }
+      }
+    }
+  });
+
+  document.getElementById('vote-new-game').addEventListener('click', newGame);
+
+  document.getElementById('vote-skip').addEventListener('click', () => {
+    if (phase !== 'nominating') return;
+    // All alive players vote skip
+    votes = {};
+    const alive = players.filter(p => p.alive);
+    for (const p of alive) votes[p.id] = 'skip';
+    resolveVote();
+  });
+
+  document.getElementById('vote-cast').addEventListener('click', () => {
+    if (phase !== 'nominating' || nominated < 0) return;
+    // Simulate vote: each alive player has varying chance to vote for nominated
+    votes = {};
+    const alive = players.filter(p => p.alive);
+    for (const p of alive) {
+      if (p.id === nominated) {
+        votes[p.id] = 'skip'; // Can't vote for yourself
+      } else {
+        votes[p.id] = Math.random() < 0.6 ? nominated : 'skip';
+      }
+    }
+    phase = 'voting';
+    resultTimer = 2.5;
+    setTimeout(() => resolveVote(), 500);
+  });
+
+  function resolveVote() {
+    const tallies = {};
+    let skipCount = 0;
+    for (const [vid, target] of Object.entries(votes)) {
+      if (target === 'skip') {
+        skipCount++;
+      } else {
+        tallies[target] = (tallies[target] || 0) + 1;
+      }
+    }
+
+    let maxVotes = 0;
+    let maxPlayers = [];
+    for (const [pid, count] of Object.entries(tallies)) {
+      if (count > maxVotes) {
+        maxVotes = count;
+        maxPlayers = [parseInt(pid)];
+      } else if (count === maxVotes) {
+        maxPlayers.push(parseInt(pid));
+      }
+    }
+
+    if (skipCount >= maxVotes || maxPlayers.length > 1) {
+      resultText = 'No one was ejected! ' + (maxPlayers.length > 1 ? '(Tie)' : '(Skip majority)');
+    } else {
+      const eliminated = maxPlayers[0];
+      players[eliminated].alive = false;
+      resultText = players[eliminated].name + ' was ejected! They were ' + players[eliminated].role + '.';
+      eliminationLog.push({ name: players[eliminated].name, role: players[eliminated].role });
+    }
+
+    phase = 'result';
+    resultTimer = 3;
+
+    // Check win conditions
+    const aliveImpostors = players.filter(p => p.alive && p.role === 'Impostor').length;
+    const aliveCrew = players.filter(p => p.alive && p.role === 'Crew').length;
+    if (aliveImpostors === 0) {
+      resultText += ' CREW WINS!';
+    } else if (aliveImpostors >= aliveCrew) {
+      resultText += ' IMPOSTORS WIN!';
+    }
+  }
+
+  let lastTime = performance.now();
+  function update(now) {
+    const dt = (now - lastTime) / 1000;
+    lastTime = now;
+
+    if (phase === 'result') {
+      resultTimer -= dt;
+      if (resultTimer <= 0) {
+        const aliveImpostors = players.filter(p => p.alive && p.role === 'Impostor').length;
+        const aliveCrew = players.filter(p => p.alive && p.role === 'Crew').length;
+        if (aliveImpostors === 0 || aliveImpostors >= aliveCrew) {
+          phase = 'idle';
+        } else {
+          phase = 'nominating';
+          nominated = -1;
+          votes = {};
+        }
+      }
+    }
+
+    const statusEl = document.getElementById('vote-status');
+    if (phase === 'idle') statusEl.textContent = 'Game over! Click "New Game" to play again.';
+    else if (phase === 'nominating') statusEl.textContent = 'Click a player to nominate, then "Cast Votes". ' + (nominated >= 0 ? 'Nominated: ' + players[nominated].name : 'No nomination yet.');
+    else if (phase === 'voting') statusEl.textContent = 'Votes are being cast...';
+    else if (phase === 'result') statusEl.textContent = resultText;
+
+    draw();
+    requestAnimationFrame(update);
+  }
+
+  function draw() {
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, W, H);
+
+    if (phase === 'idle' && players.length === 0) {
+      ctx.fillStyle = '#e0e0e0';
+      ctx.font = 'bold 24px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Voting System Demo', W / 2, H / 2 - 20);
+      ctx.font = '16px Inter, sans-serif';
+      ctx.fillStyle = '#888888';
+      ctx.fillText('Click "New Game" to assign roles and start voting', W / 2, H / 2 + 15);
+      return;
+    }
+
+    // Title
+    ctx.fillStyle = '#e0e0e0';
+    ctx.font = 'bold 16px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Emergency Meeting - Vote to Eliminate', W / 2, 25);
+
+    // Player info
+    const alivePlayers = players.filter(p => p.alive).length;
+    ctx.fillStyle = '#888888';
+    ctx.font = '12px Inter, sans-serif';
+    ctx.fillText('Alive: ' + alivePlayers + ' | Impostors: 2 (hidden)', W / 2, 45);
+
+    // Draw cards
+    for (let i = 0; i < players.length; i++) {
+      const p = players[i];
+      const cr = getCardRect(i);
+
+      // Card background
+      let bgColor = '#2a2a4e';
+      if (!p.alive) bgColor = '#1a1a1a';
+      else if (nominated === i) bgColor = '#4a3a2e';
+      else if (phase === 'result' && !p.alive && eliminationLog.length > 0 && eliminationLog[eliminationLog.length - 1].name === p.name) {
+        bgColor = p.role === 'Impostor' ? '#4a1a1a' : '#1a1a4a';
+      }
+
+      ctx.fillStyle = bgColor;
+      ctx.beginPath();
+      const r = 8;
+      ctx.moveTo(cr.x + r, cr.y);
+      ctx.lineTo(cr.x + cr.w - r, cr.y);
+      ctx.quadraticCurveTo(cr.x + cr.w, cr.y, cr.x + cr.w, cr.y + r);
+      ctx.lineTo(cr.x + cr.w, cr.y + cr.h - r);
+      ctx.quadraticCurveTo(cr.x + cr.w, cr.y + cr.h, cr.x + cr.w - r, cr.y + cr.h);
+      ctx.lineTo(cr.x + r, cr.y + cr.h);
+      ctx.quadraticCurveTo(cr.x, cr.y + cr.h, cr.x, cr.y + cr.h - r);
+      ctx.lineTo(cr.x, cr.y + r);
+      ctx.quadraticCurveTo(cr.x, cr.y, cr.x + r, cr.y);
+      ctx.fill();
+
+      // Border
+      if (nominated === i && p.alive) {
+        ctx.strokeStyle = '#ffd93d';
+        ctx.lineWidth = 3;
+      } else {
+        ctx.strokeStyle = p.alive ? p.color + '88' : '#333333';
+        ctx.lineWidth = 1;
+      }
+      ctx.stroke();
+
+      // Player info
+      ctx.fillStyle = p.alive ? p.color : '#555555';
+      ctx.font = 'bold 16px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(p.name, cr.x + cr.w / 2, cr.y + 30);
+
+      if (!p.alive) {
+        ctx.fillStyle = '#888888';
+        ctx.font = '12px Inter, sans-serif';
+        ctx.fillText('ELIMINATED', cr.x + cr.w / 2, cr.y + 50);
+        ctx.fillStyle = p.role === 'Impostor' ? '#c0392b' : '#2980b9';
+        ctx.fillText('Was: ' + p.role, cr.x + cr.w / 2, cr.y + 68);
+      } else {
+        ctx.fillStyle = '#aaaaaa';
+        ctx.font = '24px Inter, sans-serif';
+        ctx.fillText('?', cr.x + cr.w / 2, cr.y + 60);
+
+        if (nominated === i) {
+          ctx.fillStyle = '#ffd93d';
+          ctx.font = '11px Inter, sans-serif';
+          ctx.fillText('NOMINATED', cr.x + cr.w / 2, cr.y + cr.h - 10);
+        }
+      }
+
+      // Vote tally
+      if (phase === 'result' || phase === 'voting') {
+        const votesForThis = Object.values(votes).filter(v => v === i).length;
+        if (votesForThis > 0) {
+          ctx.fillStyle = '#ff6b6b';
+          ctx.font = 'bold 14px Inter, sans-serif';
+          ctx.fillText(votesForThis + ' vote' + (votesForThis > 1 ? 's' : ''), cr.x + cr.w / 2, cr.y + cr.h - 8);
+        }
+      }
+    }
+
+    // Result display
+    if (phase === 'result' && resultText) {
+      ctx.fillStyle = '#000000aa';
+      ctx.fillRect(0, H - 80, W, 80);
+      ctx.fillStyle = '#ffd93d';
+      ctx.font = 'bold 18px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(resultText, W / 2, H - 45);
+    }
+
+    // Vote tally sidebar
+    if ((phase === 'result' || phase === 'voting') && Object.keys(votes).length > 0) {
+      const skipVotes = Object.values(votes).filter(v => v === 'skip').length;
+      ctx.fillStyle = '#888888';
+      ctx.font = '12px Inter, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('Skip votes: ' + skipVotes, 20, H - 100);
+    }
+
+    // Elimination log
+    if (eliminationLog.length > 0) {
+      ctx.fillStyle = '#555577';
+      ctx.font = '11px Inter, sans-serif';
+      ctx.textAlign = 'right';
+      let ly = 60;
+      ctx.fillText('Elimination Log:', W - 20, ly);
+      for (const e of eliminationLog) {
+        ly += 16;
+        ctx.fillStyle = e.role === 'Impostor' ? '#c0392b' : '#2980b9';
+        ctx.fillText(e.name + ' (' + e.role + ')', W - 20, ly);
+      }
+    }
+  }
+
+  requestAnimationFrame(update);
+})();
+</script>

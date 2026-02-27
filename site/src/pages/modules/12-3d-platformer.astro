@@ -1,0 +1,791 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 12: 3D Platformer">
+  <div class="container page-content">
+    <div class="module-header">
+      <div class="module-number">Module 12</div>
+      <h1>3D Platformer</h1>
+      <p class="module-theme">Weeks 23-24 | Camera control, spatial design, and the art of the jump in three dimensions.</p>
+    </div>
+
+    <blockquote>
+      <p>"In a 2D platformer, the camera is solved. In a 3D platformer, the camera IS the problem. Everything else is downstream of whether the player can see where they're going."</p>
+    </blockquote>
+
+    <hr />
+
+    <h2>Prerequisites</h2>
+    <table>
+      <thead><tr><th>Module</th><th>What You Used From It</th></tr></thead>
+      <tbody>
+        <tr><td>Module 02 - Platformer</td><td>Gravity, jump arcs, grounded-state detection, tile collision, game feel</td></tr>
+        <tr><td>Module 11 - First-Person Game</td><td>3D coordinate systems, transforms, 3D collision, basic lighting, working in an engine</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h2>Week 1: History &amp; Design Theory</h2>
+
+    <h3>The Origin</h3>
+    <p>Shigeru Miyamoto's team at Nintendo spent months on <strong>Super Mario 64</strong> (Nintendo, 1996) doing something that sounds absurd: just making Mario feel good to move around. Before a single level was designed, before a single enemy was placed, they built a small room and tuned Mario's run, jump, triple-jump, long-jump, wall-jump, backflip, and ground-pound until the act of controlling him was intrinsically fun.</p>
+
+    <p>The camera system was revolutionary and openly acknowledged the problem it was solving. Lakitu, a character who had been a cloud-riding enemy in previous Mario games, was recast as a cameraman literally flying behind Mario with a camera on a fishing pole. This was Miyamoto telling the player: "Yes, the camera is a separate thing you manage. Here's a friendly face to make that feel natural."</p>
+
+    <h3>How the Genre Evolved</h3>
+    <p><strong>Crash Bandicoot</strong> (Naughty Dog, 1996) solved the camera problem through a completely different philosophy: constrain it. Rather than giving players a free camera, Crash's camera was mostly fixed &mdash; behind the player on rails. By limiting the camera, Naughty Dog ensured the player always had a readable view.</p>
+
+    <p><strong>Banjo-Kazooie</strong> (Rare, 1998) expanded the collect-a-thon design that Mario 64 had introduced. Multiple move types, dozens of collectible types, and ability unlocks that opened new paths in previously visited worlds demonstrated that 3D platformers could be about thorough exploration of dense spaces.</p>
+
+    <p><strong>A Hat in Time</strong> (Gears for Breakfast, 2017) and <strong>Astro Bot</strong> (Team Asobi, 2024) prove the genre is alive and still evolving, pushing the boundaries of what a 3D platformer camera can do.</p>
+
+    <h3>What Makes 3D Platformers Great</h3>
+    <p>The 3D platformer is a negotiation between two systems in constant tension: <strong>character control</strong> and <strong>camera control</strong>. The player needs to execute precise jumps, but they also need to see where they are jumping. These goals frequently conflict. Great 3D platformers resolve this through generous player mechanics (double-jumps, air control, coyote time), smart camera behavior, and level design that is readable from multiple angles.</p>
+
+    <h3>The Essential Mechanic</h3>
+    <p><strong>Jumping and landing on platforms while managing a camera that must make 3D space readable</strong> &mdash; the marriage of character control and camera control.</p>
+
+    <hr />
+
+    <h2>Week 2: Build the MVP</h2>
+
+    <h3>What You're Building</h3>
+    <p>A small 3D level with platforms at varying heights and positions. The focus is on making the jump feel good, the camera feel helpful, and the space feel readable. A tight, well-designed space with 10-15 platforms is more valuable than a sprawling empty world.</p>
+
+    <h3>Core Concepts (Must Implement)</h3>
+
+    <h4>1. Third-Person Camera System</h4>
+    <p>An orbit camera that follows the player at a fixed distance and can be rotated by the player. The camera must handle collision &mdash; if it would clip through a wall, it moves closer to the player.</p>
+
+    <pre is:raw><code>// Orbit camera each frame:
+yaw   += inputX * rotateSpeed
+pitch += inputY * rotateSpeed
+pitch  = clamp(pitch, -30, 60)
+
+// Desired camera position: offset behind and above player
+offset.x = -sin(yaw) * cos(pitch) * distance
+offset.y =  sin(pitch) * distance
+offset.z = -cos(yaw) * cos(pitch) * distance
+
+desiredPosition = player.position + offset
+
+// Camera collision: raycast from player to desired position
+hit = raycast(player.position, direction_to(desiredPosition), distance)
+if hit:
+  camera.position = hit.point + hit.normal * skinWidth
+else:
+  camera.position = desiredPosition
+
+camera.lookAt(player.position + (0, 1, 0))</code></pre>
+
+    <p><strong>Why it matters:</strong> The third-person camera is arguably the hardest unsolved problem in game design. No automatic system works perfectly in all situations.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Camera Orbit Demo</div>
+      <p class="demo-hint">Drag on the canvas to orbit the camera around the player cube on the platform. The camera position coordinates update in real-time. The camera always looks at the player.</p>
+      <canvas id="demo-orbit" width="760" height="420"></canvas>
+    </div>
+
+    <h4>2. 3D Character Controller with Jump</h4>
+    <p>Extend the Module 11 character controller with a jump system. Gravity pulls the player down each frame. When grounded and the jump button is pressed, apply an upward velocity impulse.</p>
+
+    <pre is:raw><code>// Gravity:
+velocity.y -= gravity * dt
+
+// Ground detection:
+groundHit = spherecast(player.position, DOWN, radius=0.3, distance=0.1)
+isGrounded = groundHit != null
+
+// Jump:
+if isGrounded and jumpPressed:
+  velocity.y = jumpForce
+
+player.position += velocity * dt</code></pre>
+
+    <p><strong>Why it matters:</strong> The 3D jump is the direct evolution of Module 2's gravity and grounded-state detection. The core physics are identical but ground normals and slope handling add complexity.</p>
+
+    <h4>3. Camera-Relative Movement</h4>
+    <p>When the player pushes the stick forward, the character must move toward where the camera is facing, not toward a fixed world direction.</p>
+
+    <pre is:raw><code>// Get camera's ground-plane directions:
+camForward = camera.forward
+camForward.y = 0
+camForward = normalize(camForward)
+
+camRight = camera.right
+camRight.y = 0
+camRight = normalize(camRight)
+
+moveDir = camForward * stickY + camRight * stickX
+
+if length(moveDir) > 0:
+  moveDir = normalize(moveDir)
+  player.rotation = look_rotation(moveDir)
+  player.position += moveDir * moveSpeed * dt</code></pre>
+
+    <p>This is THE key UX insight of 3D platformers. Without camera-relative movement, the player would need to mentally translate between "push stick up" and "character moves world-north."</p>
+
+    <p><strong>Why it matters:</strong> Camera-relative movement is what separates a playable 3D game from a frustrating one. This same pattern applies to every third-person game.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Camera-Relative Movement</div>
+      <p class="demo-hint">Use arrow keys to move the player. Drag the canvas to orbit the camera. Notice how "Up" always moves the character toward where the camera faces, not world-north. A top-down minimap shows actual world directions vs. camera directions.</p>
+      <canvas id="demo-camrel" width="760" height="420"></canvas>
+    </div>
+
+    <h4>4. 3D Spatial Design and Level Layout</h4>
+    <p>Design platforms and spaces that are readable from a dynamic camera angle. Key design principles:</p>
+    <ul>
+      <li><strong>Silhouette readability</strong> &mdash; platforms should have distinct shapes visible from multiple angles</li>
+      <li><strong>Consistent scale</strong> &mdash; the player should internalize how far they can jump</li>
+      <li><strong>Visual layering</strong> &mdash; foreground (interactive) geometry should be visually distinct from background</li>
+      <li><strong>Sightlines</strong> &mdash; the player should usually be able to see their next goal</li>
+    </ul>
+
+    <pre is:raw><code>platforms = [
+  { position: (0, 0, 0),   size: (5, 0.5, 5),  color: "green"  },  // start
+  { position: (4, 1, 3),   size: (2, 0.5, 2),  color: "green"  },  // step up
+  { position: (8, 2.5, 1), size: (2, 0.5, 2),  color: "green"  },  // gap jump
+  { position: (8, 4, 6),   size: (3, 0.5, 3),  color: "gold"   },  // goal
+]</code></pre>
+
+    <p><strong>Why it matters:</strong> Level design in 3D is harder than in 2D because the player's viewpoint is variable. You must design spaces that communicate effectively from many possible camera angles.</p>
+
+    <h4>5. Shadow / Blob Under Player</h4>
+    <p>Project a dark circle directly below the player onto whatever surface is underneath. This tells the player exactly where they will land.</p>
+
+    <pre is:raw><code>// Each frame, cast a ray down from the player:
+shadowHit = raycast(player.position, DOWN, maxDistance=50)
+
+if shadowHit:
+  blobShadow.position = shadowHit.point + shadowHit.normal * 0.01
+  blobShadow.rotation = align_to_normal(shadowHit.normal)
+  blobShadow.visible = true
+  height = player.position.y - shadowHit.point.y
+  blobShadow.scale = max(0.5, 1.0 - height * 0.05)
+else:
+  blobShadow.visible = false</code></pre>
+
+    <p><strong>Why it matters:</strong> Without a shadow, players cannot tell if they are directly above a platform or five meters to the left. This is a "generous lie" &mdash; real shadows are complex and expensive, but a simple blob projected downward solves the gameplay problem. Nearly every 3D platformer uses this technique.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Shadow Blob Demo</div>
+      <p class="demo-hint">A character jumps back and forth across a gap between two platforms. Toggle the shadow blob on/off with the button to see how it helps judge landing position. Without it, gauging where you will land becomes much harder.</p>
+      <canvas id="demo-shadow" width="760" height="400"></canvas>
+      <div class="demo-controls">
+        <button id="shadow-toggle-btn">Toggle Shadow: ON</button>
+      </div>
+    </div>
+
+    <h4>6. Moving Platforms in 3D</h4>
+    <p>Create platforms that move along a path. When the player stands on a moving platform, they must move with it. This requires parent-child transform relationships.</p>
+
+    <pre is:raw><code>// Moving platform update:
+platform.t += speed * dt
+platform.position = lerp(pointA, pointB, ping_pong(platform.t))
+
+// When player lands on a moving platform:
+if player.groundHit.object == platform:
+  platformDelta = platform.position - platform.previousPosition
+  player.position += platformDelta</code></pre>
+
+    <p><strong>Why it matters:</strong> Moving platforms introduce the critical distinction between local space and world space. This parent-child transform relationship is the same pattern used for any hierarchical attachment in 3D.</p>
+
+    <h4>7. Collectibles in 3D Space</h4>
+    <p>Place items throughout the level to guide the player. Collectibles serve as breadcrumbs &mdash; a trail of items leading toward a platform implicitly tells the player "jump here."</p>
+
+    <pre is:raw><code>// Collectible behavior each frame:
+collectible.rotation.y += spinSpeed * dt
+
+dist = distance(player.position, collectible.position)
+if dist < pickupRadius:
+  player.score += collectible.value
+  play_sound("collect")
+  spawn_particles(collectible.position)
+  collectible.active = false</code></pre>
+
+    <p><strong>Why it matters:</strong> Collectibles solve a navigation problem unique to 3D: the player can get lost. They provide implicit wayfinding and secondary objectives.</p>
+
+    <h4>8. Double-Jump and Air Control</h4>
+    <p>Give the player a second jump in mid-air and allow directional influence while airborne. Neither is physically realistic, but both are essential for making 3D platforming feel responsive and forgiving.</p>
+
+    <pre is:raw><code>jumpsRemaining = maxJumps   // 2 for double-jump
+
+if jumpPressed and jumpsRemaining > 0:
+  velocity.y = jumpForce
+  jumpsRemaining -= 1
+
+if isGrounded:
+  jumpsRemaining = maxJumps
+
+// Air control:
+if not isGrounded:
+  airMoveDir = camForward * stickY + camRight * stickX
+  velocity.x += airMoveDir.x * airControlStrength * dt
+  velocity.z += airMoveDir.z * airControlStrength * dt</code></pre>
+
+    <p><strong>Why it matters:</strong> These are the same "generous lies" from Module 2, evolved for 3D. The added dimension makes precise jumping harder, so the game compensates by giving the player more tools.</p>
+
+    <hr />
+
+    <h3>Stretch Goals</h3>
+    <ul>
+      <li><strong>Wall-jump</strong> &mdash; Detect when the player is sliding against a wall and allow a jump off of it.</li>
+      <li><strong>Checkpoints and respawn</strong> &mdash; Respawn at the last checkpoint when the player falls into a void.</li>
+      <li><strong>Camera auto-adjustment</strong> &mdash; Gently rotate the camera to show upcoming challenges.</li>
+      <li><strong>Character animation states</strong> &mdash; Idle, run, jump, fall, land animations driven by a state machine.</li>
+    </ul>
+
+    <h3>MVP Spec</h3>
+    <table>
+      <thead><tr><th>Feature</th><th>Required</th></tr></thead>
+      <tbody>
+        <tr><td>Third-person orbit camera with collision</td><td>Yes</td></tr>
+        <tr><td>3D character with gravity and jump</td><td>Yes</td></tr>
+        <tr><td>Camera-relative movement</td><td>Yes</td></tr>
+        <tr><td>At least 10 platforms at varying heights</td><td>Yes</td></tr>
+        <tr><td>Blob shadow under the player</td><td>Yes</td></tr>
+        <tr><td>At least one moving platform</td><td>Yes</td></tr>
+        <tr><td>Collectibles that guide the player</td><td>Yes</td></tr>
+        <tr><td>Double-jump or air control</td><td>Yes</td></tr>
+        <tr><td>Wall-jump</td><td>Stretch</td></tr>
+        <tr><td>Checkpoints / respawn on fall</td><td>Stretch</td></tr>
+        <tr><td>Camera auto-adjustment</td><td>Stretch</td></tr>
+        <tr><td>Character animation state machine</td><td>Stretch</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliverable</h3>
+    <p>A playable 3D platformer level with camera control, jumping, and collectibles. Write-up: What did you learn? How does designing for 3D space differ from 2D? What was your biggest camera challenge?</p>
+
+    <hr />
+
+    <h2>Analogies by Background</h2>
+    <blockquote><p>These analogies map 3D platformer concepts to patterns you already know. Find your background below.</p></blockquote>
+
+    <h3>For Backend Developers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Third-Person Camera System</td><td>Like a load balancer health check that tracks the player but must avoid collisions, adjusting distance dynamically</td></tr>
+        <tr><td>3D Character Controller with Jump</td><td>Like a state machine managing a connection lifecycle (IDLE, ACTIVE, CLOSING)</td></tr>
+        <tr><td>Camera-Relative Movement</td><td>Like resolving relative paths &mdash; <code>./forward</code> is interpreted relative to the current working directory (camera orientation)</td></tr>
+        <tr><td>3D Spatial Design / Level Layout</td><td>Like API design &mdash; the level must communicate its structure to the player through intuitive patterns</td></tr>
+        <tr><td>Shadow / Blob Under Player</td><td>Like a lightweight status probe &mdash; a constant downward raycast giving real-time position feedback</td></tr>
+        <tr><td>Moving Platforms in 3D</td><td>Like container orchestration parent-child &mdash; the player inherits the platform's position</td></tr>
+        <tr><td>Collectibles in 3D Space</td><td>Like breadcrumb logging or distributed tracing &mdash; guiding through a complex path</td></tr>
+        <tr><td>Double-Jump / Air Control</td><td>Like retry policies &mdash; a second attempt and course correction rather than failing hard</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Frontend Developers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Third-Person Camera System</td><td>Like a scroll-follow with intersection observers that detects overlaps and adjusts position</td></tr>
+        <tr><td>3D Character Controller with Jump</td><td>Like a CSS transition with cubic-bezier easing &mdash; the jump arc is a curve</td></tr>
+        <tr><td>Camera-Relative Movement</td><td>Like resolving CSS <code>transform-origin</code> &mdash; movement is relative to the camera's coordinate system</td></tr>
+        <tr><td>3D Spatial Design / Level Layout</td><td>Like responsive design &mdash; the level must be readable at different camera angles</td></tr>
+        <tr><td>Shadow / Blob Under Player</td><td>Like a tooltip or cursor follower projected onto a surface</td></tr>
+        <tr><td>Moving Platforms in 3D</td><td>Like a child element inside a CSS-transformed parent &mdash; <code>position: relative</code> and <code>absolute</code></td></tr>
+        <tr><td>Collectibles in 3D Space</td><td>Like visual affordances in UI &mdash; spinning, glowing items say "interact with me"</td></tr>
+        <tr><td>Double-Jump / Air Control</td><td>Like undo/redo in a text editor &mdash; a second chance after committing to an action</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Data / ML Engineers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Third-Person Camera System</td><td>Like a constrained optimization problem &mdash; minimizing distance to a target subject to constraints</td></tr>
+        <tr><td>3D Character Controller with Jump</td><td>Like numerical integration of a differential equation &mdash; Euler method with impulse</td></tr>
+        <tr><td>Camera-Relative Movement</td><td>Like a change of basis &mdash; input in camera basis vectors transformed to world coordinates</td></tr>
+        <tr><td>3D Spatial Design / Level Layout</td><td>Like feature engineering for interpretability &mdash; reducing the dimensionality of navigation</td></tr>
+        <tr><td>Shadow / Blob Under Player</td><td>Like a projection onto a lower-dimensional subspace</td></tr>
+        <tr><td>Moving Platforms in 3D</td><td>Like reference frame transformations in physics simulation</td></tr>
+        <tr><td>Collectibles in 3D Space</td><td>Like reward shaping in reinforcement learning &mdash; guiding toward the goal</td></tr>
+        <tr><td>Double-Jump / Air Control</td><td>Like regularization &mdash; relaxing constraints to get better generalization (playability)</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li>Super Mario 64 and Crash Bandicoot launched the same year with opposite approaches to the camera: free control vs. constrained rails. What are the tradeoffs?</li>
+      <li>The blob shadow is a "fake." Why is this acceptable? What other "lies" does your game tell the player?</li>
+      <li>Compare your 2D platformer from Module 2 to this 3D platformer. Which concepts transferred directly, and which required fundamentally different solutions?</li>
+      <li>Camera-relative movement means "forward" changes meaning whenever the camera rotates. What happens if the camera rotates while the player is holding forward?</li>
+    </ol>
+
+    <nav class="module-nav">
+      <a href={`${base}modules/11-first-person-game/`}>&larr; Module 11: First-Person Game</a>
+      <a href={`${base}modules/14-metroidvania/`}>Module 14: Metroidvania &rarr;</a>
+    </nav>
+  </div>
+</BaseLayout>
+
+<script>
+// ============================================================
+// DEMO 1: CAMERA ORBIT
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-orbit');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  let camYaw = 0.6, camPitch = 0.4;
+  let dragging = false, lastMX = 0, lastMY = 0;
+  const camDist = 220;
+
+  canvas.addEventListener('mousedown', function(e) { dragging = true; lastMX = e.clientX; lastMY = e.clientY; });
+  canvas.addEventListener('mousemove', function(e) {
+    if (!dragging) return;
+    camYaw += (e.clientX - lastMX) * 0.008;
+    camPitch += (e.clientY - lastMY) * 0.006;
+    camPitch = Math.max(-0.3, Math.min(1.2, camPitch));
+    lastMX = e.clientX; lastMY = e.clientY;
+  });
+  canvas.addEventListener('mouseup', function() { dragging = false; });
+  canvas.addEventListener('mouseleave', function() { dragging = false; });
+  canvas.addEventListener('touchstart', function(e) { e.preventDefault(); dragging = true; lastMX = e.touches[0].clientX; lastMY = e.touches[0].clientY; }, { passive: false });
+  canvas.addEventListener('touchmove', function(e) { e.preventDefault(); if (!dragging) return; camYaw += (e.touches[0].clientX - lastMX) * 0.008; camPitch += (e.touches[0].clientY - lastMY) * 0.006; camPitch = Math.max(-0.3, Math.min(1.2, camPitch)); lastMX = e.touches[0].clientX; lastMY = e.touches[0].clientY; }, { passive: false });
+  canvas.addEventListener('touchend', function() { dragging = false; });
+
+  function project(x, y, z) {
+    const cosY = Math.cos(camYaw), sinY = Math.sin(camYaw);
+    let x2 = x * cosY - z * sinY;
+    let z2 = x * sinY + z * cosY;
+    const cosP = Math.cos(camPitch), sinP = Math.sin(camPitch);
+    let y2 = y * cosP - z2 * sinP;
+    let z3 = y * sinP + z2 * cosP;
+    const scale = 400 / (400 + z3 + 300);
+    return { x: W / 2 + x2 * scale, y: H / 2 - y2 * scale, z: z3 };
+  }
+
+  function drawBox(cx, cy, cz, hw, hh, hd, color) {
+    const verts = [
+      [cx-hw,cy-hh,cz-hd],[cx+hw,cy-hh,cz-hd],[cx+hw,cy+hh,cz-hd],[cx-hw,cy+hh,cz-hd],
+      [cx-hw,cy-hh,cz+hd],[cx+hw,cy-hh,cz+hd],[cx+hw,cy+hh,cz+hd],[cx-hw,cy+hh,cz+hd]
+    ];
+    const faces = [[0,1,2,3],[4,5,6,7],[0,1,5,4],[2,3,7,6],[0,3,7,4],[1,2,6,5]];
+    const pv = verts.map(function(v) { return project(v[0], v[1], v[2]); });
+
+    // Sort faces by average Z (painter's algorithm)
+    const facesZ = faces.map(function(f, i) {
+      const avgZ = (pv[f[0]].z + pv[f[1]].z + pv[f[2]].z + pv[f[3]].z) / 4;
+      return { idx: i, z: avgZ };
+    });
+    facesZ.sort(function(a, b) { return b.z - a.z; });
+
+    for (const fd of facesZ) {
+      const f = faces[fd.idx];
+      ctx.beginPath();
+      ctx.moveTo(pv[f[0]].x, pv[f[0]].y);
+      for (let i = 1; i < 4; i++) ctx.lineTo(pv[f[i]].x, pv[f[i]].y);
+      ctx.closePath();
+      // Simple shading based on face normal approximation
+      const shade = 0.6 + fd.idx * 0.06;
+      ctx.fillStyle = color;
+      ctx.globalAlpha = shade;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Platform
+    drawBox(0, -30, 0, 100, 10, 100, '#2a4a2a');
+
+    // Player cube
+    drawBox(0, 10, 0, 20, 20, 20, '#f59e0b');
+
+    // Camera position indicator
+    const camX = -Math.sin(camYaw) * Math.cos(camPitch) * camDist;
+    const camY = Math.sin(camPitch) * camDist;
+    const camZ = -Math.cos(camYaw) * Math.cos(camPitch) * camDist;
+    const camP = project(camX, camY, camZ);
+
+    // Line from camera to player
+    const playerP = project(0, 10, 0);
+    ctx.beginPath();
+    ctx.moveTo(camP.x, camP.y);
+    ctx.lineTo(playerP.x, playerP.y);
+    ctx.strokeStyle = '#3b82f6';
+    ctx.setLineDash([4, 4]);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Camera dot
+    ctx.beginPath();
+    ctx.arc(camP.x, camP.y, 6, 0, Math.PI * 2);
+    ctx.fillStyle = '#3b82f6';
+    ctx.fill();
+    ctx.fillStyle = '#3b82f6';
+    ctx.font = '11px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('CAM', camP.x + 10, camP.y + 4);
+
+    // HUD
+    ctx.fillStyle = '#a1a1aa';
+    ctx.font = '12px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('Camera Yaw: ' + (camYaw * 180 / Math.PI).toFixed(1) + '\u00B0', 16, 24);
+    ctx.fillText('Camera Pitch: ' + (camPitch * 180 / Math.PI).toFixed(1) + '\u00B0', 16, 42);
+    ctx.fillText('Cam Pos: (' + camX.toFixed(0) + ', ' + camY.toFixed(0) + ', ' + camZ.toFixed(0) + ')', 16, 60);
+
+    ctx.fillStyle = '#71717a';
+    ctx.font = '11px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Drag to orbit the camera around the player', W / 2, H - 12);
+
+    requestAnimationFrame(render);
+  }
+  requestAnimationFrame(render);
+})();
+
+
+// ============================================================
+// DEMO 2: CAMERA-RELATIVE MOVEMENT
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-camrel');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const keys = {};
+  window.addEventListener('keydown', function(e) {
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
+    keys[e.key] = true;
+  });
+  window.addEventListener('keyup', function(e) { keys[e.key] = false; });
+
+  let camYaw = 0.6, camPitch = 0.35;
+  let dragging = false, lastMX = 0, lastMY = 0;
+  let playerX = 0, playerZ = 0;
+
+  canvas.addEventListener('mousedown', function(e) { dragging = true; lastMX = e.clientX; lastMY = e.clientY; });
+  canvas.addEventListener('mousemove', function(e) {
+    if (!dragging) return;
+    camYaw += (e.clientX - lastMX) * 0.008;
+    camPitch += (e.clientY - lastMY) * 0.005;
+    camPitch = Math.max(0.1, Math.min(1.0, camPitch));
+    lastMX = e.clientX; lastMY = e.clientY;
+  });
+  canvas.addEventListener('mouseup', function() { dragging = false; });
+  canvas.addEventListener('mouseleave', function() { dragging = false; });
+  canvas.addEventListener('touchstart', function(e) { e.preventDefault(); dragging = true; lastMX = e.touches[0].clientX; lastMY = e.touches[0].clientY; }, { passive: false });
+  canvas.addEventListener('touchmove', function(e) { e.preventDefault(); if (!dragging) return; camYaw += (e.touches[0].clientX - lastMX) * 0.008; camPitch += (e.touches[0].clientY - lastMY) * 0.005; camPitch = Math.max(0.1, Math.min(1.0, camPitch)); lastMX = e.touches[0].clientX; lastMY = e.touches[0].clientY; }, { passive: false });
+  canvas.addEventListener('touchend', function() { dragging = false; });
+
+  function project(x, y, z) {
+    const cosY = Math.cos(camYaw), sinY = Math.sin(camYaw);
+    let x2 = x * cosY - z * sinY;
+    let z2 = x * sinY + z * cosY;
+    const cosP = Math.cos(camPitch), sinP = Math.sin(camPitch);
+    let y2 = y * cosP - z2 * sinP;
+    let z3 = y * sinP + z2 * cosP;
+    const scale = 350 / (350 + z3 + 250);
+    return { x: W * 0.38 + x2 * scale, y: H / 2 - y2 * scale, z: z3 };
+  }
+
+  function render() {
+    // Camera-relative movement
+    const camFwdX = -Math.sin(camYaw);
+    const camFwdZ = -Math.cos(camYaw);
+    const camRightX = Math.cos(camYaw);
+    const camRightZ = -Math.sin(camYaw);
+
+    let moveX = 0, moveZ = 0;
+    if (keys['ArrowUp']) { moveX += camFwdX; moveZ += camFwdZ; }
+    if (keys['ArrowDown']) { moveX -= camFwdX; moveZ -= camFwdZ; }
+    if (keys['ArrowLeft']) { moveX -= camRightX; moveZ -= camRightZ; }
+    if (keys['ArrowRight']) { moveX += camRightX; moveZ += camRightZ; }
+
+    const len = Math.sqrt(moveX * moveX + moveZ * moveZ);
+    if (len > 0) {
+      moveX /= len; moveZ /= len;
+      playerX += moveX * 2;
+      playerZ += moveZ * 2;
+    }
+    playerX = Math.max(-120, Math.min(120, playerX));
+    playerZ = Math.max(-120, Math.min(120, playerZ));
+
+    ctx.clearRect(0, 0, W, H);
+
+    // 3D View (left side)
+    // Ground grid
+    ctx.globalAlpha = 0.15;
+    for (let i = -150; i <= 150; i += 30) {
+      const p1 = project(i, 0, -150);
+      const p2 = project(i, 0, 150);
+      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
+      ctx.strokeStyle = '#3f3f46'; ctx.lineWidth = 0.5; ctx.stroke();
+      const p3 = project(-150, 0, i);
+      const p4 = project(150, 0, i);
+      ctx.beginPath(); ctx.moveTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    // Player
+    const pp = project(playerX, 15, playerZ);
+    ctx.beginPath();
+    ctx.arc(pp.x, pp.y, 12, 0, Math.PI * 2);
+    ctx.fillStyle = '#f59e0b';
+    ctx.fill();
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.stroke();
+
+    // Camera forward direction arrow on player
+    const fwdEnd = project(playerX + camFwdX * 40, 15, playerZ + camFwdZ * 40);
+    ctx.beginPath();
+    ctx.moveTo(pp.x, pp.y);
+    ctx.lineTo(fwdEnd.x, fwdEnd.y);
+    ctx.strokeStyle = '#22c55e';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // World north arrow
+    const northEnd = project(playerX, 15, playerZ - 40);
+    ctx.beginPath();
+    ctx.moveTo(pp.x, pp.y);
+    ctx.lineTo(northEnd.x, northEnd.y);
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([3, 3]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Legend
+    ctx.fillStyle = '#22c55e';
+    ctx.font = '11px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('\u2014 Camera "Forward"', 16, H - 40);
+    ctx.fillStyle = '#3b82f6';
+    ctx.fillText('--- World North', 16, H - 24);
+
+    // MINIMAP (right side)
+    const mmX = W - 220, mmY = 30, mmS = 180;
+    ctx.fillStyle = '#141416';
+    ctx.strokeStyle = '#3f3f46';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(mmX, mmY, mmS, mmS, 4);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#71717a';
+    ctx.font = '600 11px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('TOP-DOWN MINIMAP', mmX + mmS / 2, mmY - 6);
+
+    // Map grid
+    ctx.strokeStyle = '#1a1a1e';
+    for (let i = 0; i < 5; i++) {
+      const gp = mmX + (i / 4) * mmS;
+      ctx.beginPath(); ctx.moveTo(gp, mmY); ctx.lineTo(gp, mmY + mmS); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(mmX, mmY + (i / 4) * mmS); ctx.lineTo(mmX + mmS, mmY + (i / 4) * mmS); ctx.stroke();
+    }
+
+    // North indicator on minimap
+    ctx.fillStyle = '#3b82f6';
+    ctx.font = '700 12px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('N', mmX + mmS / 2, mmY + 14);
+
+    // Player on minimap
+    const mpx = mmX + mmS / 2 + (playerX / 120) * (mmS / 2) * 0.8;
+    const mpy = mmY + mmS / 2 + (playerZ / 120) * (mmS / 2) * 0.8;
+    ctx.beginPath();
+    ctx.arc(mpx, mpy, 5, 0, Math.PI * 2);
+    ctx.fillStyle = '#f59e0b';
+    ctx.fill();
+
+    // Camera forward on minimap
+    ctx.beginPath();
+    ctx.moveTo(mpx, mpy);
+    ctx.lineTo(mpx + camFwdX * 25, mpy + camFwdZ * 25);
+    ctx.strokeStyle = '#22c55e';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // World north on minimap
+    ctx.beginPath();
+    ctx.moveTo(mpx, mpy);
+    ctx.lineTo(mpx, mpy - 25);
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([3, 3]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Position info
+    ctx.fillStyle = '#a1a1aa';
+    ctx.font = '11px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('Pos: (' + playerX.toFixed(0) + ', ' + playerZ.toFixed(0) + ')', mmX, mmY + mmS + 20);
+    ctx.fillText('Cam Yaw: ' + (camYaw * 180 / Math.PI).toFixed(0) + '\u00B0', mmX, mmY + mmS + 36);
+
+    ctx.fillStyle = '#71717a';
+    ctx.font = '11px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Arrow keys=move, Drag=orbit camera. "Forward" follows the camera.', W / 2, H - 8);
+
+    requestAnimationFrame(render);
+  }
+  requestAnimationFrame(render);
+})();
+
+
+// ============================================================
+// DEMO 3: SHADOW BLOB
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-shadow');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const toggleBtn = document.getElementById('shadow-toggle-btn');
+
+  let showShadow = true;
+  let t = 0;
+  toggleBtn.addEventListener('click', function() {
+    showShadow = !showShadow;
+    toggleBtn.textContent = 'Toggle Shadow: ' + (showShadow ? 'ON' : 'OFF');
+  });
+
+  // Platforms in side-view
+  const plat1 = { x: 120, y: 280, w: 220, h: 20 };
+  const plat2 = { x: 420, y: 280, w: 220, h: 20 };
+  const gap = plat2.x - (plat1.x + plat1.w);
+
+  function render() {
+    t += 0.018;
+    ctx.clearRect(0, 0, W, H);
+
+    // Background
+    ctx.fillStyle = '#0a0a14';
+    ctx.fillRect(0, 0, W, H);
+
+    // Grid
+    ctx.strokeStyle = '#1a1a1e';
+    ctx.lineWidth = 0.5;
+    for (let gx = 0; gx < W; gx += 40) {
+      ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke();
+    }
+    for (let gy = 0; gy < H; gy += 40) {
+      ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke();
+    }
+
+    // Void below
+    ctx.fillStyle = '#0a0a0e';
+    ctx.fillRect(0, 310, W, H - 310);
+
+    // Platforms
+    ctx.fillStyle = '#2a4a2a';
+    ctx.beginPath(); ctx.roundRect(plat1.x, plat1.y, plat1.w, plat1.h, 3); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(plat2.x, plat2.y, plat2.w, plat2.h, 3); ctx.fill();
+
+    // Platform surface highlight
+    ctx.fillStyle = '#3a5a3a';
+    ctx.fillRect(plat1.x, plat1.y, plat1.w, 3);
+    ctx.fillRect(plat2.x, plat2.y, plat2.w, 3);
+
+    // Character jumping animation (parabolic arc)
+    const jumpDuration = 2.0;
+    const phase = (t % (jumpDuration * 2));
+    let charX, charY;
+
+    if (phase < jumpDuration) {
+      // Jumping from plat1 to plat2
+      const p = phase / jumpDuration;
+      charX = plat1.x + plat1.w / 2 + (plat2.x + plat2.w / 2 - plat1.x - plat1.w / 2) * p;
+      charY = plat1.y - 20 - Math.sin(p * Math.PI) * 120;
+    } else {
+      // Jumping from plat2 to plat1
+      const p = (phase - jumpDuration) / jumpDuration;
+      charX = plat2.x + plat2.w / 2 + (plat1.x + plat1.w / 2 - plat2.x - plat2.w / 2) * p;
+      charY = plat2.y - 20 - Math.sin(p * Math.PI) * 120;
+    }
+
+    // Shadow blob
+    if (showShadow) {
+      // Find surface below character
+      let shadowY = H; // void
+      let shadowW = 24;
+      if (charX >= plat1.x && charX <= plat1.x + plat1.w) {
+        shadowY = plat1.y;
+      } else if (charX >= plat2.x && charX <= plat2.x + plat2.w) {
+        shadowY = plat2.y;
+      }
+
+      if (shadowY < H) {
+        const height = shadowY - charY;
+        const scale = Math.max(0.4, 1.0 - height * 0.004);
+        const alpha = Math.max(0.15, 0.6 - height * 0.003);
+        const sw = shadowW * scale;
+
+        ctx.beginPath();
+        ctx.ellipse(charX, shadowY - 2, sw, sw * 0.3, 0, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0, 0, 0, ' + alpha + ')';
+        ctx.fill();
+      }
+    }
+
+    // Character (simple capsule shape)
+    ctx.fillStyle = '#f59e0b';
+    ctx.beginPath();
+    ctx.arc(charX, charY - 10, 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillRect(charX - 8, charY - 10, 16, 20);
+    ctx.beginPath();
+    ctx.arc(charX, charY + 10, 8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Height indicator (dashed line from char to shadow)
+    if (showShadow) {
+      let shadowY = H;
+      if (charX >= plat1.x && charX <= plat1.x + plat1.w) shadowY = plat1.y;
+      else if (charX >= plat2.x && charX <= plat2.x + plat2.w) shadowY = plat2.y;
+      if (shadowY < H) {
+        ctx.setLineDash([3, 3]);
+        ctx.strokeStyle = '#f59e0b33';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(charX, charY + 18);
+        ctx.lineTo(charX, shadowY - 4);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    // Labels
+    ctx.fillStyle = showShadow ? '#22c55e' : '#ef4444';
+    ctx.font = '600 14px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('Shadow: ' + (showShadow ? 'ON' : 'OFF'), W / 2, 30);
+
+    ctx.fillStyle = '#71717a';
+    ctx.font = '11px Inter, sans-serif';
+    ctx.fillText(showShadow ? 'The shadow shows exactly where you will land' : 'Without the shadow, landing position is hard to judge', W / 2, 50);
+
+    // Danger zone label
+    ctx.fillStyle = '#ef444466';
+    ctx.font = '10px "JetBrains Mono", monospace';
+    ctx.fillText('void', plat1.x + plat1.w + gap / 2, 340);
+
+    requestAnimationFrame(render);
+  }
+  requestAnimationFrame(render);
+})();
+</script>

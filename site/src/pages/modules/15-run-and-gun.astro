@@ -1,0 +1,862 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 15: Run and Gun">
+  <div class="container page-content">
+    <div class="module-header">
+      <div class="module-number">Module 15</div>
+      <h1>Run and Gun</h1>
+      <p class="module-theme">Side-scrolling action with relentless firepower &mdash; never stop moving, never stop shooting.</p>
+    </div>
+
+    <blockquote>
+      <p>"One more quarter, one more try."</p>
+    </blockquote>
+
+    <hr />
+
+    <h2>Prerequisites</h2>
+    <table>
+      <thead><tr><th>Module</th><th>What You Used From It</th></tr></thead>
+      <tbody>
+        <tr><td>Module 02 - Platformer</td><td>Platformer movement, gravity, and collision &mdash; a run and gun is a platformer with weapons</td></tr>
+        <tr><td>Module 03 - Top-Down Shooter</td><td>Projectile systems, enemy spawning, and hit detection, now in a side-scrolling context</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h2>Week 1: History &amp; Design Theory</h2>
+
+    <h3>The Origin</h3>
+    <p><em>Contra</em> (1987), developed by Konami and directed by Shigeharu Umezaki, established the run and gun genre. It combined side-scrolling platforming with eight-directional shooting, one-hit-kill difficulty, and two-player simultaneous co-op. Its genius was in economy: the player could run, jump, and aim in any of eight directions, but a single enemy bullet meant death. This created a game where every second demanded spatial awareness, pattern recognition, and reflexes. The Konami Code became famous precisely because <em>Contra</em> was so punishing &mdash; 30 lives felt generous.</p>
+
+    <h3>How the Genre Evolved</h3>
+    <p><strong>Metal Slug</strong> (SNK, 1996) elevated the genre through lavish hand-drawn animation, destructible environments, and vehicles the player could commandeer. It added weapon pickups with limited ammunition that encouraged constant cycling, and its hostage-rescue mechanic gave players a reason to explore.</p>
+
+    <p><strong>Gunstar Heroes</strong> (Treasure, 1993) introduced a weapon combination system where the player could hold two weapon types and combine them for unique effects, adding strategic choice to a genre typically defined by reflex alone.</p>
+
+    <p><strong>Cuphead</strong> (Studio MDHR, 2017) brought the genre to a new audience by pairing 1930s hand-drawn animation with punishing boss-rush gameplay. Its parry mechanic (slapping pink objects to build super meter) added a risk/reward layer that rewarded aggressive, precise play. Cuphead proved that the boss fight &mdash; the genre's climactic moments &mdash; could sustain an entire game.</p>
+
+    <h3>What Makes Run and Gun Great</h3>
+    <p>The core design insight of the run and gun genre is <strong>authored tension</strong>. Unlike genres where difficulty emerges from systems, a run and gun game is a choreographed experience &mdash; every enemy placement, every platform, every boss attack is hand-designed to create a specific moment of pressure. The designer controls exactly when the player will face three enemies from the left while jumping a pit. This authorship means the game can escalate difficulty with precision, creating a rhythm of tension and release that feels almost musical. The player's mastery is not over a system but over a <em>performance</em> &mdash; memorizing the choreography until execution becomes fluid.</p>
+
+    <h3>The Essential Mechanic</h3>
+    <p><strong>Simultaneous movement and shooting through authored encounter spaces</strong> &mdash; the player must navigate platforming challenges while aiming and firing at enemies placed to create specific pressure moments.</p>
+
+    <hr />
+
+    <h2>Week 2: Build the MVP</h2>
+
+    <h3>What You're Building</h3>
+    <p>A single side-scrolling level with enemy encounters that the player must shoot through, ending with a multi-phase boss fight. The player can move, jump, and aim in at least 4 directions while firing. Include at least one weapon pickup and a lives system.</p>
+
+    <h3>Core Concepts (Must Implement)</h3>
+
+    <h4>1. Multi-Directional Aiming While Moving</h4>
+    <p>The player character must be able to aim in multiple directions (at minimum: forward, up, diagonal-up-forward, diagonal-down-forward) while running and jumping. Aiming direction and movement direction are controlled independently.</p>
+
+    <pre is:raw><code># Aim direction based on input
+def get_aim_direction(input):
+    aim_x = 0
+    aim_y = 0
+
+    if input.aim_up:
+        aim_y = -1
+    if input.aim_down:
+        aim_y = 1
+
+    if not input.aim_up or not input.aim_down:
+        aim_x = player.facing_direction  # -1 or 1
+
+    if input.aim_up and not input.move_left and not input.move_right:
+        aim_x = 0
+
+    return normalize(aim_x, aim_y)
+
+def fire_bullet(player, aim_dir):
+    bullet = Bullet(
+        x = player.x + aim_dir.x * GUN_OFFSET,
+        y = player.y + aim_dir.y * GUN_OFFSET,
+        vx = aim_dir.x * BULLET_SPEED,
+        vy = aim_dir.y * BULLET_SPEED
+    )
+    bullets.append(bullet)</code></pre>
+
+    <p><strong>Why it matters:</strong> Multi-directional aiming is what separates a run and gun from a platformer that happens to shoot. The ability to aim independently of movement creates the core skill expression &mdash; managing two degrees of freedom simultaneously under pressure.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Multi-Directional Aiming</div>
+      <p class="demo-hint">Use arrow keys to aim in 8 directions (including diagonals). The character stays centered. An aim line shows the current direction. Press Space to fire a projectile. The character sprite reflects the aim direction.</p>
+      <canvas id="demo-aim" width="760" height="380"></canvas>
+    </div>
+
+    <h4>2. Scrolling Level Design with Enemy Placement</h4>
+    <p>The level scrolls horizontally as the player advances. Enemies are placed at authored positions and activate when they scroll into view.</p>
+
+    <pre is:raw><code>level_data = {
+  segments: [
+    {
+      start_x: 0, end_x: 800,
+      platforms: [ { x: 200, y: 300, w: 100, h: 20 }, ... ],
+      enemies: [
+        { type: "soldier", x: 400, y: 380, trigger_x: 200,
+          behavior: "run_and_shoot" },
+        { type: "turret", x: 700, y: 200, trigger_x: 500,
+          behavior: "aim_at_player" },
+      ]
+    }
+  ]
+}
+
+camera_x = clamp(player.x - SCREEN_WIDTH / 2, 0, LEVEL_WIDTH - SCREEN_WIDTH)
+
+for enemy in inactive_enemies:
+    if player.x >= enemy.trigger_x:
+        enemy.active = true</code></pre>
+
+    <p><strong>Why it matters:</strong> Authored enemy placement is the authorial voice of the genre. Each encounter is a hand-crafted challenge. The trigger system ensures enemies appear at the right moment.</p>
+
+    <h4>3. Boss Pattern Design</h4>
+    <p>The end-of-level boss uses a multi-phase state machine with telegraphed attacks and vulnerability windows. Each phase has distinct attack patterns.</p>
+
+    <pre is:raw><code>class Boss:
+    def __init__(self):
+        self.health = 100
+        self.phase = 1
+        self.state = "idle"
+        self.state_timer = 0
+        self.vulnerable = false
+
+    def update(self, dt):
+        self.state_timer -= dt
+
+        if self.health <= 60 and self.phase == 1:
+            self.phase = 2
+            self.enter_state("phase_transition")
+        if self.health <= 25 and self.phase == 2:
+            self.phase = 3
+            self.enter_state("phase_transition")
+
+        if self.state == "telegraph_attack":
+            if self.state_timer <= 0:
+                self.enter_state("attack")
+        elif self.state == "attack":
+            self.execute_attack(self.phase)
+            if self.state_timer <= 0:
+                self.enter_state("vulnerable")
+        elif self.state == "vulnerable":
+            self.vulnerable = true
+            if self.state_timer <= 0:
+                self.vulnerable = false
+                self.enter_state("telegraph_attack")</code></pre>
+
+    <p><strong>Why it matters:</strong> Boss fights are the genre's defining moments. The telegraph-attack-vulnerability loop is the fundamental rhythm that lets players learn a boss through observation and repetition.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Boss Pattern Visualizer</div>
+      <p class="demo-hint">A boss on the right cycles through phases: Idle (gray), Telegraph (yellow flash), Attack (red), and Vulnerable (green). The timeline bar at the bottom shows the current phase. Click "Attack" during the green Vulnerable window to deal damage. The boss has 3 health phases.</p>
+      <canvas id="demo-boss" width="760" height="420"></canvas>
+    </div>
+
+    <h4>4. Co-op / Two-Player Simultaneous Play</h4>
+    <p>Two players share the same screen, each controlling an independent character. The camera must accommodate both players.</p>
+
+    <pre is:raw><code>players = [Player(id=0), Player(id=1)]
+
+input_maps = {
+    0: { "left": KEY_A, "right": KEY_D, "up": KEY_W, "jump": KEY_SPACE,
+         "fire": KEY_F },
+    1: { "left": KEY_LEFT, "right": KEY_RIGHT, "up": KEY_UP,
+         "jump": KEY_RCTRL, "fire": KEY_RSHIFT }
+}
+
+def update_camera():
+    lead_x = max(p.x for p in players if p.alive)
+    camera_x = clamp(lead_x - SCREEN_WIDTH * 0.4, 0, LEVEL_WIDTH - SCREEN_WIDTH)</code></pre>
+
+    <p><strong>Why it matters:</strong> Co-op transforms the experience from a solo test of skill into a shared spectacle. It introduces genuine design challenges: the camera must serve two players, and difficulty must scale.</p>
+
+    <h4>5. Limited Lives / Continue System</h4>
+    <p>Each player starts with a fixed number of lives. Dying costs one life and respawns the player.</p>
+
+    <pre is:raw><code>class LifeSystem:
+    def __init__(self, starting_lives=3, max_continues=3):
+        self.lives = starting_lives
+        self.continues = max_continues
+
+    def on_death(self, player):
+        self.lives -= 1
+        if self.lives > 0:
+            player.respawn(delay=1.5)
+            return "respawn"
+        elif self.continues > 0:
+            return "continue_prompt"
+        else:
+            return "game_over"</code></pre>
+
+    <p><strong>Why it matters:</strong> The lives system creates stakes. Too punishing drives players away; too lenient removes tension. The continue system balances these forces.</p>
+
+    <h4>6. Weapon Switching / Power-Up Cycling</h4>
+    <p>The player can pick up weapon power-ups that replace or augment their default gun. Each weapon has distinct characteristics.</p>
+
+    <pre is:raw><code>WEAPONS = {
+    "default":      { fire_rate: 0.15, damage: 1, pattern: "single" },
+    "spread":       { fire_rate: 0.25, damage: 1, pattern: "fan_5" },
+    "laser":        { fire_rate: 0.05, damage: 0.5, pattern: "continuous" },
+    "missile":      { fire_rate: 0.6, damage: 5, pattern: "single_explosive" },
+}
+
+def fire_weapon(player, aim_dir):
+    weapon = WEAPONS[player.current_weapon]
+    if player.fire_cooldown > 0:
+        return
+    player.fire_cooldown = weapon.fire_rate
+
+    if weapon.pattern == "single":
+        spawn_bullet(player.pos, aim_dir, weapon.damage)
+    elif weapon.pattern == "fan_5":
+        for angle_offset in [-30, -15, 0, 15, 30]:
+            rotated = rotate_vector(aim_dir, angle_offset)
+            spawn_bullet(player.pos, rotated, weapon.damage)</code></pre>
+
+    <p><strong>Why it matters:</strong> Weapon variety gives the player tactical choices within the moment-to-moment action. Different weapons excel against different enemy configurations.</p>
+
+    <hr />
+
+    <h3>Stretch Goals</h3>
+    <ul>
+      <li><strong>Vehicle section:</strong> A brief segment where the player rides a vehicle with different movement and firepower.</li>
+      <li><strong>Screen-clearing bomb:</strong> A limited-use "smart bomb" that destroys all on-screen enemies and bullets.</li>
+      <li><strong>Score and ranking system:</strong> Track kills, accuracy, time, and deaths to assign a letter grade at level end.</li>
+      <li><strong>Destructible environment:</strong> Certain terrain elements can be destroyed by gunfire.</li>
+    </ul>
+
+    <h3>MVP Spec</h3>
+    <table>
+      <thead><tr><th>Feature</th><th>Required</th></tr></thead>
+      <tbody>
+        <tr><td>Player movement with platforming (run, jump)</td><td>Yes</td></tr>
+        <tr><td>Multi-directional aiming (4+ directions)</td><td>Yes</td></tr>
+        <tr><td>Firing projectiles in aim direction</td><td>Yes</td></tr>
+        <tr><td>Scrolling level with authored enemy placements</td><td>Yes</td></tr>
+        <tr><td>At least 3 enemy types with distinct behaviors</td><td>Yes</td></tr>
+        <tr><td>Multi-phase boss at level end</td><td>Yes</td></tr>
+        <tr><td>Boss telegraph and vulnerability windows</td><td>Yes</td></tr>
+        <tr><td>Two-player co-op on shared screen</td><td>Yes</td></tr>
+        <tr><td>Lives system with respawn</td><td>Yes</td></tr>
+        <tr><td>At least 2 weapon pickups</td><td>Yes</td></tr>
+        <tr><td>Vehicle section</td><td>Stretch</td></tr>
+        <tr><td>Screen-clearing bomb</td><td>Stretch</td></tr>
+        <tr><td>Score / ranking system</td><td>Stretch</td></tr>
+        <tr><td>Destructible environment</td><td>Stretch</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliverable</h3>
+    <p>Submit your playable run and gun level with source code, including the boss fight. Include a short write-up (300-500 words) answering: <em>How did you design your boss's phases to teach the player its patterns? Describe the telegraph-attack-vulnerability loop for each phase and how difficulty escalates between phases.</em></p>
+
+    <hr />
+
+    <h2>Analogies by Background</h2>
+    <blockquote><p>These analogies map game dev concepts to patterns you already know. Find your background below.</p></blockquote>
+
+    <h3>For Backend Developers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Multi-directional aiming</td><td>A request router resolving two independent parameters simultaneously (resource path + HTTP method)</td></tr>
+        <tr><td>Scrolling level with enemy placement</td><td>A queue-based job system &mdash; work items are pre-authored and activate when they reach the processing window</td></tr>
+        <tr><td>Boss pattern design</td><td>A circuit breaker with states &mdash; closed (attacking), open (vulnerable), half-open (telegraph)</td></tr>
+        <tr><td>Co-op / two-player</td><td>Multi-tenant architecture &mdash; two independent users sharing the same runtime</td></tr>
+        <tr><td>Limited lives / continue system</td><td>Retry policies with exponential backoff &mdash; fixed retries before requiring manual intervention</td></tr>
+        <tr><td>Weapon switching / power-ups</td><td>Strategy pattern &mdash; swapping the active algorithm at runtime based on configuration</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Frontend Developers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Multi-directional aiming</td><td>A drag-and-drop handler tracking cursor position and modifier keys independently</td></tr>
+        <tr><td>Scrolling level with enemy placement</td><td>Virtualized list rendering &mdash; elements activate when they scroll into the viewport</td></tr>
+        <tr><td>Boss pattern design</td><td>A multi-step animation sequence &mdash; keyframes with transitions between states</td></tr>
+        <tr><td>Co-op / two-player</td><td>Split state management &mdash; two independent component trees sharing a single layout container</td></tr>
+        <tr><td>Limited lives / continue system</td><td>Form validation retry limits &mdash; fixed attempts before locking the form</td></tr>
+        <tr><td>Weapon switching / power-ups</td><td>Theme switching &mdash; swapping a configuration object that changes behavior and appearance</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Data / ML Engineers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Multi-directional aiming</td><td>Multi-objective optimization &mdash; simultaneously optimizing two independent axes</td></tr>
+        <tr><td>Scrolling level with enemy placement</td><td>Windowed stream processing &mdash; events are pre-positioned and activate when they enter the window</td></tr>
+        <tr><td>Boss pattern design</td><td>A state machine in a Markov chain &mdash; defined transition probabilities between states</td></tr>
+        <tr><td>Co-op / two-player</td><td>Multi-agent simulation &mdash; two independent agents in a shared environment</td></tr>
+        <tr><td>Limited lives / continue system</td><td>Training budget &mdash; a fixed compute allocation (lives) before the run terminates</td></tr>
+        <tr><td>Weapon switching / power-ups</td><td>Hyperparameter swapping mid-run &mdash; changing configuration during training</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li><strong>Authored vs. emergent difficulty:</strong> Run and gun games hand-place every enemy encounter, while roguelikes procedurally generate them. What are the advantages and disadvantages of each approach?</li>
+      <li><strong>The camera problem in co-op:</strong> When two players share a screen but can move independently, the camera must make compromises. What happens when one player rushes ahead?</li>
+      <li><strong>Fairness in one-hit-kill design:</strong> Classic run and gun games kill the player in one hit, yet players accept this. What design elements make one-hit kills feel fair rather than frustrating?</li>
+      <li><strong>Boss readability:</strong> A boss with three phases needs to teach the player its patterns without explicit tutorials. How do you use visual and audio telegraphs?</li>
+    </ol>
+
+    <nav class="module-nav">
+      <a href={`${base}modules/14-metroidvania/`}>&larr; Module 14: Metroidvania</a>
+      <a href={`${base}modules/`}>All Modules &rarr;</a>
+    </nav>
+  </div>
+</BaseLayout>
+
+<script>
+// ============================================================
+// DEMO 1: MULTI-DIRECTIONAL AIMING
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-aim');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const keys = {};
+  window.addEventListener('keydown', function(e) {
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+    keys[e.key] = true;
+  });
+  window.addEventListener('keyup', function(e) { keys[e.key] = false; });
+
+  const player = { x: W / 2, y: H / 2 + 40 };
+  let aimX = 1, aimY = 0;
+  let facing = 1;
+  const bullets = [];
+  let fireCooldown = 0;
+
+  const groundY = H / 2 + 80;
+
+  // Direction names for display
+  function getDirName(ax, ay) {
+    if (ax === 0 && ay === -1) return 'Up';
+    if (ax === 0 && ay === 1) return 'Down';
+    if (ax === 1 && ay === 0) return 'Right';
+    if (ax === -1 && ay === 0) return 'Left';
+    if (ax > 0 && ay < 0) return 'Up-Right';
+    if (ax < 0 && ay < 0) return 'Up-Left';
+    if (ax > 0 && ay > 0) return 'Down-Right';
+    if (ax < 0 && ay > 0) return 'Down-Left';
+    return 'Right';
+  }
+
+  function render() {
+    // Update aim based on arrow keys
+    let newAimX = 0, newAimY = 0;
+    if (keys['ArrowUp']) newAimY = -1;
+    if (keys['ArrowDown']) newAimY = 1;
+    if (keys['ArrowLeft']) { newAimX = -1; facing = -1; }
+    if (keys['ArrowRight']) { newAimX = 1; facing = 1; }
+
+    // Default to facing direction if no input
+    if (newAimX === 0 && newAimY === 0) {
+      aimX = facing; aimY = 0;
+    } else {
+      // Normalize
+      const len = Math.sqrt(newAimX * newAimX + newAimY * newAimY);
+      aimX = newAimX / len;
+      aimY = newAimY / len;
+    }
+
+    // Fire
+    if (fireCooldown > 0) fireCooldown--;
+    if (keys[' '] && fireCooldown <= 0) {
+      bullets.push({
+        x: player.x + aimX * 20,
+        y: player.y - 8 + aimY * 20,
+        vx: aimX * 8,
+        vy: aimY * 8,
+        life: 60
+      });
+      fireCooldown = 8;
+    }
+
+    // Update bullets
+    for (let i = bullets.length - 1; i >= 0; i--) {
+      bullets[i].x += bullets[i].vx;
+      bullets[i].y += bullets[i].vy;
+      bullets[i].life--;
+      if (bullets[i].life <= 0 || bullets[i].x < -20 || bullets[i].x > W + 20 || bullets[i].y < -20 || bullets[i].y > H + 20) {
+        bullets.splice(i, 1);
+      }
+    }
+
+    // Render
+    ctx.clearRect(0, 0, W, H);
+
+    // Background
+    ctx.fillStyle = '#0a0a14';
+    ctx.fillRect(0, 0, W, H);
+
+    // Ground
+    ctx.fillStyle = '#1a1a1e';
+    ctx.fillRect(0, groundY, W, H - groundY);
+    ctx.strokeStyle = '#2a2a2e';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, groundY);
+    ctx.lineTo(W, groundY);
+    ctx.stroke();
+
+    // Direction compass (all 8 directions)
+    const compassX = W - 80, compassY = 70, compassR = 40;
+    ctx.strokeStyle = '#1a1a1e';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(compassX, compassY, compassR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    const dirs = [
+      { dx: 0, dy: -1, label: 'U' },
+      { dx: 1, dy: -1, label: 'UR' },
+      { dx: 1, dy: 0, label: 'R' },
+      { dx: 1, dy: 1, label: 'DR' },
+      { dx: 0, dy: 1, label: 'D' },
+      { dx: -1, dy: 1, label: 'DL' },
+      { dx: -1, dy: 0, label: 'L' },
+      { dx: -1, dy: -1, label: 'UL' }
+    ];
+
+    for (const d of dirs) {
+      const len = Math.sqrt(d.dx * d.dx + d.dy * d.dy);
+      const nx = d.dx / len, ny = d.dy / len;
+      const active = Math.abs(aimX - nx) < 0.3 && Math.abs(aimY - ny) < 0.3;
+      const ex = compassX + nx * compassR;
+      const ey = compassY + ny * compassR;
+      ctx.beginPath();
+      ctx.arc(ex, ey, 5, 0, Math.PI * 2);
+      ctx.fillStyle = active ? '#f59e0b' : '#2a2a2e';
+      ctx.fill();
+      ctx.fillStyle = active ? '#f59e0b' : '#3f3f46';
+      ctx.font = '8px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(d.label, ex + nx * 12, ey + ny * 12 + 3);
+    }
+
+    // Bullets
+    for (const b of bullets) {
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#f59e0b';
+      ctx.fill();
+      // Trail
+      ctx.beginPath();
+      ctx.moveTo(b.x, b.y);
+      ctx.lineTo(b.x - b.vx * 2, b.y - b.vy * 2);
+      ctx.strokeStyle = '#f59e0b44';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // Player character
+    ctx.save();
+    ctx.translate(player.x, player.y);
+
+    // Body
+    ctx.fillStyle = '#3b82f6';
+    ctx.beginPath();
+    ctx.roundRect(-12 * facing, -24, 24, 28, 4);
+    ctx.fill();
+
+    // Head
+    ctx.beginPath();
+    ctx.arc(0, -30, 8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Legs
+    ctx.fillStyle = '#2563eb';
+    ctx.fillRect(-8, 4, 6, 12);
+    ctx.fillRect(2, 4, 6, 12);
+
+    // Gun arm (follows aim direction)
+    const armLen = 22;
+    const armX = aimX * armLen;
+    const armY = aimY * armLen - 8;
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(facing * 6, -10);
+    ctx.lineTo(armX, armY);
+    ctx.stroke();
+
+    // Gun tip
+    ctx.beginPath();
+    ctx.arc(armX, armY, 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#f59e0b';
+    ctx.fill();
+
+    ctx.restore();
+
+    // Aim line (longer, faded)
+    ctx.beginPath();
+    ctx.moveTo(player.x + aimX * 25, player.y - 8 + aimY * 25);
+    ctx.lineTo(player.x + aimX * 100, player.y - 8 + aimY * 100);
+    ctx.strokeStyle = '#f59e0b33';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([6, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // HUD
+    ctx.fillStyle = '#a1a1aa';
+    ctx.font = '12px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('Aim: ' + getDirName(Math.round(aimX), Math.round(aimY)), 16, 24);
+    ctx.fillText('Direction: (' + aimX.toFixed(2) + ', ' + aimY.toFixed(2) + ')', 16, 42);
+    ctx.fillText('Facing: ' + (facing > 0 ? 'Right' : 'Left'), 16, 60);
+
+    ctx.fillStyle = '#71717a';
+    ctx.font = '11px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Arrow keys = aim (8 directions). Space = fire. Aim direction is independent of facing.', W / 2, H - 12);
+
+    requestAnimationFrame(render);
+  }
+  requestAnimationFrame(render);
+})();
+
+
+// ============================================================
+// DEMO 2: BOSS PATTERN VISUALIZER
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-boss');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  let bossHP = 100, bossMaxHP = 100;
+  let bossPhase = 1;
+  let bossState = 'idle'; // idle, telegraph, attack, vulnerable
+  let stateTimer = 0;
+  let phaseTimers = { idle: 1.0, telegraph: 0.8, attack: 1.2, vulnerable: 1.5 };
+  let totalTime = 0;
+  let message = '';
+  let msgTimer = 0;
+  let flashTimer = 0;
+  let playerCanAttack = false;
+  let gameState = 'playing'; // playing, won
+
+  function enterState(state) {
+    bossState = state;
+    stateTimer = phaseTimers[state];
+    if (state === 'vulnerable') playerCanAttack = true;
+    else playerCanAttack = false;
+  }
+
+  enterState('idle');
+
+  // Timeline history
+  const timeline = [];
+  const timelineMax = 200;
+
+  function getCanvasPos(e) {
+    const r = canvas.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height };
+  }
+
+  const btnAttack = { x: 80, y: H - 60, w: 120, h: 36 };
+  const btnReset = { x: W - 170, y: H - 60, w: 100, h: 36 };
+
+  canvas.addEventListener('click', function(e) {
+    const p = getCanvasPos(e);
+    // Attack button
+    if (p.x >= btnAttack.x && p.x <= btnAttack.x + btnAttack.w && p.y >= btnAttack.y && p.y <= btnAttack.y + btnAttack.h) {
+      if (gameState === 'playing') {
+        if (playerCanAttack) {
+          const dmg = 8 + Math.floor(Math.random() * 5);
+          bossHP = Math.max(0, bossHP - dmg);
+          message = 'Hit! -' + dmg + ' HP';
+          msgTimer = 60;
+          flashTimer = 10;
+
+          // Phase transitions
+          if (bossHP <= 0) {
+            gameState = 'won';
+            message = 'Boss Defeated!';
+            msgTimer = 999;
+          } else if (bossHP <= 30 && bossPhase < 3) {
+            bossPhase = 3;
+            phaseTimers = { idle: 0.5, telegraph: 0.5, attack: 1.8, vulnerable: 0.8 };
+            message = 'Phase 3! Boss enraged!'; msgTimer = 90;
+          } else if (bossHP <= 60 && bossPhase < 2) {
+            bossPhase = 2;
+            phaseTimers = { idle: 0.7, telegraph: 0.6, attack: 1.5, vulnerable: 1.0 };
+            message = 'Phase 2! Attacks faster!'; msgTimer = 90;
+          }
+        } else {
+          message = 'Boss is not vulnerable!';
+          msgTimer = 60;
+        }
+      }
+    }
+    // Reset button
+    if (p.x >= btnReset.x && p.x <= btnReset.x + btnReset.w && p.y >= btnReset.y && p.y <= btnReset.y + btnReset.h) {
+      bossHP = 100; bossPhase = 1; gameState = 'playing';
+      phaseTimers = { idle: 1.0, telegraph: 0.8, attack: 1.2, vulnerable: 1.5 };
+      enterState('idle');
+      timeline.length = 0;
+    }
+  });
+
+  let lastTime = performance.now();
+
+  function render(now) {
+    const dt = Math.min((now - lastTime) / 1000, 0.05);
+    lastTime = now;
+
+    if (gameState === 'playing') {
+      totalTime += dt;
+      stateTimer -= dt;
+      if (flashTimer > 0) flashTimer--;
+
+      if (stateTimer <= 0) {
+        if (bossState === 'idle') enterState('telegraph');
+        else if (bossState === 'telegraph') enterState('attack');
+        else if (bossState === 'attack') enterState('vulnerable');
+        else if (bossState === 'vulnerable') enterState('idle');
+      }
+
+      // Timeline
+      const colors = { idle: '#71717a', telegraph: '#f59e0b', attack: '#ef4444', vulnerable: '#22c55e' };
+      timeline.push(colors[bossState]);
+      if (timeline.length > timelineMax) timeline.shift();
+    }
+    if (msgTimer > 0) msgTimer--;
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Background
+    ctx.fillStyle = '#0a0a14';
+    ctx.fillRect(0, 0, W, H);
+
+    // Ground
+    ctx.fillStyle = '#1a1a1e';
+    ctx.fillRect(0, 280, W, H - 280);
+
+    // Player (left side)
+    ctx.fillStyle = '#3b82f6';
+    ctx.beginPath();
+    ctx.arc(120, 240, 16, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillRect(108, 256, 24, 24);
+    ctx.fillStyle = '#2563eb';
+    ctx.fillRect(110, 280, 8, 14);
+    ctx.fillRect(122, 280, 8, 14);
+
+    // Gun
+    ctx.strokeStyle = '#a1a1aa';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(136, 260);
+    ctx.lineTo(160, 255);
+    ctx.stroke();
+
+    // Boss (right side)
+    const bossX = W - 180, bossY = 200;
+    const bossW = 120, bossH = 100;
+
+    // Boss color based on state
+    let bossColor = '#3f3f46';
+    let bossGlow = '';
+    if (bossState === 'telegraph') { bossColor = '#f59e0b'; bossGlow = 'rgba(245, 158, 11, 0.15)'; }
+    else if (bossState === 'attack') { bossColor = '#ef4444'; bossGlow = 'rgba(239, 68, 68, 0.15)'; }
+    else if (bossState === 'vulnerable') { bossColor = '#22c55e'; bossGlow = 'rgba(34, 197, 94, 0.15)'; }
+
+    if (flashTimer > 0) {
+      bossColor = '#ffffff';
+    }
+
+    // Boss glow
+    if (bossGlow) {
+      ctx.fillStyle = bossGlow;
+      ctx.beginPath();
+      ctx.roundRect(bossX - 15, bossY - 15, bossW + 30, bossH + 30, 12);
+      ctx.fill();
+    }
+
+    // Boss body
+    ctx.fillStyle = bossColor + '33';
+    ctx.strokeStyle = bossColor;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.roundRect(bossX, bossY, bossW, bossH, 8);
+    ctx.fill();
+    ctx.stroke();
+
+    // Boss face
+    ctx.fillStyle = bossColor;
+    ctx.font = '36px serif';
+    ctx.textAlign = 'center';
+    if (bossState === 'attack') ctx.fillText('\uD83D\uDCA2', bossX + bossW / 2, bossY + bossH / 2 + 12);
+    else if (bossState === 'vulnerable') ctx.fillText('\uD83D\uDE35', bossX + bossW / 2, bossY + bossH / 2 + 12);
+    else if (bossState === 'telegraph') ctx.fillText('\u26A0\uFE0F', bossX + bossW / 2, bossY + bossH / 2 + 12);
+    else ctx.fillText('\uD83D\uDE20', bossX + bossW / 2, bossY + bossH / 2 + 12);
+
+    // Attack visual (projectiles during attack state)
+    if (bossState === 'attack') {
+      const attackProgress = 1 - (stateTimer / phaseTimers.attack);
+      for (let i = 0; i < bossPhase + 1; i++) {
+        const spread = (i - bossPhase / 2) * 30;
+        const bx = bossX - attackProgress * (bossX - 160);
+        const by = bossY + bossH / 2 + spread;
+        ctx.beginPath();
+        ctx.arc(bx, by, 5, 0, Math.PI * 2);
+        ctx.fillStyle = '#ef4444';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(bx, by, 8, 0, Math.PI * 2);
+        ctx.fillStyle = '#ef444433';
+        ctx.fill();
+      }
+    }
+
+    // Boss HP bar
+    const hpBarX = bossX - 10, hpBarY = bossY - 30, hpBarW = bossW + 20, hpBarH = 14;
+    ctx.fillStyle = '#18181b';
+    ctx.beginPath();
+    ctx.roundRect(hpBarX, hpBarY, hpBarW, hpBarH, 3);
+    ctx.fill();
+    const hpPct = Math.max(0, bossHP / bossMaxHP);
+    const hpColor = hpPct > 0.6 ? '#ef4444' : hpPct > 0.3 ? '#f59e0b' : '#a855f7';
+    ctx.fillStyle = hpColor;
+    ctx.beginPath();
+    ctx.roundRect(hpBarX, hpBarY, hpBarW * hpPct, hpBarH, 3);
+    ctx.fill();
+    ctx.fillStyle = '#e4e4e7';
+    ctx.font = '600 9px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(bossHP + ' / ' + bossMaxHP, hpBarX + hpBarW / 2, hpBarY + hpBarH / 2 + 3);
+
+    // Phase and state display
+    ctx.fillStyle = '#e4e4e7';
+    ctx.font = '600 14px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('Phase ' + bossPhase, 16, 28);
+
+    const stateColors = { idle: '#71717a', telegraph: '#f59e0b', attack: '#ef4444', vulnerable: '#22c55e' };
+    ctx.fillStyle = stateColors[bossState];
+    ctx.font = '700 16px "JetBrains Mono", monospace';
+    ctx.fillText(bossState.toUpperCase(), 16, 50);
+
+    const stateLabels = {
+      idle: 'Boss is idle. Waiting...',
+      telegraph: 'WARNING! Attack incoming!',
+      attack: 'DODGE! Boss is attacking!',
+      vulnerable: 'NOW! Boss is vulnerable - Attack!'
+    };
+    ctx.fillStyle = stateColors[bossState];
+    ctx.font = '12px Inter, sans-serif';
+    ctx.fillText(stateLabels[bossState], 16, 70);
+
+    // Timer bar for current state
+    const timerBarX = 16, timerBarY = 80, timerBarW = 200, timerBarH = 6;
+    ctx.fillStyle = '#18181b';
+    ctx.fillRect(timerBarX, timerBarY, timerBarW, timerBarH);
+    ctx.fillStyle = stateColors[bossState];
+    ctx.fillRect(timerBarX, timerBarY, timerBarW * (stateTimer / phaseTimers[bossState]), timerBarH);
+
+    // Timeline bar (bottom)
+    const tlX = 20, tlY = H - 110, tlW = W - 40, tlH = 20;
+    ctx.fillStyle = '#18181b';
+    ctx.beginPath();
+    ctx.roundRect(tlX, tlY, tlW, tlH, 3);
+    ctx.fill();
+
+    for (let i = 0; i < timeline.length; i++) {
+      const cx = tlX + (i / timelineMax) * tlW;
+      ctx.fillStyle = timeline[i];
+      ctx.fillRect(cx, tlY, Math.max(1, tlW / timelineMax), tlH);
+    }
+
+    // Timeline legend
+    ctx.font = '9px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    const legendItems = [
+      { label: 'Idle', color: '#71717a' },
+      { label: 'Telegraph', color: '#f59e0b' },
+      { label: 'Attack', color: '#ef4444' },
+      { label: 'Vulnerable', color: '#22c55e' }
+    ];
+    let lx = tlX;
+    for (const li of legendItems) {
+      ctx.fillStyle = li.color;
+      ctx.fillRect(lx, tlY + tlH + 6, 10, 10);
+      ctx.fillText(li.label, lx + 14, tlY + tlH + 15);
+      lx += 80;
+    }
+
+    // Buttons
+    // Attack button
+    ctx.fillStyle = playerCanAttack ? '#1a2a1a' : '#1c1c20';
+    ctx.strokeStyle = playerCanAttack ? '#22c55e' : '#3f3f46';
+    ctx.lineWidth = playerCanAttack ? 2 : 1;
+    ctx.beginPath();
+    ctx.roundRect(btnAttack.x, btnAttack.y, btnAttack.w, btnAttack.h, 4);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = playerCanAttack ? '#22c55e' : '#71717a';
+    ctx.font = '600 13px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(playerCanAttack ? 'ATTACK NOW!' : 'Attack', btnAttack.x + btnAttack.w / 2, btnAttack.y + btnAttack.h / 2);
+
+    // Reset button
+    ctx.fillStyle = '#1c1c20';
+    ctx.strokeStyle = '#71717a';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(btnReset.x, btnReset.y, btnReset.w, btnReset.h, 4);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#71717a';
+    ctx.fillText('Reset', btnReset.x + btnReset.w / 2, btnReset.y + btnReset.h / 2);
+    ctx.textBaseline = 'alphabetic';
+
+    // Message
+    if (msgTimer > 0) {
+      ctx.fillStyle = '#f59e0b';
+      ctx.font = '600 14px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(message, W / 2, 140);
+    }
+
+    // Win overlay
+    if (gameState === 'won') {
+      ctx.fillStyle = 'rgba(10, 10, 11, 0.7)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#22c55e';
+      ctx.font = '700 36px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Boss Defeated!', W / 2, H / 2 - 20);
+      ctx.fillStyle = '#a1a1aa';
+      ctx.font = '14px Inter, sans-serif';
+      ctx.fillText('Click Reset to try again', W / 2, H / 2 + 20);
+      ctx.textBaseline = 'alphabetic';
+    }
+
+    requestAnimationFrame(render);
+  }
+  requestAnimationFrame(render);
+})();
+</script>

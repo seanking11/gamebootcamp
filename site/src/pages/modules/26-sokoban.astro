@@ -1,0 +1,861 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 26: Sokoban / Push-Block Puzzle">
+  <div class="container page-content">
+    <div class="module-header">
+      <div class="module-number">Module 26</div>
+      <h1>Sokoban / Push-Block Puzzle</h1>
+      <p class="module-theme">Constrained movement, irreversible consequences &mdash; The Warehouse</p>
+    </div>
+
+    <blockquote>
+      <p>"Every push closes a door. The puzzle is knowing which doors you can afford to close."</p>
+    </blockquote>
+
+    <hr />
+
+    <h2>Prerequisites</h2>
+    <table>
+      <thead>
+        <tr><th>Module</th><th>What You Used From It</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Module 5 - Puzzle</td><td>Grid-based game state, tile-based movement, representing a discrete game world as a 2D array</td></tr>
+        <tr><td>Module 7 - Roguelike</td><td>Turn-based grid movement: the player occupies a grid cell and moves one step at a time in cardinal directions</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h2>Week 1: History &amp; Design Theory</h2>
+
+    <h3>The Origin</h3>
+    <p>Sokoban was created in 1981 by Hiroyuki Imabayashi, a college student in Japan, and published in 1982 by Thinking Rabbit. The name means "warehouse keeper," and the game is exactly that: you play a worker pushing crates onto marked storage locations in a warehouse. The rules fit on a napkin &mdash; move in four directions, push one crate at a time, cannot pull, cannot push two crates at once. Yet from these minimal rules emerges staggering complexity. Some Sokoban levels have been proven to require hundreds of moves to solve and are studied in computer science as examples of PSPACE-complete problems. Its genius is the gap between the simplicity of its rules and the depth of its challenges.</p>
+
+    <h3>How the Genre Evolved</h3>
+    <p><strong>Sokoban (Hiroyuki Imabayashi, 1982):</strong> The original defined the entire genre with a ruleset so tight it has barely been modified in forty years. Player pushes boxes onto targets on a grid. Cannot pull. Cannot push more than one box. Its lasting influence comes from its purity.</p>
+    <p><strong>Stephen's Sausage Roll (Increpare, 2016):</strong> Transformed the push puzzle into a three-dimensional spatial reasoning challenge. Instead of boxes, you push sausages that occupy two tiles and must be grilled on all sides. It demonstrated that the Sokoban framework could be extended in directions nobody had imagined.</p>
+    <p><strong>Baba Is You (Arvi Teikari, 2019):</strong> Deconstructed the puzzle genre itself by making the rules of the game into pushable objects on the grid. "BABA IS YOU" is a sentence made of word-blocks; push "ROCK" into "IS" and "YOU" and suddenly you control the rocks instead. It proved that the Sokoban grid could be a platform for meta-game design.</p>
+
+    <h3>What Makes It "Great"</h3>
+    <p>A great push-block puzzle respects the player's intelligence. There are no reflexes to test, no time pressure, no random elements &mdash; just you and the grid and the consequences of your decisions. The satisfaction comes from the moment of insight: staring at a level for minutes, feeling stuck, and then suddenly seeing the one sequence of moves that threads every block to its target without trapping any of them. Every wall is there for a reason. Every empty space matters.</p>
+
+    <h3>The Essential Mechanic</h3>
+    <p>Spatial reasoning where objects only push, never pull &mdash; every move narrows your options.</p>
+
+    <hr />
+
+    <h2>Week 2: Build the MVP</h2>
+
+    <h3>What You're Building</h3>
+    <p>A classic Sokoban game with 5-8 handcrafted levels of increasing difficulty. The player moves on a grid, pushes blocks onto target squares, and wins each level when all blocks are on targets. The game includes an undo system, dead-state detection, and a level serialization format.</p>
+
+    <h3>Core Concepts (Must Implement)</h3>
+
+    <h4>1. Push Mechanics</h4>
+    <p>The player can push a block by moving into it, but only if the space behind the block is empty. The player cannot pull blocks, and pushing two blocks at once is not allowed. These constraints are what make the puzzles work.</p>
+    <pre is:raw><code>WALL = '#'
+FLOOR = '.'
+TARGET = 'x'
+BLOCK = 'B'
+PLAYER = 'P'
+BLOCK_ON_TARGET = 'O'
+
+function try_move(state, direction):
+    player_pos = state.player_position
+    dest = player_pos + direction
+    behind = dest + direction
+
+    tile_at_dest = state.grid[dest.y][dest.x]
+
+    if tile_at_dest == WALL:
+        return state    // cannot move into wall
+
+    if tile_at_dest == BLOCK or tile_at_dest == BLOCK_ON_TARGET:
+        tile_behind = state.grid[behind.y][behind.x]
+        if tile_behind == WALL or tile_behind == BLOCK or tile_behind == BLOCK_ON_TARGET:
+            return state    // cannot push into wall or another block
+        new_state = state.clone()
+        move_block(new_state, dest, behind)
+        move_player(new_state, player_pos, dest)
+        return new_state
+
+    new_state = state.clone()
+    move_player(new_state, player_pos, dest)
+    return new_state</code></pre>
+    <p><strong>Why it matters:</strong> The push-only constraint is the entire game. If you could pull blocks, most Sokoban puzzles would become trivial. Once you push a block against a wall, it might be stuck there forever. This is what makes each move feel weighty.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Push Mechanics</div>
+      <p class="demo-hint">Use arrow keys to move the player (blue). Push the box (brown) onto the target (X mark). You can only push, never pull. Cannot push through walls or other boxes.</p>
+      <canvas id="demo-push" width="760" height="340"></canvas>
+      <div class="demo-controls">
+        <button id="push-reset-btn">Reset</button>
+        <span class="value-display" id="push-moves">Moves: 0</span>
+        <span class="value-display" id="push-status">Push the box onto the X</span>
+      </div>
+    </div>
+
+    <h4>2. Undo System</h4>
+    <p>Every move pushes the entire game state onto a history stack. Pressing undo pops the most recent state and restores it. This is essential for puzzle games &mdash; without undo, a single mistake forces a full restart.</p>
+    <pre is:raw><code>class UndoableGame:
+    current_state: GameState
+    history: Stack of GameState = []
+    redo_stack: Stack of GameState = []
+
+function make_move(game, direction):
+    new_state = try_move(game.current_state, direction)
+    if new_state != game.current_state:
+        game.history.push(game.current_state)
+        game.current_state = new_state
+        game.redo_stack.clear()
+
+function undo(game):
+    if game.history.is_empty(): return
+    game.redo_stack.push(game.current_state)
+    game.current_state = game.history.pop()
+
+function redo(game):
+    if game.redo_stack.is_empty(): return
+    game.history.push(game.current_state)
+    game.current_state = game.redo_stack.pop()</code></pre>
+    <p><strong>Why it matters:</strong> Undo transforms puzzle games from frustrating trial-and-error into satisfying experimentation. The stack-based approach is clean: every state is an immutable snapshot, so undo is just swapping which snapshot is active. This is also a practical lesson in state management that applies far beyond games.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Undo System</div>
+      <p class="demo-hint">Same puzzle but with undo. Press Z or click "Undo" to take back moves. Watch the state stack grow and shrink on the right side. The stack visualizes how undo works.</p>
+      <canvas id="demo-undo" width="760" height="340"></canvas>
+      <div class="demo-controls">
+        <button id="undo-undo-btn">Undo (Z)</button>
+        <button id="undo-reset-btn">Reset</button>
+        <span class="value-display" id="undo-moves">Moves: 0</span>
+        <span class="value-display" id="undo-stack-size">Stack: 0</span>
+      </div>
+    </div>
+
+    <h4>3. Puzzle State Validation</h4>
+    <p>The game checks whether the current state is a win (all blocks on targets) after every move.</p>
+    <pre is:raw><code>function is_level_complete(state):
+    for target_pos in state.target_positions:
+        if state.grid[target_pos.y][target_pos.x] != BLOCK_ON_TARGET:
+            return false
+    return true
+
+function after_move(game):
+    if is_level_complete(game.current_state):
+        display_victory(moves=game.history.length)
+        advance_to_next_level(game)</code></pre>
+    <p><strong>Why it matters:</strong> State validation is the feedback loop that makes the game satisfying. The instant the last block slides onto the last target, the player needs to know they won.</p>
+
+    <h4>4. Level Design for Puzzles</h4>
+    <p>Designing good Sokoban levels is a craft. Each level should have a unique solution path, a clear difficulty curve, and an "aha moment" where the player discovers the key insight.</p>
+    <pre is:raw><code>level_design_principles = {
+    "level_1": "Teach pushing: 1 block, 1 target, straight line",
+    "level_2": "Teach turning: 1 block, 1 target, requires L-shaped push",
+    "level_3": "Introduce order: 2 blocks, 2 targets, must push in correct order",
+    "level_4": "Dead states: 2 blocks, wall corners, wrong push = stuck",
+    "level_5": "Multi-step: 3 blocks, requires temporary parking of blocks",
+    "level_6": "Bottleneck: narrow corridor forces precise sequencing",
+    "level_7": "Full puzzle: 4+ blocks, all concepts combined"
+}</code></pre>
+    <p><strong>Why it matters:</strong> A Sokoban engine without good levels is like a piano without music. The code is just the instrument; the levels are the composition.</p>
+
+    <h4>5. Dead-State Detection</h4>
+    <p>A dead state occurs when a block is in a position from which it can never reach any target. The simplest case: a block pushed into a corner with no target there.</p>
+    <pre is:raw><code>function is_simple_deadlock(state, block_pos):
+    if is_on_target(state, block_pos): return false
+    blocked_horizontal = (is_wall(state, block_pos + LEFT) or
+                          is_wall(state, block_pos + RIGHT))
+    blocked_vertical =   (is_wall(state, block_pos + UP) or
+                          is_wall(state, block_pos + DOWN))
+    if blocked_horizontal AND blocked_vertical:
+        return true    // stuck in a corner, no target here = dead
+    return false</code></pre>
+    <p><strong>Why it matters:</strong> Dead-state detection is the difference between a frustrating puzzle game and a fair one. Without it, the player might spend ten minutes trying to solve a puzzle that became unsolvable on their third move.</p>
+
+    <h4>6. Level Serialization</h4>
+    <p>Levels are stored as compact text strings using the standard Sokoban format: <code>#</code> = wall, <code>.</code> = target, <code>$</code> = block, <code>@</code> = player, <code>*</code> = block on target, <code>+</code> = player on target, space = floor.</p>
+    <pre is:raw><code>level_string = """
+  #####
+###   #
+#.@$  #
+### $.#
+#.##$ #
+# # . ##
+#$ *$$.#
+#   .  #
+########
+"""
+
+function parse_level(level_string):
+    state = GameState()
+    rows = level_string.split('\n')
+    for y, row in enumerate(rows):
+        for x, char in enumerate(row):
+            match char:
+                '#': state.grid[y][x] = WALL
+                '.': state.target_positions.add({x, y})
+                '$': state.block_positions.add({x, y})
+                '@': state.player_position = {x, y}
+                '*': state.target_positions.add({x, y})
+                     state.block_positions.add({x, y})
+    return state</code></pre>
+    <p><strong>Why it matters:</strong> Level serialization makes your puzzle game extensible. With a text-based format, anyone can create new levels. The standard Sokoban format has been used for decades, and there are thousands of community-made levels available.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Playable Sokoban</div>
+      <p class="demo-hint">A full 7x7 Sokoban puzzle with 3 boxes and 3 targets. Arrow keys to move, Z to undo. Push all boxes onto the target squares (darker squares with X). The game detects when you solve it.</p>
+      <canvas id="demo-sokoban" width="760" height="460"></canvas>
+      <div class="demo-controls">
+        <button id="sok-undo-btn">Undo (Z)</button>
+        <button id="sok-reset-btn">Restart Level</button>
+        <button id="sok-next-btn">Next Level</button>
+        <span class="value-display" id="sok-moves">Moves: 0</span>
+        <span class="value-display" id="sok-pushes">Pushes: 0</span>
+        <span class="value-display" id="sok-level">Level: 1</span>
+      </div>
+    </div>
+
+    <hr />
+
+    <h3>Stretch Goals</h3>
+    <ul>
+      <li><strong>Level editor:</strong> Let the player place walls, blocks, targets, and the player start position on an empty grid.</li>
+      <li><strong>Step counter and par score:</strong> Track the number of moves per level and display a par score.</li>
+      <li><strong>Animated transitions:</strong> Have the player and blocks slide smoothly between grid cells.</li>
+      <li><strong>Rules-as-objects mode:</strong> Implement a small set of Baba Is You-style rule tiles for bonus levels.</li>
+    </ul>
+
+    <h3>MVP Spec</h3>
+    <table>
+      <thead><tr><th>Element</th><th>Scope</th></tr></thead>
+      <tbody>
+        <tr><td>Grid</td><td>Variable size per level, up to 12x12</td></tr>
+        <tr><td>Tiles</td><td>Wall, floor, target, block, player</td></tr>
+        <tr><td>Movement</td><td>4-directional, one cell per move</td></tr>
+        <tr><td>Push rules</td><td>Push one block at a time, only into empty floor or target, no pulling</td></tr>
+        <tr><td>Undo</td><td>Full undo/redo stack, unlimited depth</td></tr>
+        <tr><td>Dead-state</td><td>Corner deadlock detection with visual warning</td></tr>
+        <tr><td>Levels</td><td>5-8 handcrafted levels with progressive difficulty</td></tr>
+        <tr><td>Win condition</td><td>All blocks on targets</td></tr>
+        <tr><td>HUD</td><td>Move counter, level number, undo/redo/restart buttons</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliverable</h3>
+    <p>A playable Sokoban game with 5-8 levels of increasing difficulty. The player pushes blocks onto target squares using four-directional movement. The game must include a working undo system, dead-state detection for corner deadlocks with a visual indicator, and levels loaded from a text-based serialization format.</p>
+
+    <hr />
+
+    <h2>Analogies by Background</h2>
+
+    <h3>For Backend Developers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Push Mechanics</td><td>Like a message queue where you can only enqueue, never dequeue &mdash; once data is pushed through, you cannot pull it back.</td></tr>
+        <tr><td>Undo System</td><td>Like an event-sourced system &mdash; every state change is an event on a log, and "undo" means replaying all events except the last one.</td></tr>
+        <tr><td>State Validation</td><td>Like a health check after every deployment &mdash; a simple predicate confirms all services are in their expected positions.</td></tr>
+        <tr><td>Dead-State Detection</td><td>Like detecting circular dependencies or deadlocks in a locking system &mdash; certain configurations are provably unresolvable.</td></tr>
+        <tr><td>Level Serialization</td><td>Like infrastructure-as-code &mdash; the entire state is described in a declarative text format that can be version-controlled and shared.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Frontend Developers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Push Mechanics</td><td>Like DOM element positioning where you can only push elements in flow direction without pulling them back.</td></tr>
+        <tr><td>Undo System</td><td>Like the browser's history API &mdash; pushState adds to the stack, back pops it.</td></tr>
+        <tr><td>State Validation</td><td>Like form validation on every input change &mdash; a function tests whether all required fields have valid values.</td></tr>
+        <tr><td>Dead-State Detection</td><td>Like detecting impossible form states &mdash; a combination of selections that makes submit permanently unreachable.</td></tr>
+        <tr><td>Level Serialization</td><td>Like saving and loading component state as JSON &mdash; the entire UI configuration is a serializable string.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Data / ML Engineers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Push Mechanics</td><td>Like a write-once data pipeline &mdash; once data flows through a transformation, the original cannot be retrieved from the output.</td></tr>
+        <tr><td>Undo System</td><td>Like checkpointing in model training &mdash; each epoch's weights are saved, and "undo" means rolling back to a previous checkpoint.</td></tr>
+        <tr><td>State Validation</td><td>Like a convergence check &mdash; after each step, verify whether the loss has reached the target threshold.</td></tr>
+        <tr><td>Dead-State Detection</td><td>Like detecting vanished gradients &mdash; certain parameter configurations are provably unable to reach the optimum.</td></tr>
+        <tr><td>Level Design</td><td>Like curating a benchmark dataset &mdash; each example tests a specific capability with a measurable difficulty gradient.</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li><strong>The Undo Dilemma:</strong> Unlimited undo makes Sokoban less punishing but also reduces the weight of each decision. Where do you draw the line?</li>
+      <li><strong>Designing for One Solution:</strong> The best Sokoban levels have exactly one solution. How do you verify this without exhaustive search?</li>
+      <li><strong>The Dead-State UX Problem:</strong> When a puzzle becomes unsolvable, should the game tell the player immediately, wait for them to figure it out, or never say anything?</li>
+      <li><strong>Physical Intuition vs. Abstract Rules:</strong> Classic Sokoban uses the physical metaphor of pushing crates. Baba Is You uses abstract word-tiles. Does the physical metaphor make the game easier to learn?</li>
+    </ol>
+
+    <nav class="module-nav">
+      <a href={`${base}modules/25-4x-strategy/`}>&larr; Module 25: 4X Strategy</a>
+      <a href={`${base}modules/27-physics-puzzle/`}>Module 27: Physics Puzzle &rarr;</a>
+    </nav>
+  </div>
+</BaseLayout>
+
+<script>
+// ==================== Shared Sokoban Engine ====================
+(function() {
+  const WALL = '#', FLOOR = ' ', TARGET = '.', BOX = '$', PLAYER = '@', BOX_ON_TARGET = '*', PLAYER_ON_TARGET = '+';
+
+  function parseLevel(str) {
+    const lines = str.split('\n').filter(l => l.length > 0);
+    const rows = lines.length;
+    const cols = Math.max(...lines.map(l => l.length));
+    const grid = [];
+    const targets = [];
+    const boxes = [];
+    let player = null;
+    for (let r = 0; r < rows; r++) {
+      grid[r] = [];
+      for (let c = 0; c < cols; c++) {
+        const ch = (lines[r] || '')[c] || ' ';
+        if (ch === WALL) grid[r][c] = WALL;
+        else grid[r][c] = FLOOR;
+
+        if (ch === TARGET || ch === BOX_ON_TARGET || ch === PLAYER_ON_TARGET) targets.push({r, c});
+        if (ch === BOX || ch === BOX_ON_TARGET) boxes.push({r, c});
+        if (ch === PLAYER || ch === PLAYER_ON_TARGET) player = {r, c};
+      }
+    }
+    return { grid, targets, boxes, player, rows, cols };
+  }
+
+  function cloneState(s) {
+    return { grid: s.grid, targets: s.targets.map(t => ({...t})), boxes: s.boxes.map(b => ({...b})), player: {...s.player}, rows: s.rows, cols: s.cols };
+  }
+
+  function hasBox(boxes, r, c) { return boxes.some(b => b.r === r && b.c === c); }
+  function isTarget(targets, r, c) { return targets.some(t => t.r === r && t.c === c); }
+
+  function tryMove(state, dr, dc) {
+    const pr = state.player.r + dr;
+    const pc = state.player.c + dc;
+    if (pr < 0 || pr >= state.rows || pc < 0 || pc >= state.cols) return null;
+    if (state.grid[pr][pc] === WALL) return null;
+
+    const boxIdx = state.boxes.findIndex(b => b.r === pr && b.c === pc);
+    let pushed = false;
+    if (boxIdx >= 0) {
+      const br = pr + dr, bc = pc + dc;
+      if (br < 0 || br >= state.rows || bc < 0 || bc >= state.cols) return null;
+      if (state.grid[br][bc] === WALL) return null;
+      if (hasBox(state.boxes, br, bc)) return null;
+      const ns = cloneState(state);
+      ns.boxes[boxIdx] = {r: br, c: bc};
+      ns.player = {r: pr, c: pc};
+      return { state: ns, pushed: true };
+    }
+    const ns = cloneState(state);
+    ns.player = {r: pr, c: pc};
+    return { state: ns, pushed: false };
+  }
+
+  function isSolved(state) {
+    return state.targets.every(t => hasBox(state.boxes, t.r, t.c));
+  }
+
+  function isDeadlock(state, boxR, boxC) {
+    if (isTarget(state.targets, boxR, boxC)) return false;
+    const wallUp = boxR <= 0 || state.grid[boxR-1][boxC] === WALL;
+    const wallDown = boxR >= state.rows-1 || state.grid[boxR+1][boxC] === WALL;
+    const wallLeft = boxC <= 0 || state.grid[boxR][boxC-1] === WALL;
+    const wallRight = boxC >= state.cols-1 || state.grid[boxR][boxC+1] === WALL;
+    return (wallUp || wallDown) && (wallLeft || wallRight);
+  }
+
+  window._sokoban = { parseLevel, cloneState, tryMove, isSolved, isDeadlock, hasBox, isTarget };
+})();
+
+// ==================== Demo 1: Push Mechanics (simple 5x5) ====================
+(function() {
+  const canvas = document.getElementById('demo-push');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const resetBtn = document.getElementById('push-reset-btn');
+  const movesDisplay = document.getElementById('push-moves');
+  const statusDisplay = document.getElementById('push-status');
+  const S = window._sokoban;
+
+  const LEVEL = '#####\n#   #\n# $ #\n#  .#\n#@  #\n#####';
+  const TILE = 52;
+  let state = S.parseLevel(LEVEL);
+  let moves = 0;
+  let solved = false;
+
+  const OFFSET_X = 80;
+  const OFFSET_Y = 20;
+
+  function reset() { state = S.parseLevel(LEVEL); moves = 0; solved = false; movesDisplay.textContent = 'Moves: 0'; statusDisplay.textContent = 'Push the box onto the X'; }
+  resetBtn.addEventListener('click', reset);
+
+  window.addEventListener('keydown', (e) => {
+    if (solved) return;
+    if (!canvas.closest('.demo-container').querySelector(':hover') && document.activeElement !== document.body) return;
+    let dr = 0, dc = 0;
+    if (e.key === 'ArrowUp') dr = -1;
+    else if (e.key === 'ArrowDown') dr = 1;
+    else if (e.key === 'ArrowLeft') dc = -1;
+    else if (e.key === 'ArrowRight') dc = 1;
+    else return;
+    e.preventDefault();
+
+    // Only respond if this is the first demo (push)
+    const focusedDemo = document.querySelector('.demo-container:hover canvas');
+    if (focusedDemo && focusedDemo.id !== 'demo-push') return;
+    if (!focusedDemo) return;
+
+    const result = S.tryMove(state, dr, dc);
+    if (result) {
+      state = result.state;
+      moves++;
+      movesDisplay.textContent = 'Moves: ' + moves;
+      if (S.isSolved(state)) { solved = true; statusDisplay.textContent = 'Solved in ' + moves + ' moves!'; }
+    }
+  });
+
+  function draw() {
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    for (let r = 0; r < state.rows; r++) {
+      for (let c = 0; c < state.cols; c++) {
+        const x = OFFSET_X + c * TILE;
+        const y = OFFSET_Y + r * TILE;
+        if (state.grid[r][c] === '#') {
+          ctx.fillStyle = '#555';
+          ctx.fillRect(x, y, TILE, TILE);
+        } else {
+          ctx.fillStyle = '#2a2a4a';
+          ctx.fillRect(x, y, TILE, TILE);
+        }
+        ctx.strokeStyle = '#1a1a2e';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x, y, TILE, TILE);
+
+        // Target
+        if (S.isTarget(state.targets, r, c)) {
+          ctx.fillStyle = 'rgba(255, 215, 64, 0.3)';
+          ctx.fillRect(x, y, TILE, TILE);
+          ctx.strokeStyle = '#ffd740';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(x + 12, y + 12); ctx.lineTo(x + TILE - 12, y + TILE - 12);
+          ctx.moveTo(x + TILE - 12, y + 12); ctx.lineTo(x + 12, y + TILE - 12);
+          ctx.stroke();
+        }
+
+        // Box
+        if (S.hasBox(state.boxes, r, c)) {
+          const onTarget = S.isTarget(state.targets, r, c);
+          ctx.fillStyle = onTarget ? '#66bb6a' : '#8d6e63';
+          ctx.fillRect(x + 4, y + 4, TILE - 8, TILE - 8);
+          ctx.strokeStyle = onTarget ? '#4caf50' : '#6d4c41';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(x + 4, y + 4, TILE - 8, TILE - 8);
+          // Deadlock indicator
+          if (!onTarget && S.isDeadlock(state, r, c)) {
+            ctx.fillStyle = 'rgba(244,67,54,0.5)';
+            ctx.fillRect(x + 4, y + 4, TILE - 8, TILE - 8);
+            ctx.fillStyle = '#f44336';
+            ctx.font = 'bold 16px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('!', x + TILE/2, y + TILE/2 + 6);
+            ctx.textAlign = 'left';
+          }
+        }
+
+        // Player
+        if (state.player.r === r && state.player.c === c) {
+          ctx.fillStyle = '#4fc3f7';
+          ctx.beginPath();
+          ctx.arc(x + TILE/2, y + TILE/2, TILE/2 - 6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#fff';
+          ctx.font = 'bold 14px monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText('P', x + TILE/2, y + TILE/2 + 5);
+          ctx.textAlign = 'left';
+        }
+      }
+    }
+
+    // Instructions
+    ctx.fillStyle = '#888';
+    ctx.font = '11px monospace';
+    ctx.fillText('Hover over this demo and use arrow keys', OFFSET_X + state.cols * TILE + 20, OFFSET_Y + 20);
+    ctx.fillText('Brown = Box | X = Target | Blue = You', OFFSET_X + state.cols * TILE + 20, OFFSET_Y + 40);
+    ctx.fillText('Red ! = Deadlock (stuck box)', OFFSET_X + state.cols * TILE + 20, OFFSET_Y + 60);
+
+    if (solved) {
+      ctx.fillStyle = '#4caf50';
+      ctx.font = 'bold 20px monospace';
+      ctx.fillText('SOLVED!', OFFSET_X + state.cols * TILE + 20, OFFSET_Y + 100);
+    }
+
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+// ==================== Demo 2: Undo System ====================
+(function() {
+  const canvas = document.getElementById('demo-undo');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const undoBtn = document.getElementById('undo-undo-btn');
+  const resetBtn = document.getElementById('undo-reset-btn');
+  const movesDisplay = document.getElementById('undo-moves');
+  const stackDisplay = document.getElementById('undo-stack-size');
+  const S = window._sokoban;
+
+  const LEVEL = '######\n#    #\n# $  #\n# .$ #\n# .@ #\n######';
+  const TILE = 46;
+  let state = S.parseLevel(LEVEL);
+  let history = [];
+  let moves = 0;
+  let pushes = 0;
+  let solved = false;
+
+  const OFFSET_X = 30;
+  const OFFSET_Y = 15;
+
+  function reset() {
+    state = S.parseLevel(LEVEL);
+    history = [];
+    moves = 0; pushes = 0;
+    solved = false;
+    movesDisplay.textContent = 'Moves: 0';
+    stackDisplay.textContent = 'Stack: 0';
+  }
+  resetBtn.addEventListener('click', reset);
+
+  function doUndo() {
+    if (history.length > 0 && !solved) {
+      state = history.pop();
+      moves = Math.max(0, moves - 1);
+      movesDisplay.textContent = 'Moves: ' + moves;
+      stackDisplay.textContent = 'Stack: ' + history.length;
+    }
+  }
+  undoBtn.addEventListener('click', doUndo);
+
+  window.addEventListener('keydown', (e) => {
+    if (solved) return;
+    const focusedDemo = document.querySelector('.demo-container:hover canvas');
+    if (focusedDemo && focusedDemo.id !== 'demo-undo') return;
+    if (!focusedDemo) return;
+
+    if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); doUndo(); return; }
+
+    let dr = 0, dc = 0;
+    if (e.key === 'ArrowUp') dr = -1;
+    else if (e.key === 'ArrowDown') dr = 1;
+    else if (e.key === 'ArrowLeft') dc = -1;
+    else if (e.key === 'ArrowRight') dc = 1;
+    else return;
+    e.preventDefault();
+
+    const result = S.tryMove(state, dr, dc);
+    if (result) {
+      history.push(S.cloneState(state));
+      state = result.state;
+      moves++;
+      if (result.pushed) pushes++;
+      movesDisplay.textContent = 'Moves: ' + moves;
+      stackDisplay.textContent = 'Stack: ' + history.length;
+      if (S.isSolved(state)) solved = true;
+    }
+  });
+
+  function draw() {
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw grid
+    for (let r = 0; r < state.rows; r++) {
+      for (let c = 0; c < state.cols; c++) {
+        const x = OFFSET_X + c * TILE;
+        const y = OFFSET_Y + r * TILE;
+        ctx.fillStyle = state.grid[r][c] === '#' ? '#555' : '#2a2a4a';
+        ctx.fillRect(x, y, TILE, TILE);
+        ctx.strokeStyle = '#1a1a2e';
+        ctx.strokeRect(x, y, TILE, TILE);
+
+        if (S.isTarget(state.targets, r, c)) {
+          ctx.fillStyle = 'rgba(255, 215, 64, 0.3)';
+          ctx.fillRect(x, y, TILE, TILE);
+          ctx.strokeStyle = '#ffd740';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(x + 10, y + 10); ctx.lineTo(x + TILE - 10, y + TILE - 10);
+          ctx.moveTo(x + TILE - 10, y + 10); ctx.lineTo(x + 10, y + TILE - 10);
+          ctx.stroke();
+        }
+        if (S.hasBox(state.boxes, r, c)) {
+          const onT = S.isTarget(state.targets, r, c);
+          ctx.fillStyle = onT ? '#66bb6a' : '#8d6e63';
+          ctx.fillRect(x + 3, y + 3, TILE - 6, TILE - 6);
+          if (!onT && S.isDeadlock(state, r, c)) {
+            ctx.fillStyle = 'rgba(244,67,54,0.4)';
+            ctx.fillRect(x + 3, y + 3, TILE - 6, TILE - 6);
+          }
+        }
+        if (state.player.r === r && state.player.c === c) {
+          ctx.fillStyle = '#4fc3f7';
+          ctx.beginPath();
+          ctx.arc(x + TILE/2, y + TILE/2, TILE/2 - 5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+
+    // State stack visualization
+    const stackX = OFFSET_X + state.cols * TILE + 30;
+    ctx.fillStyle = '#ccc';
+    ctx.font = 'bold 12px monospace';
+    ctx.fillText('UNDO STACK', stackX, 20);
+    ctx.font = '10px monospace';
+
+    const maxShow = 12;
+    const startIdx = Math.max(0, history.length - maxShow);
+    for (let i = startIdx; i < history.length; i++) {
+      const dispIdx = i - startIdx;
+      const y = 35 + dispIdx * 22;
+      ctx.fillStyle = '#2a2a4a';
+      ctx.fillRect(stackX, y, 200, 18);
+      ctx.strokeStyle = '#444';
+      ctx.strokeRect(stackX, y, 200, 18);
+      ctx.fillStyle = '#aaa';
+      ctx.font = '9px monospace';
+      const h = history[i];
+      ctx.fillText('Move ' + (i+1) + ': P(' + h.player.r + ',' + h.player.c + ') Boxes:' + h.boxes.map(b => b.r+','+b.c).join(' '), stackX + 4, y + 13);
+    }
+
+    if (history.length === 0) {
+      ctx.fillStyle = '#666';
+      ctx.font = '10px monospace';
+      ctx.fillText('(empty - make moves!)', stackX, 50);
+    }
+
+    // Arrow indicating stack top
+    if (history.length > 0) {
+      const topY = 35 + Math.min(history.length - 1 - startIdx, maxShow - 1) * 22 + 9;
+      ctx.fillStyle = '#4fc3f7';
+      ctx.beginPath();
+      ctx.moveTo(stackX - 10, topY - 5);
+      ctx.lineTo(stackX - 3, topY);
+      ctx.lineTo(stackX - 10, topY + 5);
+      ctx.fill();
+    }
+
+    if (solved) {
+      ctx.fillStyle = '#4caf50';
+      ctx.font = 'bold 20px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('SOLVED!', canvas.width / 2, canvas.height - 15);
+      ctx.textAlign = 'left';
+    }
+
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+// ==================== Demo 3: Playable Sokoban (full puzzle) ====================
+(function() {
+  const canvas = document.getElementById('demo-sokoban');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const undoBtn = document.getElementById('sok-undo-btn');
+  const resetBtn = document.getElementById('sok-reset-btn');
+  const nextBtn = document.getElementById('sok-next-btn');
+  const movesDisplay = document.getElementById('sok-moves');
+  const pushesDisplay = document.getElementById('sok-pushes');
+  const levelDisplay = document.getElementById('sok-level');
+  const S = window._sokoban;
+
+  const LEVELS = [
+    '#######\n#     #\n# .$. #\n# $.$ #\n# .$. #\n#  @  #\n#######',
+    '########\n#      #\n# .$   #\n# #.## #\n#  $ $ #\n# .# @ #\n#      #\n########',
+    '#######\n##   ##\n#  $ .#\n# #$#.#\n#  $ .#\n#  @  #\n#######'
+  ];
+
+  let levelIdx = 0;
+  let state, history, moves, pushes, solved;
+
+  function loadLevel(idx) {
+    levelIdx = idx % LEVELS.length;
+    state = S.parseLevel(LEVELS[levelIdx]);
+    history = [];
+    moves = 0; pushes = 0; solved = false;
+    movesDisplay.textContent = 'Moves: 0';
+    pushesDisplay.textContent = 'Pushes: 0';
+    levelDisplay.textContent = 'Level: ' + (levelIdx + 1);
+  }
+  loadLevel(0);
+
+  resetBtn.addEventListener('click', () => loadLevel(levelIdx));
+  nextBtn.addEventListener('click', () => loadLevel(levelIdx + 1));
+  undoBtn.addEventListener('click', () => {
+    if (history.length > 0 && !solved) {
+      const prev = history.pop();
+      state = prev.state;
+      moves = prev.moves;
+      pushes = prev.pushes;
+      movesDisplay.textContent = 'Moves: ' + moves;
+      pushesDisplay.textContent = 'Pushes: ' + pushes;
+    }
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if (solved) return;
+    const focusedDemo = document.querySelector('.demo-container:hover canvas');
+    if (focusedDemo && focusedDemo.id !== 'demo-sokoban') return;
+    if (!focusedDemo) return;
+
+    if (e.key === 'z' || e.key === 'Z') {
+      e.preventDefault();
+      undoBtn.click();
+      return;
+    }
+
+    let dr = 0, dc = 0;
+    if (e.key === 'ArrowUp') dr = -1;
+    else if (e.key === 'ArrowDown') dr = 1;
+    else if (e.key === 'ArrowLeft') dc = -1;
+    else if (e.key === 'ArrowRight') dc = 1;
+    else return;
+    e.preventDefault();
+
+    const result = S.tryMove(state, dr, dc);
+    if (result) {
+      history.push({ state: S.cloneState(state), moves, pushes });
+      state = result.state;
+      moves++;
+      if (result.pushed) pushes++;
+      movesDisplay.textContent = 'Moves: ' + moves;
+      pushesDisplay.textContent = 'Pushes: ' + pushes;
+      if (S.isSolved(state)) {
+        solved = true;
+        movesDisplay.textContent = 'SOLVED in ' + moves + ' moves!';
+      }
+    }
+  });
+
+  const TILE = 48;
+
+  function draw() {
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const offsetX = (canvas.width - state.cols * TILE) / 2;
+    const offsetY = (canvas.height - state.rows * TILE) / 2;
+
+    for (let r = 0; r < state.rows; r++) {
+      for (let c = 0; c < state.cols; c++) {
+        const x = offsetX + c * TILE;
+        const y = offsetY + r * TILE;
+        if (state.grid[r][c] === '#') {
+          ctx.fillStyle = '#555';
+          ctx.fillRect(x, y, TILE, TILE);
+          ctx.strokeStyle = '#444';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(x + 2, y + 2, TILE - 4, TILE - 4);
+        } else {
+          ctx.fillStyle = '#2a2a4a';
+          ctx.fillRect(x, y, TILE, TILE);
+        }
+        ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(x, y, TILE, TILE);
+
+        if (S.isTarget(state.targets, r, c)) {
+          ctx.fillStyle = 'rgba(255, 215, 64, 0.25)';
+          ctx.fillRect(x, y, TILE, TILE);
+          ctx.strokeStyle = '#ffd740';
+          ctx.lineWidth = 2;
+          const m = 12;
+          ctx.beginPath();
+          ctx.moveTo(x + m, y + m); ctx.lineTo(x + TILE - m, y + TILE - m);
+          ctx.moveTo(x + TILE - m, y + m); ctx.lineTo(x + m, y + TILE - m);
+          ctx.stroke();
+        }
+
+        if (S.hasBox(state.boxes, r, c)) {
+          const onT = S.isTarget(state.targets, r, c);
+          ctx.fillStyle = onT ? '#66bb6a' : '#8d6e63';
+          const bm = 4;
+          ctx.fillRect(x + bm, y + bm, TILE - bm*2, TILE - bm*2);
+          ctx.strokeStyle = onT ? '#4caf50' : '#6d4c41';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(x + bm, y + bm, TILE - bm*2, TILE - bm*2);
+          // Cross pattern
+          ctx.strokeStyle = onT ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.15)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(x + bm, y + bm); ctx.lineTo(x + TILE - bm, y + TILE - bm);
+          ctx.moveTo(x + TILE - bm, y + bm); ctx.lineTo(x + bm, y + TILE - bm);
+          ctx.stroke();
+
+          if (!onT && S.isDeadlock(state, r, c)) {
+            ctx.fillStyle = 'rgba(244,67,54,0.5)';
+            ctx.fillRect(x + bm, y + bm, TILE - bm*2, TILE - bm*2);
+            ctx.fillStyle = '#f44336';
+            ctx.font = 'bold 18px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('!', x + TILE/2, y + TILE/2 + 6);
+            ctx.textAlign = 'left';
+          }
+        }
+
+        if (state.player.r === r && state.player.c === c) {
+          ctx.fillStyle = '#4fc3f7';
+          ctx.beginPath();
+          ctx.arc(x + TILE/2, y + TILE/2, TILE/2 - 5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#29b6f6';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          // Eyes
+          ctx.fillStyle = '#fff';
+          ctx.beginPath(); ctx.arc(x + TILE/2 - 6, y + TILE/2 - 4, 3, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(x + TILE/2 + 6, y + TILE/2 - 4, 3, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#1a1a2e';
+          ctx.beginPath(); ctx.arc(x + TILE/2 - 5, y + TILE/2 - 4, 1.5, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(x + TILE/2 + 7, y + TILE/2 - 4, 1.5, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+    }
+
+    if (solved) {
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#4caf50';
+      ctx.font = 'bold 36px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('LEVEL COMPLETE!', canvas.width / 2, canvas.height / 2 - 10);
+      ctx.font = '16px monospace';
+      ctx.fillStyle = '#ccc';
+      ctx.fillText(moves + ' moves, ' + pushes + ' pushes', canvas.width / 2, canvas.height / 2 + 25);
+      ctx.fillText('Click "Next Level" to continue', canvas.width / 2, canvas.height / 2 + 50);
+      ctx.textAlign = 'left';
+    }
+
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+</script>

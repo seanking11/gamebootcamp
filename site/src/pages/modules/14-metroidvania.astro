@@ -1,0 +1,679 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 14: Metroidvania">
+  <div class="container page-content">
+    <div class="module-header">
+      <div class="module-number">Module 14</div>
+      <h1>Metroidvania</h1>
+      <p class="module-theme">Interconnected exploration with ability-gated progression &mdash; the world is the puzzle.</p>
+    </div>
+
+    <blockquote>
+      <p>"The measure of a hero is not in the strength of their arm, but in the doors they can finally open."</p>
+    </blockquote>
+
+    <hr />
+
+    <h2>Prerequisites</h2>
+    <table>
+      <thead><tr><th>Module</th><th>What You Used From It</th></tr></thead>
+      <tbody>
+        <tr><td>Module 02 - Platformer</td><td>Platformer movement, gravity, and collision</td></tr>
+        <tr><td>Module 07 - Roguelike</td><td>Inventory concepts and persistent game state</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h2>Week 1: History &amp; Design Theory</h2>
+
+    <h3>The Origin</h3>
+    <p><em>Super Metroid</em> (1994), developed by Nintendo R&amp;D1 and Intelligent Systems and directed by Yoshio Sakamoto, defined the template for interconnected exploration games. While the original <em>Metroid</em> (1986) introduced the concept of a large, non-linear world gated by ability pickups, <em>Super Metroid</em> perfected the formula by giving players an atmospheric, labyrinthine map where every room connected meaningfully to others, environmental storytelling replaced exposition, and newly acquired abilities &mdash; the Morph Ball, Grapple Beam, Speed Booster &mdash; constantly recontextualized spaces the player had already traversed.</p>
+
+    <h3>How the Genre Evolved</h3>
+    <p><strong>Castlevania: Symphony of the Night</strong> (1997) fused the Metroid exploration structure with RPG systems &mdash; experience points, equipment, leveling, and a vast bestiary. The inverted castle doubled the game's content by literally flipping the world. The game coined the second half of the genre name and proved that layering progression systems onto exploration created extraordinary replay value.</p>
+
+    <p><strong>Hollow Knight</strong> (2017) showed that the Metroidvania could thrive in the indie era with a massive, hand-crafted interconnected world, a Souls-like difficulty philosophy, and a charm system for build customization. Critically, it demonstrated that the map itself could be a discoverable item &mdash; you had to find the cartographer in each area before your minimap would populate.</p>
+
+    <p><strong>Ori and the Blind Forest</strong> (2015) brought a focus on kinetic movement and emotional storytelling. The "bash" ability showed that movement abilities could be both traversal tools and combat mechanics simultaneously, blurring the line between ability-gating and skill-gating.</p>
+
+    <h3>What Makes Metroidvania Great</h3>
+    <p>The core design insight of the Metroidvania is <strong>delayed gratification through spatial memory</strong>. The genre works because it trusts the player to notice a ledge they cannot reach, a wall they cannot break, or a gap they cannot cross &mdash; and to <em>remember</em> it. When the player finally acquires the ability that unlocks that area, the satisfaction is doubled: the joy of the new power itself, plus the accumulated anticipation of every locked door they mentally catalogued. Each new ability doesn't just open one path &mdash; it opens dozens of previously glimpsed possibilities across the entire world.</p>
+
+    <h3>The Essential Mechanic</h3>
+    <p><strong>Ability-gated exploration</strong> &mdash; you see areas you cannot reach yet, then return with new powers to unlock them, transforming the entire world map into a puzzle that unfolds over time.</p>
+
+    <hr />
+
+    <h2>Week 2: Build the MVP</h2>
+
+    <h3>What You're Building</h3>
+    <p>A small interconnected world of 8-12 rooms arranged as a graph, where the player starts with basic movement and must find 2-3 abilities (such as double jump and dash) to reach new areas and eventually arrive at a final room. The focus is on the world structure, ability-gating logic, and a minimap.</p>
+
+    <h3>Core Concepts (Must Implement)</h3>
+
+    <h4>1. World Map as a Graph</h4>
+    <p>The interconnected world is represented as a graph data structure where each room is a node and each door or passage is an edge. Edges carry metadata indicating which ability (if any) is required to traverse them.</p>
+
+    <pre is:raw><code># World definition
+rooms = {
+  "start":    { edges: [{ to: "cave_l", dir: "right", requires: null }] },
+  "cave_l":   { edges: [
+                  { to: "start", dir: "left", requires: null },
+                  { to: "cave_u", dir: "up", requires: "double_jump" },
+                  { to: "shaft", dir: "right", requires: null }
+                ]},
+  "cave_u":   { edges: [{ to: "cave_l", dir: "down", requires: null },
+                         { to: "peak", dir: "right", requires: "dash" }] },
+  "shaft":    { edges: [{ to: "cave_l", dir: "left", requires: null },
+                         { to: "ability_room_1", dir: "down", requires: null }] },
+  "ability_room_1": { edges: [...], grants_ability: "double_jump" },
+  ...
+}</code></pre>
+
+    <p><strong>Why it matters:</strong> The graph is the backbone of the entire game. Every system &mdash; gating, minimap, save state, non-linear progression &mdash; reads from this structure.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: World Map Graph</div>
+      <p class="demo-hint">Rooms are nodes, doors are edges. Doors are color-coded by required ability: white=none, red=missile, blue=double-jump, green=wall-climb. Click the ability buttons to "acquire" them and see which doors unlock. Locked doors are shown as dashed lines.</p>
+      <canvas id="demo-graph" width="760" height="440"></canvas>
+    </div>
+
+    <h4>2. Ability-Gating</h4>
+    <p>Each edge in the world graph may specify a required ability. When the player attempts to traverse an edge, the system checks whether the player's acquired abilities satisfy the requirement.</p>
+
+    <pre is:raw><code>function can_traverse(player, edge):
+    if edge.requires is null:
+        return true
+    return edge.requires in player.abilities
+
+function attempt_door(player, edge):
+    if can_traverse(player, edge):
+        transition_to_room(edge.to)
+    else:
+        show_feedback("You need " + edge.requires + " to pass.")</code></pre>
+
+    <p><strong>Why it matters:</strong> Ability-gating is what transforms a collection of rooms into a Metroidvania. Without it, you have a platformer with room transitions. The gates create the "I'll come back later" moments that define the genre.</p>
+
+    <h4>3. Backtracking-Friendly Level Design</h4>
+    <p>Rooms must be designed so that returning to them with new abilities feels rewarding rather than tedious. Rooms should have multiple exits gated at different ability levels, shortcuts that open from one side, and visual hints of unreachable areas.</p>
+
+    <pre is:raw><code># Room layout principle:
+# Each room has a "base path" accessible on first visit
+# and "gated paths" visible but blocked.
+room_cave_l = {
+  platforms: [
+    { x: 0, y: 0, w: 300, h: 20 },          # ground floor
+    { x: 200, y: -120, w: 80, h: 20 },       # high ledge (needs double_jump)
+  ],
+  doors: [
+    { x: 290, y: 0, leads_to: "shaft", requires: null },
+    { x: 220, y: -120, leads_to: "cave_u", requires: "double_jump" },
+  ]
+}</code></pre>
+
+    <p><strong>Why it matters:</strong> Backtracking is the most common criticism of the genre when done poorly. Good backtracking design ensures the player always sees something new on a return trip.</p>
+
+    <h4>4. Minimap / Map System</h4>
+    <p>A minimap tracks which rooms the player has visited and displays them relative to the current room. Unvisited rooms can be hidden or shown as outlines.</p>
+
+    <pre is:raw><code>class MiniMap:
+    def __init__(self, world_graph):
+        self.world = world_graph
+        self.visited = set()
+        self.room_positions = {}
+        self.assign_grid_positions()
+
+    def visit_room(self, room_id):
+        self.visited.add(room_id)
+
+    def render(self, current_room, screen, corner_x, corner_y):
+        for room_id, (gx, gy) in self.room_positions.items():
+            if room_id not in self.visited:
+                continue
+            rx = corner_x + gx * CELL_SIZE
+            ry = corner_y + gy * CELL_SIZE
+            color = COLOR_CURRENT if room_id == current_room else COLOR_VISITED
+            draw_rect(screen, color, rx, ry, CELL_SIZE, CELL_SIZE)</code></pre>
+
+    <p><strong>Why it matters:</strong> Without a map, players get lost and frustrated. The minimap transforms spatial confusion into spatial mastery.</p>
+
+    <h4>5. Save / Checkpoint System</h4>
+    <p>The game must persist the player's state &mdash; current room, acquired abilities, visited rooms, and any collected items.</p>
+
+    <pre is:raw><code>class GameState:
+    def __init__(self):
+        self.current_room = "start"
+        self.abilities = set()
+        self.visited_rooms = set()
+        self.items_collected = set()
+
+    def to_dict(self):
+        return {
+            "current_room": self.current_room,
+            "abilities": list(self.abilities),
+            "visited_rooms": list(self.visited_rooms),
+            "items_collected": list(self.items_collected),
+        }
+
+def save_game(state, filepath):
+    write_json(filepath, state.to_dict())
+
+def load_game(filepath):
+    data = read_json(filepath)
+    state = GameState()
+    state.from_dict(data)
+    return state</code></pre>
+
+    <p><strong>Why it matters:</strong> Metroidvanias are long-form experiences. Without persistence, the genre cannot function.</p>
+
+    <h4>6. Non-Linear Progression</h4>
+    <p>The world graph should support multiple valid orderings for acquiring abilities. At least two abilities should be reachable from the starting area.</p>
+
+    <pre is:raw><code>def find_all_completion_orders(world, start, goal):
+    results = []
+    def explore(current_room, abilities, visited, path):
+        if current_room == goal:
+            results.append(path[:])
+            return
+        for edge in world[current_room].edges:
+            if edge.to in visited:
+                continue
+            if edge.requires and edge.requires not in abilities:
+                continue
+            new_abilities = abilities.copy()
+            if hasattr(world[edge.to], 'grants_ability'):
+                new_abilities.add(world[edge.to].grants_ability)
+            explore(edge.to, new_abilities, visited | {edge.to}, path + [edge.to])
+    explore(start, set(), {start}, [start])
+    return results</code></pre>
+
+    <p><strong>Why it matters:</strong> Non-linearity gives players agency. Two players can compare notes and realize they played the same game in different orders.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Ability Gating Visualizer</div>
+      <p class="demo-hint">A side-view mini level with barriers. Toggle abilities (Double Jump, Wall Climb, Dash) using the buttons to see which areas become reachable. Reachable areas light up green; unreachable areas stay dim.</p>
+      <canvas id="demo-gating" width="760" height="400"></canvas>
+    </div>
+
+    <hr />
+
+    <h3>Stretch Goals</h3>
+    <ul>
+      <li><strong>Hidden breakable walls:</strong> Certain tiles can be destroyed with a specific ability, revealing secret passages.</li>
+      <li><strong>Ability-based combat:</strong> Enemies that can only be damaged by specific abilities.</li>
+      <li><strong>Map item collectibles:</strong> Percentage-tracked collectibles throughout the world.</li>
+      <li><strong>Fast travel between save rooms:</strong> Instant travel between visited save rooms to reduce late-game backtracking.</li>
+    </ul>
+
+    <h3>MVP Spec</h3>
+    <table>
+      <thead><tr><th>Feature</th><th>Required</th></tr></thead>
+      <tbody>
+        <tr><td>World graph with 8-12 rooms</td><td>Yes</td></tr>
+        <tr><td>Player movement (walk, jump)</td><td>Yes</td></tr>
+        <tr><td>2-3 ability pickups (e.g., double jump, dash)</td><td>Yes</td></tr>
+        <tr><td>Ability-gated doors/passages</td><td>Yes</td></tr>
+        <tr><td>Room transitions on door entry</td><td>Yes</td></tr>
+        <tr><td>Minimap showing visited rooms</td><td>Yes</td></tr>
+        <tr><td>Save/load game state to file</td><td>Yes</td></tr>
+        <tr><td>Save room mechanic</td><td>Yes</td></tr>
+        <tr><td>At least 2 valid paths to the final room</td><td>Yes</td></tr>
+        <tr><td>Visual cues for gated passages</td><td>Yes</td></tr>
+        <tr><td>Hidden breakable walls</td><td>Stretch</td></tr>
+        <tr><td>Enemies with ability-specific weaknesses</td><td>Stretch</td></tr>
+        <tr><td>Collectibles with completion percentage</td><td>Stretch</td></tr>
+        <tr><td>Fast travel between save rooms</td><td>Stretch</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliverable</h3>
+    <p>Submit your playable Metroidvania MVP with source code and a <strong>world map diagram</strong> showing all rooms as nodes, edges with their gate requirements, and the locations of ability pickups. Include a short write-up (300-500 words) answering: <em>How did you decide which rooms to gate with which abilities, and what tradeoffs did you make between linearity and non-linearity?</em></p>
+
+    <hr />
+
+    <h2>Analogies by Background</h2>
+    <blockquote><p>These analogies map game dev concepts to patterns you already know. Find your background below.</p></blockquote>
+
+    <h3>For Backend Developers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>World map as a graph</td><td>A microservice topology &mdash; nodes are services, edges are API calls with auth requirements</td></tr>
+        <tr><td>Ability-gating</td><td>Role-based access control (RBAC) &mdash; access only with the required permission</td></tr>
+        <tr><td>Backtracking design</td><td>Database migration rollbacks &mdash; revisiting previous states with new schema capabilities</td></tr>
+        <tr><td>Minimap / map system</td><td>Service discovery and health dashboards</td></tr>
+        <tr><td>Save / checkpoint system</td><td>Database snapshots or transaction savepoints</td></tr>
+        <tr><td>Non-linear progression</td><td>Eventual consistency &mdash; multiple valid orderings converging to the same final state</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Frontend Developers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>World map as a graph</td><td>A single-page app's route graph &mdash; pages are nodes, some routes are protected</td></tr>
+        <tr><td>Ability-gating</td><td>Route guards or feature flags</td></tr>
+        <tr><td>Backtracking design</td><td>Browser history with progressive enhancement</td></tr>
+        <tr><td>Minimap / map system</td><td>A site map or breadcrumb navigation</td></tr>
+        <tr><td>Save / checkpoint system</td><td>localStorage or sessionStorage persistence</td></tr>
+        <tr><td>Non-linear progression</td><td>Flexible user flows &mdash; multi-step form sections in any order</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Data / ML Engineers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>World map as a graph</td><td>A computation DAG (Airflow or Spark) &mdash; nodes are tasks, edges are dependencies</td></tr>
+        <tr><td>Ability-gating</td><td>Feature dependencies in a pipeline</td></tr>
+        <tr><td>Backtracking design</td><td>Iterative model refinement &mdash; re-examining data with a better model</td></tr>
+        <tr><td>Minimap / map system</td><td>Experiment tracking dashboards (MLflow, W&amp;B)</td></tr>
+        <tr><td>Save / checkpoint system</td><td>Model checkpointing during training</td></tr>
+        <tr><td>Non-linear progression</td><td>Hyperparameter search &mdash; multiple valid paths through the search space</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li><strong>The "Aha!" moment:</strong> How would you design visual and audio cues to ensure that a player who sees a gated door at hour 1 still remembers it at hour 4? What role does the map system play?</li>
+      <li><strong>Linearity vs. freedom:</strong> If you make the world too open, players may get lost or sequence-break. If you make it too linear, you lose the genre's appeal. Where did your MVP land on this spectrum?</li>
+      <li><strong>The backtracking problem:</strong> What design techniques can mitigate the tedium of revisiting rooms without eliminating the satisfaction of returning with new abilities?</li>
+      <li><strong>Difficulty and gating:</strong> Some Metroidvanias use skill-gates alongside ability-gates. How does mixing these two types change the player experience?</li>
+    </ol>
+
+    <nav class="module-nav">
+      <a href={`${base}modules/12-3d-platformer/`}>&larr; Module 12: 3D Platformer</a>
+      <a href={`${base}modules/15-run-and-gun/`}>Module 15: Run and Gun &rarr;</a>
+    </nav>
+  </div>
+</BaseLayout>
+
+<script>
+// ============================================================
+// DEMO 1: WORLD MAP GRAPH
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-graph');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const abilities = {
+    missile: { name: 'Missile', color: '#ef4444', acquired: false },
+    double_jump: { name: 'Double Jump', color: '#3b82f6', acquired: false },
+    wall_climb: { name: 'Wall Climb', color: '#22c55e', acquired: false }
+  };
+
+  const rooms = [
+    { id: 'start', label: 'Start', x: 80, y: H / 2, grants: null },
+    { id: 'hall_a', label: 'Hall A', x: 200, y: H / 2 - 80, grants: null },
+    { id: 'hall_b', label: 'Hall B', x: 200, y: H / 2 + 80, grants: null },
+    { id: 'missile_room', label: 'Missile\nRoom', x: 340, y: H / 2 - 140, grants: 'missile' },
+    { id: 'djump_room', label: 'Dbl Jump\nRoom', x: 340, y: H / 2 + 140, grants: 'double_jump' },
+    { id: 'upper_cave', label: 'Upper\nCave', x: 480, y: H / 2 - 80, grants: null },
+    { id: 'lower_cave', label: 'Lower\nCave', x: 480, y: H / 2 + 80, grants: null },
+    { id: 'wclimb_room', label: 'Wall Climb\nRoom', x: 480, y: H / 2, grants: 'wall_climb' },
+    { id: 'final_gate', label: 'Final\nGate', x: 620, y: H / 2, grants: null },
+    { id: 'boss', label: 'Boss', x: 710, y: H / 2, grants: null }
+  ];
+
+  const edges = [
+    { from: 'start', to: 'hall_a', requires: null },
+    { from: 'start', to: 'hall_b', requires: null },
+    { from: 'hall_a', to: 'missile_room', requires: null },
+    { from: 'hall_b', to: 'djump_room', requires: null },
+    { from: 'hall_a', to: 'upper_cave', requires: 'missile' },
+    { from: 'hall_b', to: 'lower_cave', requires: 'double_jump' },
+    { from: 'upper_cave', to: 'wclimb_room', requires: null },
+    { from: 'lower_cave', to: 'wclimb_room', requires: null },
+    { from: 'wclimb_room', to: 'final_gate', requires: 'wall_climb' },
+    { from: 'final_gate', to: 'boss', requires: 'missile' }
+  ];
+
+  function getRoom(id) { return rooms.find(function(r) { return r.id === id; }); }
+
+  function getCanvasPos(e) {
+    const r = canvas.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height };
+  }
+
+  // Ability toggle buttons
+  const btnY = H - 40;
+  const btnW = 120, btnH = 28;
+  const abilityKeys = Object.keys(abilities);
+  const btns = abilityKeys.map(function(key, i) {
+    return { x: W / 2 - (abilityKeys.length * (btnW + 10)) / 2 + i * (btnW + 10), y: btnY, w: btnW, h: btnH, key: key };
+  });
+
+  canvas.addEventListener('click', function(e) {
+    const p = getCanvasPos(e);
+    for (const b of btns) {
+      if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) {
+        abilities[b.key].acquired = !abilities[b.key].acquired;
+        return;
+      }
+    }
+  });
+
+  function canTraverse(edge) {
+    if (!edge.requires) return true;
+    return abilities[edge.requires] && abilities[edge.requires].acquired;
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Draw edges
+    for (const edge of edges) {
+      const from = getRoom(edge.from);
+      const to = getRoom(edge.to);
+      const unlocked = canTraverse(edge);
+      const reqColor = edge.requires ? abilities[edge.requires].color : '#71717a';
+
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x, to.y);
+      ctx.strokeStyle = unlocked ? reqColor : reqColor + '44';
+      ctx.lineWidth = unlocked ? 3 : 1.5;
+      if (!unlocked) ctx.setLineDash([6, 4]);
+      else ctx.setLineDash([]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Lock icon on locked edges
+      if (!unlocked && edge.requires) {
+        const mx = (from.x + to.x) / 2;
+        const my = (from.y + to.y) / 2;
+        ctx.fillStyle = reqColor;
+        ctx.font = '14px serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('\uD83D\uDD12', mx, my + 4);
+      }
+    }
+
+    // Draw rooms
+    for (const room of rooms) {
+      // Check if reachable from start
+      const reachable = isReachable(room.id);
+      const nodeR = 28;
+
+      // Glow if reachable
+      if (reachable) {
+        ctx.beginPath();
+        ctx.arc(room.x, room.y, nodeR + 6, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(245, 158, 11, 0.1)';
+        ctx.fill();
+      }
+
+      ctx.beginPath();
+      ctx.arc(room.x, room.y, nodeR, 0, Math.PI * 2);
+      ctx.fillStyle = reachable ? '#1c1c20' : '#0e0e10';
+      ctx.fill();
+
+      let borderColor = '#3f3f46';
+      if (room.grants && abilities[room.grants]) borderColor = abilities[room.grants].color;
+      if (room.id === 'start') borderColor = '#f59e0b';
+      if (room.id === 'boss') borderColor = '#ef4444';
+
+      ctx.strokeStyle = reachable ? borderColor : borderColor + '44';
+      ctx.lineWidth = reachable ? 2 : 1;
+      ctx.stroke();
+
+      // Label
+      ctx.fillStyle = reachable ? '#e4e4e7' : '#3f3f46';
+      ctx.font = '600 9px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      const lines = room.label.split('\n');
+      for (let i = 0; i < lines.length; i++) {
+        ctx.fillText(lines[i], room.x, room.y + (i - (lines.length - 1) / 2) * 12 + 3);
+      }
+
+      // Grants ability indicator
+      if (room.grants) {
+        ctx.fillStyle = abilities[room.grants].color;
+        ctx.font = '700 8px "JetBrains Mono", monospace';
+        ctx.fillText('[' + abilities[room.grants].name + ']', room.x, room.y + nodeR + 12);
+      }
+    }
+
+    // Ability toggle buttons
+    for (const b of btns) {
+      const ab = abilities[b.key];
+      ctx.fillStyle = ab.acquired ? ab.color + '22' : '#141416';
+      ctx.strokeStyle = ab.color;
+      ctx.lineWidth = ab.acquired ? 2 : 1;
+      ctx.beginPath();
+      ctx.roundRect(b.x, b.y, b.w, b.h, 4);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = ab.acquired ? ab.color : '#71717a';
+      ctx.font = '600 11px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText((ab.acquired ? '\u2713 ' : '') + ab.name, b.x + b.w / 2, b.y + b.h / 2);
+    }
+    ctx.textBaseline = 'alphabetic';
+
+    // Legend
+    ctx.fillStyle = '#71717a';
+    ctx.font = '11px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Click abilities to toggle. Locked doors show as dashed lines.', W / 2, btnY - 12);
+
+    requestAnimationFrame(render);
+  }
+
+  function isReachable(targetId) {
+    const visited = new Set();
+    const queue = ['start'];
+    visited.add('start');
+    while (queue.length > 0) {
+      const current = queue.shift();
+      if (current === targetId) return true;
+      for (const edge of edges) {
+        let neighbor = null;
+        if (edge.from === current && !visited.has(edge.to)) neighbor = edge.to;
+        if (edge.to === current && !visited.has(edge.from)) neighbor = edge.from;
+        if (neighbor && canTraverse(edge)) {
+          visited.add(neighbor);
+          queue.push(neighbor);
+        }
+      }
+    }
+    return false;
+  }
+
+  requestAnimationFrame(render);
+})();
+
+
+// ============================================================
+// DEMO 2: ABILITY GATING VISUALIZER
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-gating');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const abilities = { double_jump: false, wall_climb: false, dash: false };
+
+  const groundY = 300;
+  // Areas: zones with required ability and position
+  const areas = [
+    { x: 0, y: groundY, w: 200, h: 20, label: 'Start Area', requires: null, reachable: true },
+    { x: 200, y: groundY, w: 160, h: 20, label: 'Low Path', requires: null, reachable: true },
+    { x: 200, y: groundY - 100, w: 120, h: 20, label: 'High Ledge', requires: 'double_jump', reachable: false },
+    { x: 380, y: groundY - 100, w: 120, h: 20, label: 'Wall Passage', requires: 'wall_climb', reachable: false },
+    { x: 380, y: groundY, w: 120, h: 20, label: 'Corridor', requires: null, reachable: true },
+    { x: 520, y: groundY, w: 120, h: 20, label: 'Dash Gap', requires: 'dash', reachable: false },
+    { x: 660, y: groundY, w: 100, h: 20, label: 'Boss Room', requires: null, reachable: false }
+  ];
+
+  // Barriers
+  const barriers = [
+    { x: 188, y: groundY - 120, w: 12, h: 120, requires: 'double_jump', label: 'Too high\nto reach' },
+    { x: 370, y: groundY - 120, w: 12, h: 40, requires: 'wall_climb', label: 'Smooth wall\n(need climb)' },
+    { x: 500, y: groundY - 10, w: 20, h: 30, requires: 'dash', label: 'Gap too wide\n(need dash)' }
+  ];
+
+  const abilityColors = { double_jump: '#3b82f6', wall_climb: '#22c55e', dash: '#a855f7' };
+
+  function getCanvasPos(e) {
+    const r = canvas.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height };
+  }
+
+  const btnW = 120, btnH = 28, btnY = 30;
+  const abilityKeys = Object.keys(abilities);
+  const btns = abilityKeys.map(function(key, i) {
+    return { x: W / 2 - (abilityKeys.length * (btnW + 12)) / 2 + i * (btnW + 12), y: btnY, w: btnW, h: btnH, key: key };
+  });
+
+  canvas.addEventListener('click', function(e) {
+    const p = getCanvasPos(e);
+    for (const b of btns) {
+      if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) {
+        abilities[b.key] = !abilities[b.key];
+        updateReachability();
+        return;
+      }
+    }
+  });
+
+  function updateReachability() {
+    // Simple left-to-right flow checking reachability
+    // Start area is always reachable
+    areas[0].reachable = true;
+    areas[1].reachable = true; // Low path connected to start
+    areas[4].reachable = true; // Corridor connected to low path
+
+    // High ledge requires double jump from start area
+    areas[2].reachable = abilities.double_jump;
+    // Wall passage requires wall climb AND reaching high ledge
+    areas[3].reachable = areas[2].reachable && abilities.wall_climb;
+    // Dash gap requires dash AND reaching corridor
+    areas[5].reachable = areas[4].reachable && abilities.dash;
+    // Boss room requires reaching dash gap
+    areas[6].reachable = areas[5].reachable;
+  }
+  updateReachability();
+
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Background
+    ctx.fillStyle = '#0a0a14';
+    ctx.fillRect(0, 0, W, H);
+
+    // Ground below platforms
+    ctx.fillStyle = '#1a1a1e';
+    ctx.fillRect(0, groundY + 20, W, H - groundY - 20);
+
+    // Draw areas (platforms)
+    for (const area of areas) {
+      const reached = area.reachable;
+      ctx.fillStyle = reached ? '#1a3a1a' : '#1a1a1e';
+      ctx.beginPath();
+      ctx.roundRect(area.x, area.y, area.w, area.h, 3);
+      ctx.fill();
+
+      if (reached) {
+        ctx.fillStyle = '#22c55e22';
+        ctx.fillRect(area.x, area.y - 60, area.w, 60);
+      }
+
+      ctx.strokeStyle = reached ? '#22c55e' : '#3f3f46';
+      ctx.lineWidth = reached ? 2 : 1;
+      ctx.beginPath();
+      ctx.roundRect(area.x, area.y, area.w, area.h, 3);
+      ctx.stroke();
+
+      // Label
+      ctx.fillStyle = reached ? '#e4e4e7' : '#3f3f46';
+      ctx.font = '600 10px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(area.label, area.x + area.w / 2, area.y + area.h + 16);
+
+      if (area.requires) {
+        const col = abilityColors[area.requires] || '#71717a';
+        ctx.fillStyle = reached ? col : col + '44';
+        ctx.font = '9px "JetBrains Mono", monospace';
+        ctx.fillText('Needs: ' + area.requires.replace('_', ' '), area.x + area.w / 2, area.y + area.h + 30);
+      }
+    }
+
+    // Draw barriers
+    for (const b of barriers) {
+      const unlocked = abilities[b.requires];
+      ctx.fillStyle = unlocked ? '#22c55e33' : abilityColors[b.requires] + '44';
+      ctx.fillRect(b.x, b.y, b.w, b.h);
+      ctx.strokeStyle = unlocked ? '#22c55e' : abilityColors[b.requires];
+      ctx.lineWidth = 1.5;
+      if (!unlocked) ctx.setLineDash([4, 3]);
+      ctx.strokeRect(b.x, b.y, b.w, b.h);
+      ctx.setLineDash([]);
+
+      if (!unlocked) {
+        ctx.fillStyle = abilityColors[b.requires];
+        ctx.font = '9px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        const lines = b.label.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          ctx.fillText(lines[i], b.x + b.w / 2, b.y - 12 + i * 12);
+        }
+      } else {
+        ctx.fillStyle = '#22c55e';
+        ctx.font = '12px serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('\u2713', b.x + b.w / 2, b.y + b.h / 2 + 4);
+      }
+    }
+
+    // Player character at start
+    ctx.fillStyle = '#f59e0b';
+    ctx.beginPath();
+    ctx.arc(40, groundY - 12, 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillRect(34, groundY - 12, 12, 14);
+
+    // Ability toggle buttons
+    for (const b of btns) {
+      const col = abilityColors[b.key];
+      const on = abilities[b.key];
+      ctx.fillStyle = on ? col + '22' : '#141416';
+      ctx.strokeStyle = col;
+      ctx.lineWidth = on ? 2 : 1;
+      ctx.beginPath();
+      ctx.roundRect(b.x, b.y, b.w, b.h, 4);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = on ? col : '#71717a';
+      ctx.font = '600 11px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const label = b.key.replace('_', ' ');
+      ctx.fillText((on ? '\u2713 ' : '') + label, b.x + b.w / 2, b.y + b.h / 2);
+    }
+    ctx.textBaseline = 'alphabetic';
+
+    // Count reachable
+    const reachCount = areas.filter(function(a) { return a.reachable; }).length;
+    ctx.fillStyle = '#a1a1aa';
+    ctx.font = '12px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('Areas reachable: ' + reachCount + ' / ' + areas.length, W / 2, H - 16);
+
+    requestAnimationFrame(render);
+  }
+  requestAnimationFrame(render);
+})();
+</script>

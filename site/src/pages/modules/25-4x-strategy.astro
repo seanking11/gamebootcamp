@@ -1,0 +1,687 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 25: 4X Strategy">
+  <div class="container page-content">
+    <div class="module-header">
+      <div class="module-number">Module 25</div>
+      <h1>4X Strategy</h1>
+      <p class="module-theme">Explore, expand, exploit, exterminate &mdash; civilization in miniature | One More Turn</p>
+    </div>
+
+    <blockquote>
+      <p>"A great empire, like a great cake, is most easily diminished at the edges."</p>
+    </blockquote>
+
+    <hr />
+
+    <h2>Prerequisites</h2>
+    <table>
+      <thead>
+        <tr><th>Module</th><th>What You Used From It</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Module 22 (RTS) or Module 23 (TBS)</td><td>Real-time or turn-based strategic decision-making, unit management, and resource systems</td></tr>
+        <tr><td>Module 6 - Tower Defense</td><td>Economic systems &mdash; income per wave, spending on defenses vs. saving for upgrades</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h2>Week 1: History &amp; Design Theory</h2>
+
+    <h3>The Origin</h3>
+    <p>The 4X genre gets its name from the four verbs that define it: explore, expand, exploit, exterminate. Coined by Alan Emrich in a 1993 review of Master of Orion, the label describes games where you guide a civilization from a single settlement to dominance over an entire world (or galaxy). The genre's roots stretch back to board games like Civilization (1980) and early computer games like Empire (1977), but it was Sid Meier's Civilization (1991) that established the template: a procedurally generated map, fog of war, technology research, city management, diplomacy, and multiple victory conditions. What makes 4X endure is its promise of consequence. Every decision &mdash; where to found a city, which technology to research, whether to ally with or invade a neighbor &mdash; echoes across hundreds of turns.</p>
+
+    <h3>How the Genre Evolved</h3>
+    <p><strong>Civilization IV (Firaxis, 2005):</strong> Widely regarded as the most refined entry at the time. Civ IV perfected the core loop of settling cities, researching technologies, and managing diplomacy. It introduced religion as a soft-power system and great people as milestone rewards. Its lasting contribution was proving that a 4X game could be deeply complex without being impenetrable.</p>
+    <p><strong>Stellaris (Paradox Interactive, 2016):</strong> Moved the 4X formula into real-time with pause, blending grand strategy with space exploration. Stellaris introduced emergent storytelling through event chains and crisis events that made each playthrough feel like a unique science fiction narrative.</p>
+    <p><strong>Humankind (Amplitude Studios, 2021):</strong> Challenged the Civilization formula by letting players change their civilization's culture every era. Its territory system offered a fresh take on expansion, proving the design space still has room for innovation.</p>
+
+    <h3>What Makes It "Great"</h3>
+    <p>A great 4X game makes you feel like every decision matters &mdash; not just now, but fifty turns from now. The interlocking systems (economy, military, research, diplomacy) create a web where pulling one thread tugs on all the others. This depth is what creates the "one more turn" phenomenon &mdash; there is always another decision to make, another consequence to see unfold.</p>
+
+    <h3>The Essential Mechanic</h3>
+    <p>Managing an empire across multiple interconnected systems where every choice has long-term consequences.</p>
+
+    <hr />
+
+    <h2>Week 2: Build the MVP</h2>
+
+    <h3>What You're Building</h3>
+    <p>A miniature 4X game played on a small hex map. You start with one settler unit and must found a city, explore the map, research technologies, manage your economy, and achieve a victory condition &mdash; all in about 30 minutes of play time.</p>
+
+    <h3>Core Concepts (Must Implement)</h3>
+
+    <h4>1. Hex Grid System</h4>
+    <p>Hex grids are the foundation of nearly every modern 4X game. Hexes have six equidistant neighbors (unlike squares, which have diagonal adjacency problems), making distance calculations uniform and movement intuitive. Cube coordinates are the cleanest way to do hex math.</p>
+    <pre is:raw><code>// Cube coordinates: each hex has (q, r, s) where q + r + s = 0
+class HexCoord:
+    q, r, s    // constraint: q + r + s == 0
+
+function hex_distance(a, b):
+    return max(abs(a.q - b.q), abs(a.r - b.r), abs(a.s - b.s))
+
+function hex_neighbors(hex):
+    directions = [
+        {+1, -1, 0}, {+1, 0, -1}, {0, +1, -1},
+        {-1, +1, 0}, {-1, 0, +1}, {0, -1, +1}
+    ]
+    return [HexCoord(hex.q + d.q, hex.r + d.r, hex.s + d.s) for d in directions]
+
+function hex_to_pixel(hex, size):
+    x = size * (3/2 * hex.q)
+    y = size * (sqrt(3)/2 * hex.q + sqrt(3) * hex.r)
+    return {x, y}
+
+function pixel_to_hex(x, y, size):
+    q = (2/3 * x) / size
+    r = (-1/3 * x + sqrt(3)/3 * y) / size
+    return cube_round(q, r, -q - r)</code></pre>
+    <p><strong>Why it matters:</strong> Hex math is the skeleton of the entire game. Every system &mdash; movement, territory, fog of war, combat range &mdash; builds on hex distance and neighbor calculations. Cube coordinates eliminate the offset-grid headaches that plague square grids and make algorithms clean and predictable.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Hex Grid with Cube Coordinates</div>
+      <p class="demo-hint">Click any hex to select it. Neighbors of the selected hex are highlighted green. Click a second hex to see the distance between them. Cube coordinates (q, r, s) are shown for each hex.</p>
+      <canvas id="demo-hex" width="760" height="460"></canvas>
+      <div class="demo-controls">
+        <button id="hex-clear-btn">Clear Selection</button>
+        <span class="value-display" id="hex-info">Click a hex to select</span>
+        <span class="value-display" id="hex-dist-info">Distance: --</span>
+      </div>
+    </div>
+
+    <h4>2. City / Settlement Founding and Territory</h4>
+    <p>Cities are the economic engine of a 4X game. When a settler founds a city, it claims the surrounding hexes as its territory. Each hex provides yields based on its terrain. The city grows and its borders expand.</p>
+    <pre is:raw><code>INITIAL_BORDER_RADIUS = 1
+
+class City:
+    position: HexCoord
+    territory: Set of HexCoord
+    population: int = 1
+    food_stockpile: float = 0
+
+function found_city(player, settler_unit, hex):
+    city = City(position=hex)
+    city.territory = hexes_in_range(hex, INITIAL_BORDER_RADIUS)
+    player.cities.append(city)
+    remove_unit(settler_unit)
+    for tile in city.territory:
+        tile.owner = player</code></pre>
+    <p><strong>Why it matters:</strong> Cities turn the hex map from a static landscape into a contested economic engine. The founding decision is one of the most consequential in the game: a city placed on a river with wheat and hills will outperform one on desert for the entire game.</p>
+
+    <h4>3. Tech Tree / Research System</h4>
+    <p>Players spend accumulated science points to unlock technologies. Each technology takes multiple turns and may unlock new buildings, units, or abilities. The tree has branching paths so players must prioritize.</p>
+    <pre is:raw><code>tech_tree = {
+    "agriculture":   {cost: 20, prereqs: [],              unlocks: ["granary"]},
+    "mining":        {cost: 20, prereqs: [],              unlocks: ["mine"]},
+    "bronze_working":{cost: 40, prereqs: ["mining"],      unlocks: ["warrior"]},
+    "writing":       {cost: 40, prereqs: ["agriculture"], unlocks: ["library"]},
+    "mathematics":   {cost: 60, prereqs: ["writing"],     unlocks: ["walls"]},
+    "iron_working":  {cost: 80, prereqs: ["bronze_working"], unlocks: ["swordsman"]},
+    "astronomy":     {cost: 100, prereqs: ["mathematics", "mining"], unlocks: ["victory"]}
+}
+
+function start_research(player, tech_name):
+    tech = tech_tree[tech_name]
+    if all(prereq in player.researched for prereq in tech.prereqs):
+        player.current_research = tech_name
+        player.research_progress = 0</code></pre>
+    <p><strong>Why it matters:</strong> The tech tree is the strategic backbone. It forces long-term planning: researching military technology means delaying economic improvements. The branching structure means two players will diverge based on research choices.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Tech Tree</div>
+      <p class="demo-hint">Click a technology node to begin researching it (prerequisites must be completed first). Watch the progress bar fill. Completed techs unlock downstream technologies. The dependency graph shows connections.</p>
+      <canvas id="demo-techtree" width="760" height="400"></canvas>
+      <div class="demo-controls">
+        <button id="tt-reset-btn">Reset Research</button>
+        <span class="value-display" id="tt-info">Click a tech to research it</span>
+        <span class="value-display" id="tt-science">Science/tick: 5</span>
+      </div>
+    </div>
+
+    <h4>4. Diplomacy Basics</h4>
+    <p>AI opponents have attitudes toward the player based on game events. Actions like expanding near their borders or building a large military change their disposition.</p>
+    <pre is:raw><code>function update_attitude(ai, player, event):
+    modifiers = {
+        "settled_near_border": -20,
+        "declared_war": -50,
+        "trade_deal": +15,
+        "gifted_gold": +10,
+        "military_buildup": -10
+    }
+    ai.attitude_toward[player.id] += modifiers.get(event, 0)
+    clamp(ai.attitude_toward[player.id], -100, 100)</code></pre>
+    <p><strong>Why it matters:</strong> Diplomacy transforms the AI from a faceless obstacle into a character with motivations. Even a simple attitude system creates meaningful moments.</p>
+
+    <h4>5. Turn-Based Macro Economy</h4>
+    <p>Each turn, every city generates yields: food for growth, production for building, gold for maintenance, science for research. The economy operates at a per-turn granularity.</p>
+    <pre is:raw><code>function process_economy(player):
+    total_income = 0
+    total_expenses = 0
+    for city in player.cities:
+        yields = calculate_city_yields(city)
+        city.food_stockpile += yields.food - (city.population * FOOD_PER_POP)
+        city.production_stockpile += yields.production
+        total_income += yields.gold
+    for unit in player.units:
+        total_expenses += unit.maintenance_cost
+    player.gold += total_income - total_expenses</code></pre>
+    <p><strong>Why it matters:</strong> The economy connects every system. Military units cost gold to maintain, so a large army is a constant drain. This creates the fundamental 4X tension: growth has costs, and unchecked expansion can bankrupt an empire.</p>
+
+    <h4>6. Victory Conditions</h4>
+    <p>Multiple victory conditions give players different strategic goals. Having more than one victory path means the player must decide which to pursue and which to defend against.</p>
+    <pre is:raw><code>victory_conditions = {
+    "domination": {
+        check: (player, game) => all other players have 0 cities
+    },
+    "science": {
+        check: (player, game) => "astronomy" in player.researched
+                                 AND player.has_built("space_program")
+    }
+}</code></pre>
+    <p><strong>Why it matters:</strong> Multiple victory conditions are what make 4X strategy truly strategic. A player pursuing science must still maintain enough military to not be conquered.</p>
+
+    <h4>7. Fog of War at Civilization Scale</h4>
+    <p>The map starts unexplored. As units move, they reveal terrain around them. Explored but unoccupied areas become "shrouded" &mdash; visible terrain but not current enemy positions.</p>
+    <pre is:raw><code>enum TileVisibility: UNEXPLORED, SHROUDED, VISIBLE
+
+function update_fog_of_war(player, hex_map):
+    for tile in hex_map:
+        if tile.visibility[player] == VISIBLE:
+            tile.visibility[player] = SHROUDED
+    visible_sources = player.units + player.cities
+    for source in visible_sources:
+        range = VISION_RANGE_CITY if source is City else VISION_RANGE_UNIT
+        for hex in hexes_in_range(source.position, range):
+            tile = hex_map.get(hex)
+            if tile:
+                tile.visibility[player] = VISIBLE</code></pre>
+    <p><strong>Why it matters:</strong> Fog of war creates information asymmetry &mdash; the most important ingredient in strategic tension. This uncertainty forces scouting and makes exploration genuinely exciting.</p>
+
+    <hr />
+
+    <h3>Stretch Goals</h3>
+    <ul>
+      <li><strong>Multiple AI opponents:</strong> Add a second AI player to create three-way diplomatic dynamics.</li>
+      <li><strong>Unit combat system:</strong> Implement rock-paper-scissors unit types.</li>
+      <li><strong>City production queue:</strong> Let cities queue multiple buildings and units.</li>
+      <li><strong>Map generation:</strong> Procedurally generate the hex map with noise functions.</li>
+    </ul>
+
+    <h3>MVP Spec</h3>
+    <table>
+      <thead><tr><th>Element</th><th>Scope</th></tr></thead>
+      <tbody>
+        <tr><td>Map</td><td>10x10 hex grid with 3-4 terrain types</td></tr>
+        <tr><td>Resources</td><td>2 resource types placed on specific hexes</td></tr>
+        <tr><td>Cities</td><td>Found cities with settlers, cities claim surrounding hexes</td></tr>
+        <tr><td>Tech tree</td><td>8-12 technologies in a branching tree</td></tr>
+        <tr><td>Economy</td><td>Per-turn yields: food, production, gold, science</td></tr>
+        <tr><td>Diplomacy</td><td>1 AI opponent with attitude tracking</td></tr>
+        <tr><td>Victory</td><td>2 conditions: domination and science</td></tr>
+        <tr><td>Fog of war</td><td>Unexplored/shrouded/visible states</td></tr>
+        <tr><td>Units</td><td>3 types: settler, warrior, scout</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliverable</h3>
+    <p>A playable miniature 4X game on a hex map where you found cities, research technologies, manage an economy, interact with one AI opponent, and pursue one of two victory conditions. A complete game should take approximately 30 minutes.</p>
+
+    <hr />
+
+    <h2>Analogies by Background</h2>
+
+    <h3>For Backend Developers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Hex Grid System</td><td>Like a distributed hash ring &mdash; nodes are evenly spaced, each responsible for a region, and neighbor lookups use consistent coordinate math.</td></tr>
+        <tr><td>City Founding</td><td>Like provisioning a new server in a region &mdash; it claims resources, serves nearby requests, and has ongoing operational costs.</td></tr>
+        <tr><td>Tech Tree</td><td>Like a dependency graph in a build system &mdash; you cannot build a target until its prerequisites are satisfied.</td></tr>
+        <tr><td>Victory Conditions</td><td>Like SLA compliance checks &mdash; multiple metrics are evaluated each cycle, and meeting any one threshold triggers a state change.</td></tr>
+        <tr><td>Fog of War</td><td>Like service discovery with TTL &mdash; known endpoints go stale if not refreshed.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Frontend Developers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Hex Grid System</td><td>Like a CSS hex grid layout &mdash; each cell has a defined position and neighbors are calculated from coordinates.</td></tr>
+        <tr><td>City Founding</td><td>Like creating a new component scope &mdash; the component claims its DOM territory and manages its own state.</td></tr>
+        <tr><td>Tech Tree</td><td>Like a feature flag dependency chain &mdash; enabling a flag requires its prerequisites to be active.</td></tr>
+        <tr><td>Economy</td><td>Like a render budget &mdash; each frame has income and expenses, and overspending causes degradation.</td></tr>
+        <tr><td>Fog of War</td><td>Like lazy loading &mdash; unloaded sections show a skeleton, loaded sections show real data.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Data / ML Engineers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Hex Grid System</td><td>Like a spatial index structure &mdash; coordinates enable efficient neighbor queries and range searches.</td></tr>
+        <tr><td>Tech Tree</td><td>Like a DAG of data pipeline stages &mdash; downstream transformations cannot run until upstream dependencies complete.</td></tr>
+        <tr><td>Diplomacy</td><td>Like a reinforcement learning reward signal &mdash; the AI's attitude is a running score that drives policy decisions.</td></tr>
+        <tr><td>Victory Conditions</td><td>Like early stopping criteria &mdash; multiple metrics are checked each epoch, and hitting any threshold ends the run.</td></tr>
+        <tr><td>Economy</td><td>Like a data pipeline cost model &mdash; each stage consumes resources, and a deficit forces pruning.</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li><strong>Scope as the Enemy:</strong> 4X games are notorious for scope creep. How do you decide which systems are essential for the core loop? What is the smallest set of interlocking systems that still feels like a 4X game?</li>
+      <li><strong>The AI Problem:</strong> A competent 4X AI is one of the hardest problems in game development. For the MVP, what is the minimum AI behavior that makes the game feel like a contest rather than a sandbox?</li>
+      <li><strong>The Pacing Trap:</strong> 4X games often start exciting and become tedious in the midgame. How would you design a 30-minute 4X game that keeps the pacing tight throughout?</li>
+      <li><strong>Information Overload:</strong> A 4X game presents dozens of numbers per turn. How do you surface the right information at the right time without overwhelming the player?</li>
+    </ol>
+
+    <nav class="module-nav">
+      <a href={`${base}modules/24-auto-battler/`}>&larr; Module 24: Auto-Battler</a>
+      <a href={`${base}modules/26-sokoban/`}>Module 26: Sokoban &rarr;</a>
+    </nav>
+  </div>
+</BaseLayout>
+
+<script>
+// ==================== Demo 1: Hex Grid with Cube Coordinates ====================
+(function() {
+  const canvas = document.getElementById('demo-hex');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const clearBtn = document.getElementById('hex-clear-btn');
+  const hexInfo = document.getElementById('hex-info');
+  const distInfo = document.getElementById('hex-dist-info');
+
+  const HEX_SIZE = 32;
+  const ORIGIN_X = canvas.width / 2;
+  const ORIGIN_Y = canvas.height / 2;
+  const GRID_RADIUS = 5;
+
+  const TERRAIN_COLORS = {
+    grass: '#4a7c3f', hills: '#8a7a5a', forest: '#2d5a27', water: '#2a6496', desert: '#c2a64e'
+  };
+  const TERRAIN_KEYS = Object.keys(TERRAIN_COLORS);
+
+  let hexes = [];
+  let selected1 = null;
+  let selected2 = null;
+  let hoverHex = null;
+
+  // Generate hex grid
+  for (let q = -GRID_RADIUS; q <= GRID_RADIUS; q++) {
+    for (let r = -GRID_RADIUS; r <= GRID_RADIUS; r++) {
+      const s = -q - r;
+      if (Math.abs(s) > GRID_RADIUS) continue;
+      const terrain = TERRAIN_KEYS[Math.floor(Math.random() * TERRAIN_KEYS.length)];
+      hexes.push({ q, r, s, terrain });
+    }
+  }
+
+  function hexToPixel(q, r) {
+    const x = HEX_SIZE * (3/2 * q);
+    const y = HEX_SIZE * (Math.sqrt(3)/2 * q + Math.sqrt(3) * r);
+    return { x: ORIGIN_X + x, y: ORIGIN_Y + y };
+  }
+
+  function pixelToHex(px, py) {
+    const x = px - ORIGIN_X;
+    const y = py - ORIGIN_Y;
+    const q = (2/3 * x) / HEX_SIZE;
+    const r = (-1/3 * x + Math.sqrt(3)/3 * y) / HEX_SIZE;
+    const s = -q - r;
+    // Round to nearest hex
+    let rq = Math.round(q), rr = Math.round(r), rs = Math.round(s);
+    const dq = Math.abs(rq - q), dr = Math.abs(rr - r), ds = Math.abs(rs - s);
+    if (dq > dr && dq > ds) rq = -rr - rs;
+    else if (dr > ds) rr = -rq - rs;
+    else rs = -rq - rr;
+    return { q: rq, r: rr, s: rs };
+  }
+
+  function hexDistance(a, b) {
+    return Math.max(Math.abs(a.q - b.q), Math.abs(a.r - b.r), Math.abs(a.s - b.s));
+  }
+
+  function findHex(q, r) {
+    return hexes.find(h => h.q === q && h.r === r);
+  }
+
+  function isNeighbor(a, b) {
+    return hexDistance(a, b) === 1;
+  }
+
+  function drawHex(cx, cy, size, fill, stroke, lineWidth) {
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const angle = Math.PI / 180 * (60 * i - 30);
+      const hx = cx + size * Math.cos(angle);
+      const hy = cy + size * Math.sin(angle);
+      if (i === 0) ctx.moveTo(hx, hy);
+      else ctx.lineTo(hx, hy);
+    }
+    ctx.closePath();
+    if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+    if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lineWidth || 1; ctx.stroke(); }
+  }
+
+  clearBtn.addEventListener('click', () => {
+    selected1 = null;
+    selected2 = null;
+    hexInfo.textContent = 'Click a hex to select';
+    distInfo.textContent = 'Distance: --';
+  });
+
+  canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    hoverHex = pixelToHex(mx, my);
+  });
+
+  canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const clicked = pixelToHex(mx, my);
+    const hex = findHex(clicked.q, clicked.r);
+    if (!hex) return;
+
+    if (!selected1) {
+      selected1 = hex;
+      hexInfo.textContent = 'Selected: (' + hex.q + ', ' + hex.r + ', ' + hex.s + ') ' + hex.terrain;
+      distInfo.textContent = 'Click another hex for distance';
+    } else if (!selected2) {
+      if (hex.q === selected1.q && hex.r === selected1.r) {
+        selected1 = null;
+        hexInfo.textContent = 'Click a hex to select';
+        distInfo.textContent = 'Distance: --';
+      } else {
+        selected2 = hex;
+        const d = hexDistance(selected1, selected2);
+        hexInfo.textContent = 'A: (' + selected1.q + ',' + selected1.r + ',' + selected1.s + ') B: (' + hex.q + ',' + hex.r + ',' + hex.s + ')';
+        distInfo.textContent = 'Distance: ' + d + ' hexes';
+      }
+    } else {
+      selected1 = hex;
+      selected2 = null;
+      hexInfo.textContent = 'Selected: (' + hex.q + ', ' + hex.r + ', ' + hex.s + ') ' + hex.terrain;
+      distInfo.textContent = 'Click another hex for distance';
+    }
+  });
+
+  function draw() {
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    for (const hex of hexes) {
+      const { x, y } = hexToPixel(hex.q, hex.r);
+      let fill = TERRAIN_COLORS[hex.terrain];
+      let stroke = '#333';
+      let lw = 0.5;
+
+      // Neighbor highlight
+      if (selected1 && !selected2 && isNeighbor(selected1, hex) && !(hex.q === selected1.q && hex.r === selected1.r)) {
+        fill = '#66bb6a';
+        stroke = '#fff';
+        lw = 1.5;
+      }
+
+      // Selection highlight
+      if (selected1 && hex.q === selected1.q && hex.r === selected1.r) {
+        stroke = '#ffd740';
+        lw = 3;
+      }
+      if (selected2 && hex.q === selected2.q && hex.r === selected2.r) {
+        stroke = '#ff7043';
+        lw = 3;
+      }
+
+      // Hover
+      if (hoverHex && hex.q === hoverHex.q && hex.r === hoverHex.r) {
+        fill = '#555';
+      }
+
+      drawHex(x, y, HEX_SIZE - 1, fill, stroke, lw);
+
+      // Coordinate labels
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.font = '8px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(hex.q + ',' + hex.r, x, y + 3);
+    }
+
+    // Distance line
+    if (selected1 && selected2) {
+      const p1 = hexToPixel(selected1.q, selected1.r);
+      const p2 = hexToPixel(selected2.q, selected2.r);
+      ctx.strokeStyle = '#ffd740';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      const mx = (p1.x + p2.x) / 2;
+      const my = (p1.y + p2.y) / 2;
+      const d = hexDistance(selected1, selected2);
+      ctx.fillStyle = '#ffd740';
+      ctx.font = 'bold 14px monospace';
+      ctx.fillText('d=' + d, mx, my - 10);
+    }
+
+    // Legend
+    ctx.textAlign = 'left';
+    ctx.font = '10px monospace';
+    let lx = 10, ly = canvas.height - 15;
+    for (const [name, color] of Object.entries(TERRAIN_COLORS)) {
+      ctx.fillStyle = color;
+      ctx.fillRect(lx, ly - 8, 10, 10);
+      ctx.fillStyle = '#ccc';
+      ctx.fillText(name, lx + 14, ly);
+      lx += ctx.measureText(name).width + 26;
+    }
+
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+// ==================== Demo 2: Tech Tree ====================
+(function() {
+  const canvas = document.getElementById('demo-techtree');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const resetBtn = document.getElementById('tt-reset-btn');
+  const ttInfo = document.getElementById('tt-info');
+  const scienceDisplay = document.getElementById('tt-science');
+
+  const SCIENCE_PER_TICK = 5;
+  const TICK_INTERVAL = 0.3; // seconds
+
+  const techs = [
+    { id: 'agriculture', name: 'Agriculture', cost: 20, prereqs: [], x: 80, y: 80, unlocks: 'Granary' },
+    { id: 'mining', name: 'Mining', cost: 20, prereqs: [], x: 80, y: 250, unlocks: 'Mine' },
+    { id: 'writing', name: 'Writing', cost: 40, prereqs: ['agriculture'], x: 250, y: 80, unlocks: 'Library' },
+    { id: 'bronze', name: 'Bronze Work', cost: 40, prereqs: ['mining'], x: 250, y: 250, unlocks: 'Warrior' },
+    { id: 'math', name: 'Mathematics', cost: 60, prereqs: ['writing'], x: 420, y: 80, unlocks: 'Walls' },
+    { id: 'currency', name: 'Currency', cost: 50, prereqs: ['writing', 'bronze'], x: 420, y: 170, unlocks: 'Market' },
+    { id: 'iron', name: 'Iron Working', cost: 80, prereqs: ['bronze'], x: 420, y: 300, unlocks: 'Swordsman' },
+    { id: 'engineering', name: 'Engineering', cost: 70, prereqs: ['math', 'currency'], x: 590, y: 120, unlocks: 'Aqueduct' },
+    { id: 'astronomy', name: 'Astronomy', cost: 100, prereqs: ['engineering', 'iron'], x: 590, y: 280, unlocks: 'VICTORY' },
+  ];
+
+  let researched = new Set();
+  let currentResearch = null;
+  let progress = 0;
+  let tickTimer = 0;
+
+  resetBtn.addEventListener('click', () => {
+    researched.clear();
+    currentResearch = null;
+    progress = 0;
+    ttInfo.textContent = 'Click a tech to research it';
+  });
+
+  canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    for (const tech of techs) {
+      const dx = mx - tech.x, dy = my - tech.y;
+      if (Math.abs(dx) < 60 && Math.abs(dy) < 22) {
+        if (researched.has(tech.id)) {
+          ttInfo.textContent = tech.name + ' already researched!';
+          return;
+        }
+        const prereqsMet = tech.prereqs.every(p => researched.has(p));
+        if (!prereqsMet) {
+          ttInfo.textContent = tech.name + ': prerequisites not met!';
+          return;
+        }
+        currentResearch = tech.id;
+        progress = 0;
+        ttInfo.textContent = 'Researching: ' + tech.name;
+        return;
+      }
+    }
+  });
+
+  let lastTime = performance.now();
+
+  function draw() {
+    const now = performance.now();
+    const dt = (now - lastTime) / 1000;
+    lastTime = now;
+
+    // Research progress
+    if (currentResearch) {
+      tickTimer += dt;
+      if (tickTimer >= TICK_INTERVAL) {
+        tickTimer = 0;
+        progress += SCIENCE_PER_TICK;
+        const tech = techs.find(t => t.id === currentResearch);
+        if (tech && progress >= tech.cost) {
+          researched.add(currentResearch);
+          ttInfo.textContent = tech.name + ' completed! Unlocks: ' + tech.unlocks;
+          currentResearch = null;
+          progress = 0;
+        }
+      }
+    }
+
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw connections
+    for (const tech of techs) {
+      for (const prereq of tech.prereqs) {
+        const from = techs.find(t => t.id === prereq);
+        if (!from) continue;
+        const bothDone = researched.has(from.id) && researched.has(tech.id);
+        ctx.strokeStyle = bothDone ? '#4caf50' : researched.has(from.id) ? '#666' : '#333';
+        ctx.lineWidth = bothDone ? 2 : 1;
+        ctx.beginPath();
+        ctx.moveTo(from.x + 55, from.y);
+        ctx.lineTo(tech.x - 55, tech.y);
+        ctx.stroke();
+        // Arrow
+        const angle = Math.atan2(tech.y - from.y, tech.x - 55 - from.x - 55);
+        const ax = tech.x - 55;
+        const ay = tech.y;
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);
+        ctx.lineTo(ax - 8 * Math.cos(angle - 0.4), ay - 8 * Math.sin(angle - 0.4));
+        ctx.lineTo(ax - 8 * Math.cos(angle + 0.4), ay - 8 * Math.sin(angle + 0.4));
+        ctx.closePath();
+        ctx.fillStyle = ctx.strokeStyle;
+        ctx.fill();
+      }
+    }
+
+    // Draw tech nodes
+    for (const tech of techs) {
+      const isResearched = researched.has(tech.id);
+      const isCurrent = currentResearch === tech.id;
+      const prereqsMet = tech.prereqs.every(p => researched.has(p));
+
+      let bgColor = '#2a2a4a';
+      let borderColor = '#444';
+      let textColor = '#888';
+
+      if (isResearched) {
+        bgColor = '#1b5e20';
+        borderColor = '#4caf50';
+        textColor = '#fff';
+      } else if (isCurrent) {
+        bgColor = '#1a237e';
+        borderColor = '#42a5f5';
+        textColor = '#fff';
+      } else if (prereqsMet) {
+        bgColor = '#333355';
+        borderColor = '#7986cb';
+        textColor = '#ccc';
+      }
+
+      // Node box
+      const w = 110, h = 44;
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(tech.x - w/2, tech.y - h/2, w, h);
+      ctx.strokeStyle = borderColor;
+      ctx.lineWidth = isCurrent ? 2.5 : 1.5;
+      ctx.strokeRect(tech.x - w/2, tech.y - h/2, w, h);
+
+      // Progress bar
+      if (isCurrent) {
+        const pct = progress / tech.cost;
+        ctx.fillStyle = '#42a5f5';
+        ctx.fillRect(tech.x - w/2, tech.y + h/2 - 5, w * pct, 5);
+      }
+
+      // Text
+      ctx.fillStyle = textColor;
+      ctx.font = 'bold 10px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(tech.name, tech.x, tech.y - 3);
+      ctx.font = '9px monospace';
+      ctx.fillStyle = isResearched ? '#a5d6a7' : '#777';
+      ctx.fillText(isResearched ? 'DONE' : (isCurrent ? Math.floor(progress) + '/' + tech.cost : 'Cost: ' + tech.cost), tech.x, tech.y + 12);
+      if (tech.unlocks) {
+        ctx.fillStyle = '#ffd740';
+        ctx.font = '8px monospace';
+        ctx.fillText(tech.unlocks, tech.x, tech.y + h/2 + 12);
+      }
+    }
+
+    ctx.textAlign = 'left';
+
+    // Legend
+    ctx.font = '10px monospace';
+    ctx.fillStyle = '#4caf50';
+    ctx.fillRect(10, canvas.height - 18, 10, 10);
+    ctx.fillStyle = '#ccc';
+    ctx.fillText('Researched', 24, canvas.height - 9);
+    ctx.fillStyle = '#42a5f5';
+    ctx.fillRect(110, canvas.height - 18, 10, 10);
+    ctx.fillStyle = '#ccc';
+    ctx.fillText('In Progress', 124, canvas.height - 9);
+    ctx.fillStyle = '#7986cb';
+    ctx.fillRect(220, canvas.height - 18, 10, 10);
+    ctx.fillStyle = '#ccc';
+    ctx.fillText('Available', 234, canvas.height - 9);
+    ctx.fillStyle = '#444';
+    ctx.fillRect(310, canvas.height - 18, 10, 10);
+    ctx.fillStyle = '#ccc';
+    ctx.fillText('Locked', 324, canvas.height - 9);
+
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+</script>

@@ -1,0 +1,804 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 24: Auto-Battler">
+  <div class="container page-content">
+    <div class="module-header">
+      <div class="module-number">Module 24</div>
+      <h1>Auto-Battler</h1>
+      <p class="module-theme">Strategic drafting meets hands-off combat &mdash; Digital Chess Club</p>
+    </div>
+
+    <blockquote>
+      <p>"The fight is already over before it begins. Your job was five minutes ago."</p>
+    </blockquote>
+
+    <hr />
+
+    <h2>Prerequisites</h2>
+    <table>
+      <thead>
+        <tr><th>Module</th><th>What You Used From It</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Module 6 - Tower Defense</td><td>Wave-based pacing, spatial placement on a grid, entities interacting without direct player control during execution phases</td></tr>
+        <tr><td>Module 10 - Deckbuilder</td><td>Shop-and-draft loop, random offers, synergy construction, tension between building toward a plan and adapting to what is available</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h2>Week 1: History &amp; Design Theory</h2>
+
+    <h3>The Origin</h3>
+    <p>The auto-battler genre emerged almost fully formed in January 2019 when a team of modders released Dota Auto Chess as a custom game mode inside Dota 2. Players drafted heroes from a shared pool, placed them on an 8x8 chessboard grid, and watched them fight automatically against other players' boards. Within weeks it had millions of daily players. The game fused the character-collecting satisfaction of gacha games with the positional strategy of chess and the economic pressure of poker. What made it revolutionary was the realization that combat itself did not need to be interactive &mdash; all the meaningful decisions happened before the fight, in the draft and the positioning.</p>
+
+    <h3>How the Genre Evolved</h3>
+    <p><strong>Dota Auto Chess (2019):</strong> The original mod that defined the genre. Eight players share a unit pool, spend gold in a shop to buy and upgrade heroes, place them on a grid, and watch rounds of automated combat. It established the core loop of draft-position-fight and introduced the economic system of saving gold for interest.</p>
+    <p><strong>Teamfight Tactics (Riot Games, 2019):</strong> Riot's response brought the genre to a massive audience through the League of Legends client. TFT refined the item system, introduced the carousel round, and polished the synergy system with clear trait thresholds. It proved the genre could sustain a live-service model with rotating sets.</p>
+    <p><strong>Super Auto Pets (2021):</strong> A radical simplification that stripped the genre to its essence. Units are animals arranged in a single line instead of a grid. What remains is pure draft economics and synergy construction. Its success demonstrated that the core auto-battler loop &mdash; buy, arrange, watch, adapt &mdash; is compelling even without complexity.</p>
+
+    <h3>What Makes It "Great"</h3>
+    <p>A great auto-battler creates a constant tension between commitment and flexibility. Every round, the shop offers you a small random selection of units, and you must decide: do you buy that unit to chase a powerful synergy, or save your gold to earn interest for a stronger economy later? The automated combat is not a gimmick &mdash; it is the design insight that lets the game focus entirely on the decisions that matter: resource allocation, risk assessment, and spatial reasoning.</p>
+
+    <h3>The Essential Mechanic</h3>
+    <p>Drafting and positioning units that fight automatically &mdash; strategy is in preparation, not execution.</p>
+
+    <hr />
+
+    <h2>Week 2: Build the MVP</h2>
+
+    <h3>What You're Building</h3>
+    <p>A single-player auto-battler where you face a series of increasingly difficult AI opponents. Each round, you spend gold to buy units from a randomized shop, place them on a small grid, and watch them fight the enemy team automatically. Units of the same type grant synergy bonuses when you field enough of them. You can reroll the shop for new options, save gold to earn interest, and upgrade units by collecting duplicates.</p>
+
+    <h3>Core Concepts (Must Implement)</h3>
+
+    <h4>1. Draft / Shop System</h4>
+    <p>The shop presents a random selection of units each round. The player spends gold to buy units and can pay to reroll for a new selection. This is where the majority of strategic decisions happen.</p>
+    <pre is:raw><code>SHOP_SIZE = 5
+REROLL_COST = 2
+
+function generate_shop(tier_odds, unit_pool):
+    shop = []
+    for i in 0..SHOP_SIZE:
+        tier = weighted_random(tier_odds)
+        available = unit_pool.filter(u => u.tier == tier AND u.copies_remaining > 0)
+        unit = random_choice(available)
+        shop.append(unit)
+    return shop
+
+function buy_unit(player, shop_index):
+    unit = shop[shop_index]
+    if player.gold >= unit.cost:
+        player.gold -= unit.cost
+        add_to_bench(player, unit)
+        shop[shop_index] = EMPTY
+        check_for_upgrade(player, unit.type)
+
+function reroll_shop(player):
+    if player.gold >= REROLL_COST:
+        player.gold -= REROLL_COST
+        return_units_to_pool(current_shop)
+        player.shop = generate_shop(tier_odds_for_level(player.level), unit_pool)</code></pre>
+    <p><strong>Why it matters:</strong> The shop is the primary interface between randomness and player agency. Every auto-battler lives or dies by how its shop feels. Too random and players feel helpless; too predictable and there is no adaptation. The reroll mechanic gives players a pressure valve &mdash; they can spend resources to fight bad luck, but at a cost.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Draft Shop &amp; Board Placement</div>
+      <p class="demo-hint">Click units in the shop to buy them (costs gold). Click a cell on the 4x4 board to place a purchased unit. "Reroll" refreshes the shop for 2 gold. Active synergies and gold balance update in real-time.</p>
+      <canvas id="demo-shop" width="760" height="480"></canvas>
+      <div class="demo-controls">
+        <button id="shop-reroll-btn">Reroll (2g)</button>
+        <button id="shop-fight-btn">Fight!</button>
+        <button id="shop-reset-btn">New Game</button>
+        <span class="value-display" id="shop-gold-display">Gold: 10</span>
+        <span class="value-display" id="shop-synergy-display">Synergies: --</span>
+      </div>
+    </div>
+
+    <h4>2. Synergy / Tribal Bonuses</h4>
+    <p>Units belong to one or more types (tribes, traits). When you field enough units of the same type, the entire team receives a bonus. Thresholds create breakpoints that drive drafting decisions.</p>
+    <pre is:raw><code>synergy_definitions = {
+    "warrior": {2: {armor: +5}, 4: {armor: +15}},
+    "mage":    {2: {spell_power: +20}, 4: {spell_power: +50}},
+    "beast":   {2: {attack_speed: +15%}, 4: {attack_speed: +30%}}
+}
+
+function calculate_active_synergies(board_units):
+    type_counts = {}
+    for unit in board_units:
+        for type in unit.types:
+            type_counts[type] = type_counts.get(type, 0) + 1
+    active_buffs = []
+    for type, count in type_counts:
+        thresholds = synergy_definitions[type].keys().sort(descending)
+        for threshold in thresholds:
+            if count >= threshold:
+                active_buffs.append(synergy_definitions[type][threshold])
+                break
+    return active_buffs</code></pre>
+    <p><strong>Why it matters:</strong> Synergies transform the draft from "pick the strongest individual unit" into "build a team that is greater than the sum of its parts." The threshold system creates natural decision points: do you splash two warriors for a small bonus or commit to four for a massive one?</p>
+
+    <h4>3. Board Placement Strategy</h4>
+    <p>Before combat begins, the player arranges their units on a grid. Where a unit stands determines who it fights first, who it protects, and whether it survives long enough to use its abilities.</p>
+    <pre is:raw><code>BOARD_ROWS = 4
+BOARD_COLS = 7
+
+function place_unit(player, unit, row, col):
+    if row < 0 OR row >= BOARD_ROWS OR col >= BOARD_COLS:
+        return false
+    if board[row][col] is not EMPTY:
+        return false
+    board[row][col] = unit
+    unit.position = {row, col}
+    return true</code></pre>
+    <p><strong>Why it matters:</strong> Placement is the spatial puzzle within the auto-battler. Two players with identical units and synergies will get different results based on positioning. This is where the "chess" in auto chess comes from.</p>
+
+    <h4>4. Automated Combat Resolution</h4>
+    <p>Once the player finalizes their board, combat plays out without any input. Units select targets based on simple rules (nearest enemy), attack on cooldowns, and use abilities when their mana is full.</p>
+    <pre is:raw><code>function resolve_combat(team_a, team_b):
+    all_units = team_a + team_b
+    for unit in all_units:
+        unit.current_hp = unit.max_hp
+        unit.mana = 0
+
+    while team_a.has_living_units() AND team_b.has_living_units():
+        for unit in all_units.sort_by(attack_speed):
+            if unit.is_dead(): continue
+            target = find_target(unit, get_enemies(unit))
+            if target == null: continue
+            if not in_range(unit, target):
+                move_toward(unit, target)
+            else:
+                damage = calculate_damage(unit.attack, target.armor)
+                target.current_hp -= damage
+                if target.current_hp <= 0:
+                    mark_dead(target)
+    return {winner: surviving_team(), damage: count_surviving_units(winner)}
+
+function find_target(unit, enemies):
+    living = enemies.filter(e => e.is_alive())
+    return living.sort_by(distance_to(unit)).first()</code></pre>
+    <p><strong>Why it matters:</strong> Automated combat is the defining feature of the genre. By removing execution from the player's hands, the game shifts all skill expression to preparation. The combat system must be readable &mdash; the player needs to watch a fight, understand why they lost, and know what to change.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Auto Combat</div>
+      <p class="demo-hint">After placing units on the board above, press "Fight!" to watch automated combat. Blue units (yours) fight red units (enemy) automatically. Units move toward the nearest enemy and attack. Watch the battle play out hands-free.</p>
+      <canvas id="demo-combat" width="760" height="400"></canvas>
+      <div class="demo-controls">
+        <button id="combat-start-btn">Start Combat</button>
+        <button id="combat-reset-btn">Reset</button>
+        <span class="value-display" id="combat-status">Place units above, then fight!</span>
+      </div>
+    </div>
+
+    <h4>5. Economy Management</h4>
+    <p>Gold is earned each round from a base income, interest on savings, and win/loss streak bonuses. The interest system creates a fundamental tension: spend now for power or save for compound returns.</p>
+    <pre is:raw><code>BASE_INCOME = 5
+INTEREST_RATE = 0.1
+MAX_INTEREST = 5
+STREAK_BONUS = {0: 0, 1: 0, 2: 1, 3: 1, 4: 2, 5+: 3}
+
+function calculate_round_income(player):
+    base = BASE_INCOME
+    interest = min(floor(player.gold * INTEREST_RATE), MAX_INTEREST)
+    streak = STREAK_BONUS[player.current_streak_length]
+    bonus = 1 if player.won_last_round else 0
+    return base + interest + streak + bonus</code></pre>
+    <p><strong>Why it matters:</strong> The economy system is what gives auto-battlers their strategic depth beyond the draft. Interest on saved gold means that every purchase has a hidden cost: the future interest you will not earn. This creates distinct strategic archetypes (greedy vs aggressive).</p>
+
+    <h4>6. Shared Pool Drafting</h4>
+    <p>All players draw from the same finite pool of units. When one player buys a unit, there are fewer copies available for everyone else. This creates indirect competition during the draft phase.</p>
+    <pre is:raw><code>function initialize_unit_pool():
+    pool = {}
+    for unit_type in all_unit_types:
+        copies = {1: 29, 2: 22, 3: 16, 4: 12, 5: 10}
+        pool[unit_type] = copies[unit_type.tier]
+    return pool
+
+function buy_from_pool(pool, unit_type):
+    if pool[unit_type] > 0:
+        pool[unit_type] -= 1
+        return unit_type
+    return null</code></pre>
+    <p><strong>Why it matters:</strong> The shared pool transforms what could be a solo optimization puzzle into a competitive resource game. Smart players scout opponents and pivot to uncontested strategies.</p>
+
+    <h4>7. Round Structure</h4>
+    <p>The game progresses through a sequence of rounds: PvE rounds against neutral creeps, then PvP rounds. Each round has a preparation phase and a combat phase.</p>
+    <pre is:raw><code>function run_round(round, player):
+    // PREPARATION PHASE
+    player.shop = generate_shop(...)
+    start_timer(PREP_TIME)
+    wait_for_timer_or_ready()
+
+    // COMBAT PHASE
+    if round.type == "pve":
+        enemy_board = round.enemies
+    else:
+        enemy_board = select_opponent(player).board.clone()
+
+    result = resolve_combat(player.board, enemy_board)
+    if result.winner != player:
+        player.hp -= result.damage
+
+    update_streak(player, result.winner == player)
+    end_of_round(player)</code></pre>
+    <p><strong>Why it matters:</strong> The round structure provides rhythm and pacing. The preparation-then-combat loop creates a heartbeat: tension as you scramble to improve your board, then release as you watch the fight play out.</p>
+
+    <hr />
+
+    <h3>Stretch Goals</h3>
+    <ul>
+      <li><strong>Unit upgrades:</strong> Buying three copies of the same unit automatically combines them into a stronger two-star version.</li>
+      <li><strong>Item system:</strong> Defeated PvE rounds drop items that can be equipped on units.</li>
+      <li><strong>Multiple opponents:</strong> Expand from one AI opponent to a full lobby of simulated opponents.</li>
+      <li><strong>Carousel round:</strong> A special round where units with items circle on a conveyor belt and each player picks one.</li>
+    </ul>
+
+    <h3>MVP Spec</h3>
+    <table>
+      <thead><tr><th>Element</th><th>Scope</th></tr></thead>
+      <tbody>
+        <tr><td>Grid</td><td>4x7 board for the player, mirrored for the opponent</td></tr>
+        <tr><td>Units</td><td>8-10 unit types across 3 tiers and 3-4 synergy types</td></tr>
+        <tr><td>Shop</td><td>5 slots, reroll for 2 gold, refreshes each round</td></tr>
+        <tr><td>Economy</td><td>Base income + interest (10%, capped at 5) + streak bonus</td></tr>
+        <tr><td>Synergies</td><td>3-4 types with 2/4 thresholds</td></tr>
+        <tr><td>Combat</td><td>Automated: nearest-target, attack on cooldown</td></tr>
+        <tr><td>Rounds</td><td>3 PvE rounds then PvP rounds until one side reaches 0 HP</td></tr>
+        <tr><td>Health</td><td>Player starts at 100 HP, loses HP equal to surviving enemy units on a loss</td></tr>
+        <tr><td>Win condition</td><td>Survive all rounds or reduce AI opponent's HP to 0</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliverable</h3>
+    <p>A playable single-player auto-battler with a shop phase where you buy units from a randomized selection, place them on a grid, and watch automated combat resolve against an AI opponent. The game must include at least three synergy types with visible bonuses, an economy system with interest on saved gold, and a clear win/loss state.</p>
+
+    <hr />
+
+    <h2>Analogies by Background</h2>
+
+    <h3>For Backend Developers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Draft / Shop System</td><td>Like a service registry where available instances are drawn from a pool &mdash; each request depletes availability, rerolling is re-querying with a cost.</td></tr>
+        <tr><td>Synergy / Tribal Bonuses</td><td>Like middleware chains that activate only when enough compatible services are registered &mdash; reaching a threshold enables a new capability.</td></tr>
+        <tr><td>Automated Combat</td><td>Like a CI/CD pipeline executing after you commit &mdash; you set up the conditions and watch the system run.</td></tr>
+        <tr><td>Shared Pool Drafting</td><td>Like a connection pool shared across microservices &mdash; one service hogging connections starves the others.</td></tr>
+        <tr><td>Economy Management</td><td>Like capacity planning with compound returns &mdash; investing in infrastructure now reduces future costs.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Frontend Developers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Draft / Shop System</td><td>Like a component marketplace where you browse available widgets, purchase the ones you need, and refresh the listing.</td></tr>
+        <tr><td>Board Placement</td><td>Like CSS Grid layout &mdash; you are positioning elements into specific grid cells and the arrangement determines interaction.</td></tr>
+        <tr><td>Automated Combat</td><td>Like the browser render pipeline after you commit DOM changes &mdash; you set up state and the engine resolves it.</td></tr>
+        <tr><td>Economy Management</td><td>Like a performance budget &mdash; you can spend rendering time now for richness or save it for smoother interactions later.</td></tr>
+        <tr><td>Round Structure</td><td>Like the React lifecycle &mdash; mount (preparation), render (combat), and cleanup (round end) phases repeat.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Data / ML Engineers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Draft / Shop System</td><td>Like hyperparameter search with a budget &mdash; each evaluation costs compute, rerolling is re-sampling the search space.</td></tr>
+        <tr><td>Synergy / Tribal Bonuses</td><td>Like feature interactions in a model &mdash; individual features are useful, but specific combinations produce non-linear boosts.</td></tr>
+        <tr><td>Automated Combat</td><td>Like launching a training run &mdash; you configure the hyperparameters, hit start, and observe the loss curve.</td></tr>
+        <tr><td>Shared Pool Drafting</td><td>Like a shared GPU cluster &mdash; other teams' jobs compete for the same resources.</td></tr>
+        <tr><td>Round Structure</td><td>Like an epoch-based training loop &mdash; each epoch consists of forward pass, loss calculation, and backprop.</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li><strong>The Preparation Paradox:</strong> Auto-battlers remove all player input during combat, yet players report feeling more responsible for outcomes. Why does limiting agency during execution increase the feeling of ownership over results?</li>
+      <li><strong>Economic Depth vs. Accessibility:</strong> The interest-on-gold system creates rich strategic depth but is the hardest concept for new players to grasp. How would you design the UI so players discover the interest mechanic naturally?</li>
+      <li><strong>The Shared Pool Problem:</strong> In a single-player MVP, there is only one opponent drawing from the pool. How do you simulate the competitive pressure of a full lobby?</li>
+      <li><strong>Randomness as Content:</strong> Auto-battlers generate replayability almost entirely through randomness in the shop. How much randomness is enough to create variety, and at what point does it feel like the game is playing you?</li>
+    </ol>
+
+    <nav class="module-nav">
+      <a href={`${base}modules/23-turn-based-strategy/`}>&larr; Module 23: Turn-Based Strategy</a>
+      <a href={`${base}modules/25-4x-strategy/`}>Module 25: 4X Strategy &rarr;</a>
+    </nav>
+  </div>
+</BaseLayout>
+
+<script>
+// ==================== Demo 1: Draft Shop & Board Placement ====================
+(function() {
+  const canvas = document.getElementById('demo-shop');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const rerollBtn = document.getElementById('shop-reroll-btn');
+  const fightBtn = document.getElementById('shop-fight-btn');
+  const resetBtn = document.getElementById('shop-reset-btn');
+  const goldDisplay = document.getElementById('shop-gold-display');
+  const synergyDisplay = document.getElementById('shop-synergy-display');
+
+  const UNIT_TYPES = [
+    { name: 'Knight', type: 'warrior', color: '#e57373', cost: 3, hp: 120, atk: 10, tier: 1, symbol: 'Kn' },
+    { name: 'Berserker', type: 'warrior', color: '#ef5350', cost: 3, hp: 100, atk: 14, tier: 1, symbol: 'Bk' },
+    { name: 'Wizard', type: 'mage', color: '#7e57c2', cost: 4, hp: 70, atk: 18, tier: 2, symbol: 'Wz' },
+    { name: 'Sorcerer', type: 'mage', color: '#9575cd', cost: 3, hp: 65, atk: 15, tier: 1, symbol: 'So' },
+    { name: 'Wolf', type: 'beast', color: '#8d6e63', cost: 2, hp: 80, atk: 12, tier: 1, symbol: 'Wf' },
+    { name: 'Bear', type: 'beast', color: '#a1887f', cost: 4, hp: 140, atk: 8, tier: 2, symbol: 'Br' },
+    { name: 'Archer', type: 'ranger', color: '#66bb6a', cost: 3, hp: 60, atk: 16, tier: 1, symbol: 'Ar' },
+    { name: 'Sniper', type: 'ranger', color: '#43a047', cost: 5, hp: 55, atk: 22, tier: 2, symbol: 'Sn' },
+  ];
+
+  const SYNERGY_COLORS = { warrior: '#e57373', mage: '#9575cd', beast: '#a1887f', ranger: '#66bb6a' };
+  const SYNERGY_BONUSES = { warrior: { 2: '+5 armor', 3: '+12 armor' }, mage: { 2: '+20% spell', 3: '+50% spell' }, beast: { 2: '+15% speed', 3: '+30% speed' }, ranger: { 2: '+10 atk', 3: '+25 atk' } };
+
+  const BOARD_ROWS = 4, BOARD_COLS = 4;
+  const BOARD_X = 30, BOARD_Y = 160, CELL = 60;
+  const SHOP_X = 30, SHOP_Y = 20, SHOP_W = 130, SHOP_H = 110;
+
+  let gold = 10;
+  let shop = [];
+  let board = [];
+  let bench = [];
+  let selectedBench = null;
+
+  function initBoard() {
+    board = [];
+    for (let r = 0; r < BOARD_ROWS; r++) {
+      board[r] = [];
+      for (let c = 0; c < BOARD_COLS; c++) board[r][c] = null;
+    }
+  }
+
+  function generateShop() {
+    shop = [];
+    for (let i = 0; i < 5; i++) {
+      shop.push({ ...UNIT_TYPES[Math.floor(Math.random() * UNIT_TYPES.length)] });
+    }
+  }
+
+  function calcSynergies() {
+    const counts = {};
+    for (let r = 0; r < BOARD_ROWS; r++) {
+      for (let c = 0; c < BOARD_COLS; c++) {
+        if (board[r][c]) {
+          const t = board[r][c].type;
+          counts[t] = (counts[t] || 0) + 1;
+        }
+      }
+    }
+    const parts = [];
+    for (const [type, count] of Object.entries(counts)) {
+      const bonuses = SYNERGY_BONUSES[type];
+      let bonus = '';
+      if (bonuses) {
+        const thresholds = Object.keys(bonuses).map(Number).sort((a,b) => b - a);
+        for (const t of thresholds) {
+          if (count >= t) { bonus = ' ' + bonuses[t]; break; }
+        }
+      }
+      parts.push(type + ':' + count + bonus);
+    }
+    synergyDisplay.textContent = parts.length > 0 ? parts.join(' | ') : 'Synergies: --';
+  }
+
+  function reset() {
+    gold = 10;
+    bench = [];
+    selectedBench = null;
+    initBoard();
+    generateShop();
+    goldDisplay.textContent = 'Gold: ' + gold;
+    calcSynergies();
+  }
+  reset();
+
+  rerollBtn.addEventListener('click', () => {
+    if (gold >= 2) { gold -= 2; generateShop(); goldDisplay.textContent = 'Gold: ' + gold; }
+  });
+  resetBtn.addEventListener('click', reset);
+
+  canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    // Check shop click
+    for (let i = 0; i < shop.length; i++) {
+      const sx = SHOP_X + i * (SHOP_W + 10);
+      if (mx >= sx && mx <= sx + SHOP_W && my >= SHOP_Y && my <= SHOP_Y + SHOP_H) {
+        if (shop[i] && gold >= shop[i].cost) {
+          gold -= shop[i].cost;
+          bench.push({ ...shop[i] });
+          shop[i] = null;
+          goldDisplay.textContent = 'Gold: ' + gold;
+          selectedBench = bench.length - 1;
+        }
+        return;
+      }
+    }
+
+    // Check bench click
+    const benchY = BOARD_Y + BOARD_ROWS * CELL + 20;
+    for (let i = 0; i < bench.length; i++) {
+      const bx = BOARD_X + i * 55;
+      if (mx >= bx && mx <= bx + 48 && my >= benchY && my <= benchY + 48) {
+        selectedBench = i;
+        return;
+      }
+    }
+
+    // Check board click
+    if (selectedBench !== null && selectedBench < bench.length) {
+      const col = Math.floor((mx - BOARD_X) / CELL);
+      const row = Math.floor((my - BOARD_Y) / CELL);
+      if (col >= 0 && col < BOARD_COLS && row >= 0 && row < BOARD_ROWS) {
+        if (board[row][col] === null) {
+          board[row][col] = bench[selectedBench];
+          bench.splice(selectedBench, 1);
+          selectedBench = null;
+          calcSynergies();
+        }
+      }
+    }
+  });
+
+  function draw() {
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Shop
+    ctx.fillStyle = '#ccc';
+    ctx.font = 'bold 12px monospace';
+    ctx.fillText('SHOP (click to buy)', SHOP_X, SHOP_Y - 5);
+    for (let i = 0; i < 5; i++) {
+      const sx = SHOP_X + i * (SHOP_W + 10);
+      ctx.fillStyle = shop[i] ? '#2a2a4a' : '#1a1a2e';
+      ctx.fillRect(sx, SHOP_Y, SHOP_W, SHOP_H);
+      ctx.strokeStyle = '#444';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(sx, SHOP_Y, SHOP_W, SHOP_H);
+      if (shop[i]) {
+        const u = shop[i];
+        ctx.fillStyle = u.color;
+        ctx.beginPath();
+        ctx.arc(sx + SHOP_W / 2, SHOP_Y + 35, 20, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 11px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(u.symbol, sx + SHOP_W / 2, SHOP_Y + 39);
+        ctx.font = '10px monospace';
+        ctx.fillText(u.name, sx + SHOP_W / 2, SHOP_Y + 68);
+        ctx.fillStyle = '#aaa';
+        ctx.fillText(u.type, sx + SHOP_W / 2, SHOP_Y + 82);
+        ctx.fillStyle = '#ffd740';
+        ctx.fillText(u.cost + 'g', sx + SHOP_W / 2, SHOP_Y + 96);
+        ctx.textAlign = 'left';
+      }
+    }
+
+    // Board label
+    ctx.fillStyle = '#ccc';
+    ctx.font = 'bold 12px monospace';
+    ctx.fillText('BOARD (click to place)', BOARD_X, BOARD_Y - 5);
+
+    // Board
+    for (let r = 0; r < BOARD_ROWS; r++) {
+      for (let c = 0; c < BOARD_COLS; c++) {
+        const x = BOARD_X + c * CELL;
+        const y = BOARD_Y + r * CELL;
+        ctx.fillStyle = (r + c) % 2 === 0 ? '#2a2a4a' : '#252545';
+        ctx.fillRect(x, y, CELL, CELL);
+        ctx.strokeStyle = '#444';
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(x, y, CELL, CELL);
+        if (board[r][c]) {
+          const u = board[r][c];
+          ctx.fillStyle = u.color;
+          ctx.beginPath();
+          ctx.arc(x + CELL / 2, y + CELL / 2, CELL / 2 - 6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#fff';
+          ctx.font = 'bold 11px monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText(u.symbol, x + CELL / 2, y + CELL / 2 + 4);
+          ctx.textAlign = 'left';
+        }
+      }
+    }
+
+    // Synergy panel on the right
+    const panelX = BOARD_X + BOARD_COLS * CELL + 30;
+    ctx.fillStyle = '#ccc';
+    ctx.font = 'bold 12px monospace';
+    ctx.fillText('SYNERGIES', panelX, BOARD_Y + 10);
+    const counts = {};
+    for (let r = 0; r < BOARD_ROWS; r++) {
+      for (let c = 0; c < BOARD_COLS; c++) {
+        if (board[r][c]) {
+          const t = board[r][c].type;
+          counts[t] = (counts[t] || 0) + 1;
+        }
+      }
+    }
+    let sy = BOARD_Y + 30;
+    for (const [type, count] of Object.entries(counts)) {
+      ctx.fillStyle = SYNERGY_COLORS[type] || '#888';
+      ctx.font = '11px monospace';
+      const bonuses = SYNERGY_BONUSES[type];
+      let active = '';
+      if (bonuses) {
+        const thresholds = Object.keys(bonuses).map(Number).sort((a,b) => b - a);
+        for (const t of thresholds) {
+          if (count >= t) { active = bonuses[t]; break; }
+        }
+      }
+      ctx.fillText(type + ': ' + count + (active ? ' -> ' + active : ''), panelX, sy);
+      sy += 18;
+    }
+
+    // Stats panel
+    ctx.fillStyle = '#888';
+    ctx.font = '11px monospace';
+    ctx.fillText('Gold: ' + gold, panelX, sy + 20);
+    ctx.fillText('Board units: ' + board.flat().filter(Boolean).length + '/4', panelX, sy + 38);
+
+    // Bench
+    const benchY = BOARD_Y + BOARD_ROWS * CELL + 20;
+    ctx.fillStyle = '#ccc';
+    ctx.font = 'bold 12px monospace';
+    ctx.fillText('BENCH (click to select, then click board)', BOARD_X, benchY - 5);
+    for (let i = 0; i < bench.length; i++) {
+      const bx = BOARD_X + i * 55;
+      ctx.fillStyle = i === selectedBench ? '#3a3a5a' : '#2a2a4a';
+      ctx.fillRect(bx, benchY, 48, 48);
+      ctx.strokeStyle = i === selectedBench ? '#fff' : '#444';
+      ctx.lineWidth = i === selectedBench ? 2 : 1;
+      ctx.strokeRect(bx, benchY, 48, 48);
+      const u = bench[i];
+      ctx.fillStyle = u.color;
+      ctx.beginPath();
+      ctx.arc(bx + 24, benchY + 24, 16, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 10px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(u.symbol, bx + 24, benchY + 28);
+      ctx.textAlign = 'left';
+    }
+
+    requestAnimationFrame(draw);
+  }
+  draw();
+
+  // Store board reference for combat demo
+  window._autoBattlerBoard = board;
+  window._autoBattlerBoardRows = BOARD_ROWS;
+  window._autoBattlerBoardCols = BOARD_COLS;
+  fightBtn.addEventListener('click', () => {
+    const combatBtn = document.getElementById('combat-start-btn');
+    if (combatBtn) combatBtn.click();
+  });
+})();
+
+// ==================== Demo 2: Auto Combat ====================
+(function() {
+  const canvas = document.getElementById('demo-combat');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const startBtn = document.getElementById('combat-start-btn');
+  const resetBtn = document.getElementById('combat-reset-btn');
+  const statusDisplay = document.getElementById('combat-status');
+
+  let fighters = [];
+  let fighting = false;
+  let result = null;
+
+  const ENEMY_UNITS = [
+    { name: 'Goblin', color: '#c62828', hp: 60, maxHp: 60, atk: 8, speed: 60, symbol: 'Gb', team: 'enemy' },
+    { name: 'Orc', color: '#d32f2f', hp: 90, maxHp: 90, atk: 12, speed: 50, symbol: 'Or', team: 'enemy' },
+    { name: 'Troll', color: '#b71c1c', hp: 110, maxHp: 110, atk: 10, speed: 40, symbol: 'Tr', team: 'enemy' },
+  ];
+
+  function setupCombat() {
+    fighters = [];
+    result = null;
+
+    // Player units from board
+    const board = window._autoBattlerBoard;
+    const rows = window._autoBattlerBoardRows || 4;
+    const cols = window._autoBattlerBoardCols || 4;
+    if (board) {
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          if (board[r][c]) {
+            fighters.push({
+              name: board[r][c].name,
+              color: board[r][c].color,
+              hp: board[r][c].hp || 80,
+              maxHp: board[r][c].hp || 80,
+              atk: board[r][c].atk || 10,
+              speed: 50 + Math.random() * 30,
+              symbol: board[r][c].symbol,
+              team: 'player',
+              x: 80 + c * 60,
+              y: 80 + r * 70,
+              targetX: 0, targetY: 0,
+              attackTimer: 0, dead: false
+            });
+          }
+        }
+      }
+    }
+
+    if (fighters.length === 0) {
+      // Default player units
+      fighters.push({ name: 'Knight', color: '#4fc3f7', hp: 100, maxHp: 100, atk: 10, speed: 55, symbol: 'Kn', team: 'player', x: 100, y: 120, targetX: 0, targetY: 0, attackTimer: 0, dead: false });
+      fighters.push({ name: 'Archer', color: '#81c784', hp: 70, maxHp: 70, atk: 15, speed: 45, symbol: 'Ar', team: 'player', x: 80, y: 220, targetX: 0, targetY: 0, attackTimer: 0, dead: false });
+      fighters.push({ name: 'Mage', color: '#ce93d8', hp: 60, maxHp: 60, atk: 18, speed: 40, symbol: 'Mg', team: 'player', x: 120, y: 300, targetX: 0, targetY: 0, attackTimer: 0, dead: false });
+    } else {
+      fighters.forEach((f, i) => {
+        f.targetX = 0; f.targetY = 0; f.attackTimer = 0; f.dead = false;
+      });
+    }
+
+    // Enemy units
+    ENEMY_UNITS.forEach((e, i) => {
+      fighters.push({
+        ...e,
+        x: canvas.width - 120 + (i % 2) * 50,
+        y: 100 + i * 90,
+        targetX: 0, targetY: 0,
+        attackTimer: 0, dead: false
+      });
+    });
+
+    fighting = true;
+    statusDisplay.textContent = 'Battle in progress...';
+  }
+
+  startBtn.addEventListener('click', setupCombat);
+  resetBtn.addEventListener('click', () => {
+    fighting = false;
+    fighters = [];
+    result = null;
+    statusDisplay.textContent = 'Place units above, then fight!';
+  });
+
+  let lastTime = performance.now();
+  let damageFloats = [];
+
+  function update() {
+    const now = performance.now();
+    const dt = (now - lastTime) / 1000;
+    lastTime = now;
+
+    if (fighting && !result) {
+      const alive = fighters.filter(f => !f.dead);
+      const playerAlive = alive.filter(f => f.team === 'player');
+      const enemyAlive = alive.filter(f => f.team === 'enemy');
+
+      if (playerAlive.length === 0) { result = 'DEFEAT'; statusDisplay.textContent = 'Defeat! Enemy wins.'; }
+      else if (enemyAlive.length === 0) { result = 'VICTORY'; statusDisplay.textContent = 'Victory! Your team wins!'; }
+
+      for (const f of alive) {
+        const enemies = alive.filter(e => e.team !== f.team);
+        if (enemies.length === 0) continue;
+
+        let nearest = null, nearDist = Infinity;
+        for (const e of enemies) {
+          const dx = e.x - f.x, dy = e.y - f.y;
+          const d = Math.sqrt(dx*dx + dy*dy);
+          if (d < nearDist) { nearDist = d; nearest = e; }
+        }
+
+        if (nearest) {
+          if (nearDist > 40) {
+            const dx = nearest.x - f.x, dy = nearest.y - f.y;
+            const d = Math.sqrt(dx*dx + dy*dy);
+            f.x += (dx / d) * f.speed * dt;
+            f.y += (dy / d) * f.speed * dt;
+          } else {
+            f.attackTimer += dt;
+            if (f.attackTimer >= 1.0) {
+              f.attackTimer = 0;
+              nearest.hp -= f.atk;
+              damageFloats.push({ x: nearest.x, y: nearest.y - 20, text: '-' + f.atk, timer: 1, color: f.team === 'player' ? '#4fc3f7' : '#e57373' });
+              if (nearest.hp <= 0) { nearest.dead = true; }
+            }
+          }
+        }
+      }
+    }
+
+    // Update damage floats
+    damageFloats = damageFloats.filter(d => {
+      d.timer -= dt;
+      d.y -= 30 * dt;
+      return d.timer > 0;
+    });
+
+    // Draw
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Divider
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.moveTo(canvas.width / 2, 0);
+    ctx.lineTo(canvas.width / 2, canvas.height);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = 'rgba(79,195,247,0.1)';
+    ctx.fillRect(0, 0, canvas.width / 2, canvas.height);
+    ctx.fillStyle = 'rgba(229,115,115,0.1)';
+    ctx.fillRect(canvas.width / 2, 0, canvas.width / 2, canvas.height);
+
+    ctx.font = '11px monospace';
+    ctx.fillStyle = '#4fc3f7';
+    ctx.fillText('YOUR TEAM', 20, 20);
+    ctx.fillStyle = '#e57373';
+    ctx.textAlign = 'right';
+    ctx.fillText('ENEMY TEAM', canvas.width - 20, 20);
+    ctx.textAlign = 'left';
+
+    // Fighters
+    for (const f of fighters) {
+      if (f.dead) {
+        ctx.globalAlpha = 0.2;
+      }
+      ctx.fillStyle = f.color;
+      ctx.beginPath();
+      ctx.arc(f.x, f.y, 22, 0, Math.PI * 2);
+      ctx.fill();
+
+      // HP bar
+      const hpPct = Math.max(0, f.hp / f.maxHp);
+      ctx.fillStyle = '#333';
+      ctx.fillRect(f.x - 20, f.y - 32, 40, 5);
+      ctx.fillStyle = hpPct > 0.5 ? '#4caf50' : hpPct > 0.25 ? '#ffb74d' : '#f44336';
+      ctx.fillRect(f.x - 20, f.y - 32, 40 * hpPct, 5);
+
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 11px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(f.symbol, f.x, f.y + 4);
+      ctx.textAlign = 'left';
+      ctx.globalAlpha = 1;
+    }
+
+    // Damage floats
+    for (const d of damageFloats) {
+      ctx.globalAlpha = d.timer;
+      ctx.fillStyle = d.color;
+      ctx.font = 'bold 14px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(d.text, d.x, d.y);
+      ctx.textAlign = 'left';
+      ctx.globalAlpha = 1;
+    }
+
+    // Result
+    if (result) {
+      ctx.font = 'bold 36px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = result === 'VICTORY' ? '#4caf50' : '#f44336';
+      ctx.fillText(result, canvas.width / 2, canvas.height / 2);
+      ctx.textAlign = 'left';
+    }
+
+    requestAnimationFrame(update);
+  }
+  update();
+})();
+</script>

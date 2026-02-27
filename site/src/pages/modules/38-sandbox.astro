@@ -1,0 +1,814 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 38: Sandbox">
+  <div class="container page-content">
+    <div class="module-header">
+      <div class="module-number">Module 38</div>
+      <h1>Sandbox</h1>
+      <p class="module-theme">Build a world where the player makes the rules | Digital Legos on an Infinite Table</p>
+    </div>
+
+    <blockquote>
+      "The best sandbox game gives you every tool and no instructions &mdash; and somehow that's enough."
+    </blockquote>
+
+    <hr />
+
+    <h2>Prerequisites</h2>
+    <table>
+      <thead>
+        <tr><th>Module</th><th>What You Used From It</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Module 31 - Survival/Crafting or Module 05 - Puzzle</td><td>Grid-based world representation and item/block interaction patterns. Sandbox games extend grids to open-ended, player-authored worlds.</td></tr>
+        <tr><td>Module 07 - Roguelike</td><td>Procedural generation fundamentals. Sandbox worlds are generated, not hand-designed, and noise functions drive terrain creation.</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h2>Week 1: History &amp; Design Theory</h2>
+
+    <h3>The Origin</h3>
+    <p>The sandbox genre crystallized when a Swedish programmer named Markus "Notch" Persson released an early alpha of <strong>Minecraft</strong> in 2009, drawing inspiration from Infiniminer, Dwarf Fortress, and his own love of building. The premise was disarmingly simple: a world made of blocks, and you can place or destroy any of them. There were no objectives, no score, no win condition. You spawned in a procedurally generated landscape and decided what to do. Some players built castles. Some dug to the bottom of the world. Some recreated entire cities from real life. Minecraft did not invent the sandbox &mdash; games like SimCity and Garry's Mod had explored player freedom before &mdash; but it distilled the concept to its purest form. A world of blocks was a world of infinite possibility because every block was both a material and a canvas. By 2011, Minecraft was a global phenomenon, and the idea that a game could succeed without a designer-authored goal had been proven beyond any doubt.</p>
+
+    <h3>How the Genre Evolved</h3>
+    <p><strong>Garry's Mod (Facepunch Studios, 2004)</strong> &mdash; Started as a mod for Half-Life 2 that gave players access to the Source engine's physics objects and tools. Garry's Mod was not a game but a playground: spawn props, weld them together, attach thrusters, and see what happens. It pioneered the idea that the game engine itself &mdash; its physics, its rendering, its entity system &mdash; could be the toy. The community created game modes (Trouble in Terrorist Town, Prop Hunt) that turned the sandbox into a platform for entirely new games.</p>
+
+    <p><strong>Minecraft (Mojang, 2011)</strong> &mdash; Defined the modern sandbox by combining block-based building with procedural terrain generation, survival mechanics, and crafting. Minecraft's procedural worlds meant no two players saw the same landscape, yet every player had the same tools. The addition of Survival mode gave structure to the freeform creative experience, but Creative mode remained equally valid. Minecraft demonstrated that a game with intentionally simple graphics could become the best-selling game of all time by betting everything on player agency and systemic depth.</p>
+
+    <p><strong>Terraria (Re-Logic, 2011)</strong> &mdash; Applied the sandbox formula to 2D, adding boss fights, loot progression, and biome variety to the building-and-mining core. Terraria proved that sandboxes did not need to be 3D to feel vast, and that adding authored content (bosses, events, rare items) to a player-driven world created a compelling hybrid. Where Minecraft leaned into open-ended creation, Terraria leaned into exploration and combat &mdash; showing that the sandbox concept was flexible enough to support very different player motivations within the same genre.</p>
+
+    <h3>What Makes It "Great"</h3>
+    <p>A great sandbox game trusts the player completely. It provides a world with consistent rules &mdash; gravity pulls, water flows, fire spreads &mdash; and then steps back. The rules must be discoverable through experimentation rather than explained through tutorials. The world must be large enough to feel like exploration matters and systemic enough that interactions between blocks create emergent surprises (water meeting lava creates obsidian; a lit torch next to a wood structure creates fire). The creative tools must have both a low floor (place a block, break a block) and a high ceiling (redstone computers, pixel art landscapes, functional machines). And critically, the world must feel like it belongs to the player: they shaped it, they built it, and when they log in tomorrow, it will be exactly as they left it. Persistence is what turns a toy into a home.</p>
+
+    <h3>The Essential Mechanic</h3>
+    <p>Player-directed creation in a systemic world &mdash; you make your own fun.</p>
+
+    <hr />
+
+    <h2>Week 2: Build the MVP</h2>
+
+    <h3>What You're Building</h3>
+    <p>A 2D block-based sandbox where the player can place and destroy blocks on a grid, explore a procedurally generated terrain (hills, caves, surface variation), interact with blocks that follow physical rules (sand falls, water flows), save and load the world state, and switch between Creative mode (unlimited blocks, no threats) and Survival mode (limited inventory, health). The world is divided into chunks that load and unload as the player moves.</p>
+
+    <h3>Core Concepts</h3>
+
+    <h4>1. Voxel / Block-based World</h4>
+    <p>The world is a grid where every cell holds a block type. Each block type has properties (solid, transparent, gravity-affected) and the player interacts by placing or removing blocks.</p>
+    <pre is:raw><code>// Block type definitions
+BLOCK_TYPES:
+    AIR:    { id: 0, solid: false, transparent: true,  gravity: false }
+    DIRT:   { id: 1, solid: true,  transparent: false, gravity: false }
+    STONE:  { id: 2, solid: true,  transparent: false, gravity: false }
+    SAND:   { id: 3, solid: true,  transparent: false, gravity: true  }
+    WATER:  { id: 4, solid: false, transparent: true,  gravity: true, fluid: true }
+    WOOD:   { id: 5, solid: true,  transparent: false, gravity: false }
+    GRASS:  { id: 6, solid: true,  transparent: false, gravity: false }
+
+// World as a 2D grid
+class BlockWorld:
+    grid = {}  // (x, y) -> blockId
+
+    function placeBlock(x, y, blockId):
+        if getBlock(x, y) == AIR.id:
+            setBlock(x, y, blockId)
+            triggerBlockUpdate(x, y)
+
+    function destroyBlock(x, y):
+        existing = getBlock(x, y)
+        if existing != AIR.id:
+            setBlock(x, y, AIR.id)
+            triggerBlockUpdate(x, y)</code></pre>
+    <p><strong>Why it matters:</strong> The block grid is the world. Every other system &mdash; rendering, physics, saving, generation &mdash; reads from and writes to this grid. Keeping the data structure simple (a map of coordinates to block IDs) makes everything else straightforward.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Noise Terrain Generator</div>
+      <p class="demo-hint">A 2D terrain cross-section generated with Perlin-like noise. Adjust frequency, amplitude, and octaves with sliders. Click "Regenerate" for a new seed. Watch how layering octaves creates natural-looking terrain.</p>
+      <canvas id="demo-terrain" width="760" height="420"></canvas>
+      <div class="demo-controls">
+        <label>Frequency: <input type="range" id="terrain-freq" min="1" max="50" value="10" /></label>
+        <label>Amplitude: <input type="range" id="terrain-amp" min="10" max="150" value="60" /></label>
+        <label>Octaves: <input type="range" id="terrain-oct" min="1" max="6" value="3" /></label>
+        <button id="terrain-regen">Regenerate</button>
+        <span class="value-display" id="terrain-info">Freq: 10 | Amp: 60 | Octaves: 3</span>
+      </div>
+    </div>
+
+    <h4>2. Chunk-based World Loading</h4>
+    <p>The world is divided into fixed-size chunks (e.g., 16x16 blocks). Only chunks near the player are loaded into memory. As the player moves, new chunks are generated or loaded, and distant chunks are unloaded.</p>
+    <pre is:raw><code>CHUNK_SIZE = 16
+
+class ChunkManager:
+    loadedChunks = {}
+    LOAD_RADIUS = 4
+
+    function update(playerPosition):
+        playerChunkX = floor(playerPosition.x / CHUNK_SIZE)
+        // Load chunks in radius
+        for cx in range(playerChunkX - LOAD_RADIUS, playerChunkX + LOAD_RADIUS + 1):
+            if (cx) NOT in loadedChunks:
+                loadOrGenerateChunk(cx)
+        // Unload distant chunks
+        for cx in loadedChunks:
+            if abs(cx - playerChunkX) > LOAD_RADIUS + 1:
+                saveAndUnload(cx)</code></pre>
+    <p><strong>Why it matters:</strong> Without chunks, you must load the entire world at once. Chunks let you trade memory for I/O: only the player's vicinity is in memory, and the rest lives on disk. This is the same principle as virtual memory &mdash; the player perceives an infinite world, but only a small window is active at any moment.</p>
+
+    <h4>3. Infinite or Very Large World Generation</h4>
+    <p>Procedural terrain generation uses noise functions to create natural-looking landscapes. Perlin or simplex noise produces smooth, continuous elevation maps that generate hills, valleys, and caves without any hand-authoring.</p>
+    <pre is:raw><code>function generateChunk(chunkX, chunkY):
+    chunk = Chunk(chunkX, chunkY)
+    for localX in range(CHUNK_SIZE):
+        worldX = chunkX * CHUNK_SIZE + localX
+        surfaceHeight = getSurfaceHeight(worldX)
+        for localY in range(CHUNK_SIZE):
+            worldY = chunkY * CHUNK_SIZE + localY
+            if worldY > surfaceHeight:
+                chunk.setBlock(localX, localY, AIR)
+            else if worldY == surfaceHeight:
+                chunk.setBlock(localX, localY, GRASS)
+            else if worldY > surfaceHeight - 4:
+                chunk.setBlock(localX, localY, DIRT)
+            else:
+                caveNoise = noise2D(worldX * 0.05, worldY * 0.05)
+                if caveNoise > CAVE_THRESHOLD:
+                    chunk.setBlock(localX, localY, AIR)  // cave
+                else:
+                    chunk.setBlock(localX, localY, STONE)
+
+function getSurfaceHeight(worldX):
+    height = BASE_GROUND_LEVEL
+    height += noise1D(worldX * 0.01) * 20   // large hills
+    height += noise1D(worldX * 0.05) * 5    // small bumps
+    height += noise1D(worldX * 0.1)  * 2    // surface roughness
+    return floor(height)</code></pre>
+    <p><strong>Why it matters:</strong> Procedural generation is what makes the world feel infinite. The noise function is deterministic &mdash; given the same seed and coordinates, it always produces the same terrain &mdash; so chunks can be generated on-demand and will seamlessly tile together.</p>
+
+    <h4>4. Player-created Content</h4>
+    <p>There are no authored levels. The player is the level designer. This means providing intuitive tools for block placement/destruction and ensuring the world is responsive enough that building feels good.</p>
+    <pre is:raw><code>class PlayerBuilder:
+    selectedBlock = DIRT
+    hotbar = [DIRT, STONE, WOOD, SAND, WATER, GLASS]
+
+    function handleInput(player, world):
+        targetPos = getBlockAtCursor(player.position, player.aimDirection)
+        // Destroy block (left click)
+        if primaryAction():
+            world.destroyBlock(targetPos.x, targetPos.y)
+        // Place block (right click)
+        if secondaryAction():
+            adjacentPos = getAdjacentBlock(targetPos, player.aimDirection)
+            if NOT playerOccupies(player, adjacentPos):
+                world.placeBlock(adjacentPos.x, adjacentPos.y, selectedBlock)</code></pre>
+    <p><strong>Why it matters:</strong> The player's ability to reshape the world IS the game. If placement feels sluggish, if targeting is imprecise, or if feedback is unclear, the creative experience suffers. The build tools are this game's controller.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Block World</div>
+      <p class="demo-hint">A 2D side-view grid (like Terraria). Click to place blocks, right-click (or hold Shift+click) to destroy. Select block types: Dirt (brown), Stone (gray), Sand (yellow, falls with gravity), Water (blue, flows). Sand and water obey cellular automata rules.</p>
+      <canvas id="demo-blocks" width="760" height="420"></canvas>
+      <div class="demo-controls">
+        <button id="block-dirt" class="active">Dirt</button>
+        <button id="block-stone">Stone</button>
+        <button id="block-sand">Sand</button>
+        <button id="block-water">Water</button>
+        <button id="block-erase">Eraser</button>
+        <button id="block-clear">Clear All</button>
+        <button id="block-gen-terrain">Generate Terrain</button>
+        <span class="value-display" id="block-info">Left-click: place | Right/Shift+click: destroy</span>
+      </div>
+    </div>
+
+    <h4>5. Block Interaction Rules</h4>
+    <p>Blocks interact with their neighbors: sand falls when unsupported, water flows downhill and spreads, fire ignites flammable blocks. These rules create emergent behavior from simple local interactions, similar to cellular automata.</p>
+    <pre is:raw><code>function updateBlocks(world, activeBlocks):
+    for each (x, y) in activeBlocks:
+        blockType = BLOCK_TYPES[world.getBlock(x, y)]
+
+        // Gravity: sand and gravel fall
+        if blockType.gravity AND NOT blockType.fluid:
+            below = world.getBlock(x, y - 1)
+            if below == AIR.id:
+                world.setBlock(x, y, AIR.id)
+                world.setBlock(x, y - 1, blockId)
+
+        // Fluid: water flows sideways and down
+        if blockType.fluid:
+            updateFluid(world, x, y, blockId)
+
+function updateFluid(world, x, y, fluidId):
+    below = world.getBlock(x, y - 1)
+    if below == AIR.id:
+        world.setBlock(x, y - 1, fluidId)
+    else:
+        left = world.getBlock(x - 1, y)
+        right = world.getBlock(x + 1, y)
+        if left == AIR.id: world.setBlock(x - 1, y, fluidId)
+        if right == AIR.id: world.setBlock(x + 1, y, fluidId)</code></pre>
+    <p><strong>Why it matters:</strong> Block interactions are what make the world feel alive rather than static. When the player digs under sand and watches it collapse, when they pour water and it flows into a cave, when they accidentally set a forest on fire &mdash; these emergent moments create stories. The rules are simple, but their interactions are complex. This is systemic design: small rules, big consequences.</p>
+
+    <h4>6. Save / Load Large World State</h4>
+    <p>The world must persist between sessions. Saving the entire world at once is expensive, so chunks are saved individually as they are modified.</p>
+    <pre is:raw><code>function saveChunk(chunk):
+    if NOT chunk.isDirty: return
+    compressed = runLengthEncode(chunk.blocks)
+    data = { version: SAVE_VERSION, chunkX: chunk.chunkX,
+             chunkY: chunk.chunkY, blocks: compressed }
+    writeBinaryFile(getChunkFilePath(chunk.chunkX, chunk.chunkY), data)
+
+// Run-length encoding:
+// [STONE, STONE, STONE, AIR, AIR] -> [(STONE, 3), (AIR, 2)]</code></pre>
+    <p><strong>Why it matters:</strong> A sandbox game without saving is a sandcastle at high tide. Players invest hours building structures, and losing that work is unacceptable. Chunk-based saving means only modified regions are written to disk. Run-length encoding exploits the fact that most chunks are filled with large contiguous regions of the same block type, compressing the data dramatically.</p>
+
+    <h4>7. Creative vs. Survival Modes</h4>
+    <p>The same world supports different experiences by toggling systems on and off. Creative mode gives unlimited blocks and disables damage. Survival mode adds health, hunger, inventory limits, and threats.</p>
+    <pre is:raw><code>class GameRules:
+    function applyMode(mode, systems):
+        switch mode:
+            case CREATIVE:
+                systems.health.enabled = false
+                systems.inventory.unlimited = true
+                systems.flying.enabled = true
+                systems.blockBreakSpeed = INSTANT
+            case SURVIVAL:
+                systems.health.enabled = true
+                systems.inventory.unlimited = false
+                systems.damage.enabled = true
+                systems.enemies.enabled = true</code></pre>
+    <p><strong>Why it matters:</strong> Two modes from one world doubles the game's appeal. Creative mode attracts builders who want to construct without constraints. Survival mode attracts adventurers who want challenge and progression. The design principle &mdash; toggling systems on and off rather than building separate games &mdash; is efficient and demonstrates that game feel is defined by rules, not content.</p>
+
+    <hr />
+
+    <h3>Stretch Goals</h3>
+    <ol>
+      <li>Add biomes (desert, forest, snow) that vary block distribution based on noise.</li>
+      <li>Implement a basic crafting system: combine blocks at a crafting table to create new blocks or tools.</li>
+      <li>Add day/night cycle with lighting that affects visibility and enemy spawning.</li>
+      <li>Implement basic enemies (zombies that spawn at night) with simple pathfinding.</li>
+      <li>Add a tool system where pickaxes mine faster than bare hands.</li>
+      <li>Create a simple multiplayer mode where two players can build in the same world.</li>
+    </ol>
+
+    <h3>MVP Spec</h3>
+    <table>
+      <thead>
+        <tr><th>Element</th><th>Scope</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>World</td><td>2D side-view block grid, procedurally generated terrain with hills and caves</td></tr>
+        <tr><td>Blocks</td><td>6-8 block types: air, dirt, stone, grass, sand, water, wood</td></tr>
+        <tr><td>Generation</td><td>Noise-based terrain with surface variation, underground caves, at least 2 visual layers</td></tr>
+        <tr><td>Chunks</td><td>World divided into 16x16 chunks, loaded/unloaded based on player proximity</td></tr>
+        <tr><td>Player</td><td>Character that walks, jumps, and has a reach radius for placing/destroying blocks</td></tr>
+        <tr><td>Building</td><td>Place selected block type, destroy existing blocks, hotbar for block selection</td></tr>
+        <tr><td>Physics</td><td>Sand falls under gravity, water flows down and sideways</td></tr>
+        <tr><td>Modes</td><td>Creative (unlimited blocks, no damage) and Survival (health, inventory limits)</td></tr>
+        <tr><td>Save/Load</td><td>Chunk-based saving with run-length encoding, auto-save, world metadata file</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliverable</h3>
+    <p>A playable 2D sandbox where the player spawns in a procedurally generated world, can place and destroy blocks freely, watches sand fall and water flow, explores caves underground, and saves their world to disk. The world must load in chunks as the player explores so that the world feels unbounded. Creative and Survival modes must both be functional. A playtester should be able to dig a cave, build a house, flood it with water, and come back the next day to find it exactly as they left it.</p>
+
+    <hr />
+
+    <h2>Analogies by Background</h2>
+
+    <blockquote>
+      <p>These analogies map game dev concepts to patterns you already know. Find your background below.</p>
+    </blockquote>
+
+    <h3>For Backend Developers</h3>
+    <table>
+      <thead>
+        <tr><th>Concept</th><th>Analogy</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Voxel / block-based world</td><td>Like a key-value store where the key is spatial coordinates and the value is a block type &mdash; the entire world is a giant distributed hash map</td></tr>
+        <tr><td>Chunk-based world loading</td><td>Like database sharding &mdash; partition data by spatial key, load shards on demand, and unload idle shards</td></tr>
+        <tr><td>Infinite world generation</td><td>Like lazy evaluation or on-demand resource provisioning &mdash; data is computed only when requested</td></tr>
+        <tr><td>Player-created content</td><td>Like a user-generated content API &mdash; the server provides the schema and tools, but all content comes from users</td></tr>
+        <tr><td>Block interaction rules</td><td>Like event-driven microservices &mdash; a block change emits an event, neighboring blocks react, and cascading updates propagate</td></tr>
+        <tr><td>Save/load world state</td><td>Like incremental backups with change tracking &mdash; only modified chunks are written, and compression exploits redundancy</td></tr>
+        <tr><td>Creative vs. survival modes</td><td>Like feature flags and permission tiers &mdash; the same codebase serves different experiences by toggling capabilities</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Frontend Developers</h3>
+    <table>
+      <thead>
+        <tr><th>Concept</th><th>Analogy</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Voxel / block-based world</td><td>Like a CSS Grid layout where every cell is a styled element &mdash; the world is a massive grid, and each cell's "class" determines its appearance</td></tr>
+        <tr><td>Chunk-based world loading</td><td>Like virtualized scrolling (react-window) in a long list &mdash; only render DOM nodes for visible items</td></tr>
+        <tr><td>Infinite world generation</td><td>Like procedural CSS patterns or generative art &mdash; deterministic functions produce varied output from minimal input</td></tr>
+        <tr><td>Player-created content</td><td>Like a no-code website builder &mdash; the platform provides components and a canvas, but every layout is user-authored</td></tr>
+        <tr><td>Block interaction rules</td><td>Like CSS cascade and inheritance &mdash; changing one element triggers reflow in neighbors</td></tr>
+        <tr><td>Save/load world state</td><td>Like localStorage with serialization &mdash; converting complex application state to a compact format for persistence</td></tr>
+        <tr><td>Creative vs. survival modes</td><td>Like toggling between edit mode and preview mode in a CMS &mdash; same content, different interaction rules</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Data / ML Engineers</h3>
+    <table>
+      <thead>
+        <tr><th>Concept</th><th>Analogy</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Voxel / block-based world</td><td>Like a sparse tensor or sparse matrix &mdash; most values are zero (air), so you store only non-default entries</td></tr>
+        <tr><td>Chunk-based world loading</td><td>Like batch loading training data &mdash; load chunks of a dataset into memory as needed, process them, and release</td></tr>
+        <tr><td>Infinite world generation</td><td>Like procedural data augmentation with a fixed seed &mdash; deterministic transformations create unlimited varied samples</td></tr>
+        <tr><td>Player-created content</td><td>Like interactive labeling tools &mdash; the system provides the interface, but the human provides all meaningful content</td></tr>
+        <tr><td>Block interaction rules</td><td>Like cellular automata or Conway's Game of Life &mdash; simple local rules applied to a grid produce complex emergent behavior</td></tr>
+        <tr><td>Save/load world state</td><td>Like model checkpointing &mdash; periodically serialize state to disk so progress can resume after interruption</td></tr>
+        <tr><td>Creative vs. survival modes</td><td>Like switching between training mode and evaluation mode &mdash; the same model behaves differently depending on which systems are active</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li><strong>The blank canvas problem:</strong> Many players launch a sandbox game and immediately ask "but what do I DO?" Total freedom can be paralyzing. How do you guide players toward satisfying experiences without imposing objectives that undermine the sandbox premise?</li>
+      <li><strong>Emergence vs. intention:</strong> When water meets lava in Minecraft, it creates obsidian. This emerged from the interaction rules. How do you design block interaction systems that produce interesting emergent behaviors without producing game-breaking exploits?</li>
+      <li><strong>Performance as a design constraint:</strong> A sandbox world is astronomically large. Every design decision has performance implications. How does the need to run at 60fps on modest hardware constrain what is possible?</li>
+      <li><strong>Player investment and grief:</strong> In a multiplayer sandbox, one player can spend hours building a castle that another player destroys in seconds. How do you handle this tension? Should blocks be indestructible in certain areas?</li>
+    </ol>
+
+    <nav class="module-nav">
+      <a href={`${base}modules/37-social-deduction/`}>&larr; Module 37: Social Deduction</a>
+      <a href={`${base}modules/`}>All Modules &rarr;</a>
+    </nav>
+  </div>
+</BaseLayout>
+
+<script>
+// ============================================================
+// DEMO 1: Noise Terrain Generator
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-terrain');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  // Simple Perlin-like noise (value noise with smoothing)
+  let seed = Math.random() * 10000;
+  const noiseCache = {};
+
+  function hashNoise(x) {
+    const key = Math.floor(x);
+    if (noiseCache[key] !== undefined) return noiseCache[key];
+    // Simple hash
+    let n = Math.sin(key * 127.1 + seed * 311.7) * 43758.5453;
+    n = n - Math.floor(n);
+    noiseCache[key] = n;
+    return n;
+  }
+
+  function smoothNoise(x) {
+    const intX = Math.floor(x);
+    const fracX = x - intX;
+    // Smoothstep interpolation
+    const t = fracX * fracX * (3 - 2 * fracX);
+    return hashNoise(intX) * (1 - t) + hashNoise(intX + 1) * t;
+  }
+
+  function octaveNoise(x, octaves, frequency, amplitude) {
+    let total = 0;
+    let freq = frequency;
+    let amp = amplitude;
+    let maxAmp = 0;
+    for (let i = 0; i < octaves; i++) {
+      total += smoothNoise(x * freq) * amp;
+      maxAmp += amp;
+      freq *= 2;
+      amp *= 0.5;
+    }
+    return total / maxAmp * amplitude;
+  }
+
+  function regenerate() {
+    seed = Math.random() * 10000;
+    Object.keys(noiseCache).forEach(k => delete noiseCache[k]);
+  }
+
+  const freqSlider = document.getElementById('terrain-freq');
+  const ampSlider = document.getElementById('terrain-amp');
+  const octSlider = document.getElementById('terrain-oct');
+  const infoEl = document.getElementById('terrain-info');
+
+  document.getElementById('terrain-regen').addEventListener('click', regenerate);
+
+  function draw() {
+    const freq = parseInt(freqSlider.value) / 1000;
+    const amp = parseInt(ampSlider.value);
+    const oct = parseInt(octSlider.value);
+    infoEl.textContent = 'Freq: ' + freqSlider.value + ' | Amp: ' + ampSlider.value + ' | Octaves: ' + oct;
+
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, W, H);
+
+    const baseY = H * 0.5;
+    const BLOCK_SIZE = 4;
+
+    // Draw individual octaves at top
+    const octaveH = 50;
+    const octaveY = 15;
+    ctx.fillStyle = '#888888';
+    ctx.font = '11px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('Individual Octaves:', 10, octaveY);
+
+    const octaveColors = ['#ff6b6b', '#ffd93d', '#6bcb77', '#4ecdc4', '#a78bfa', '#f97316'];
+    for (let o = 0; o < oct; o++) {
+      const oy = octaveY + 10 + o * 12;
+      ctx.strokeStyle = octaveColors[o % octaveColors.length] + '88';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      const oFreq = freq * Math.pow(2, o);
+      const oAmp = amp * Math.pow(0.5, o);
+      for (let x = 0; x < W; x++) {
+        const noiseVal = smoothNoise(x * oFreq) * oAmp;
+        const y = octaveY + 40 + octaveH / 2 - noiseVal * 0.3;
+        if (x === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      ctx.fillStyle = octaveColors[o % octaveColors.length];
+      ctx.font = '9px JetBrains Mono, monospace';
+      ctx.fillText('oct' + (o + 1) + ' f=' + (oFreq * 1000).toFixed(0) + ' a=' + oAmp.toFixed(0), W - 140, oy + 10);
+    }
+
+    // Draw terrain cross-section
+    const terrainY = octaveY + octaveH + 30;
+    const terrainH = H - terrainY - 10;
+    const terrainBaseY = terrainY + terrainH * 0.4;
+
+    // Sky gradient
+    const skyGrad = ctx.createLinearGradient(0, terrainY, 0, terrainY + terrainH);
+    skyGrad.addColorStop(0, '#0a0a2e');
+    skyGrad.addColorStop(0.3, '#1a1a4e');
+    skyGrad.addColorStop(1, '#1a2a3e');
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, terrainY, W, terrainH);
+
+    // Generate and draw terrain blocks
+    for (let px = 0; px < W; px += BLOCK_SIZE) {
+      const worldX = px;
+      const surfaceHeight = octaveNoise(worldX, oct, freq, amp);
+      const surfaceY = terrainBaseY - surfaceHeight;
+
+      // Surface block (grass)
+      for (let py = surfaceY; py < terrainY + terrainH; py += BLOCK_SIZE) {
+        const depth = py - surfaceY;
+        let color;
+        if (depth < BLOCK_SIZE) {
+          color = '#4a8c3f'; // Grass
+        } else if (depth < BLOCK_SIZE * 4) {
+          color = '#8B6914'; // Dirt
+        } else {
+          // Stone with potential caves
+          const caveNoise = smoothNoise(px * 0.02 + 5000) * smoothNoise(py * 0.03 + 3000);
+          if (caveNoise > 0.35) {
+            color = '#1a1a2e'; // Cave
+          } else {
+            color = '#6b6b6b'; // Stone
+          }
+        }
+        ctx.fillStyle = color;
+        ctx.fillRect(px, py, BLOCK_SIZE, BLOCK_SIZE);
+      }
+    }
+
+    // Draw the surface line
+    ctx.strokeStyle = '#ffffff33';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let px = 0; px < W; px += 2) {
+      const surfaceHeight = octaveNoise(px, oct, freq, amp);
+      const surfaceY = terrainBaseY - surfaceHeight;
+      if (px === 0) ctx.moveTo(px, surfaceY);
+      else ctx.lineTo(px, surfaceY);
+    }
+    ctx.stroke();
+
+    // Labels
+    ctx.fillStyle = '#888888';
+    ctx.font = '12px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Combined Terrain Cross-Section (block rendering)', W / 2, terrainY - 5);
+
+    // Noise formula
+    ctx.fillStyle = '#666688';
+    ctx.font = '11px JetBrains Mono, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('height(x) = Sum[noise(x * freq * 2^i) * amp * 0.5^i] for i = 0..' + (oct - 1), 10, H - 5);
+  }
+
+  function loop() {
+    draw();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+
+// ============================================================
+// DEMO 2: Block World
+// ============================================================
+(function() {
+  const canvas = document.getElementById('demo-blocks');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const BLOCK_SIZE = 10;
+  const COLS = Math.floor(W / BLOCK_SIZE);
+  const ROWS = Math.floor(H / BLOCK_SIZE);
+
+  const AIR = 0, DIRT = 1, STONE = 2, SAND = 3, WATER = 4;
+  const BLOCK_COLORS = {
+    [AIR]: null,
+    [DIRT]: '#8B6914',
+    [STONE]: '#808080',
+    [SAND]: '#dbc078',
+    [WATER]: '#3498db88'
+  };
+  const BLOCK_NAMES = { [AIR]: 'Air', [DIRT]: 'Dirt', [STONE]: 'Stone', [SAND]: 'Sand', [WATER]: 'Water' };
+
+  let grid = new Array(COLS * ROWS).fill(AIR);
+  let selectedBlock = DIRT;
+  let eraseMode = false;
+
+  function getBlock(x, y) {
+    if (x < 0 || x >= COLS || y < 0 || y >= ROWS) return STONE; // Border
+    return grid[y * COLS + x];
+  }
+
+  function setBlock(x, y, type) {
+    if (x < 0 || x >= COLS || y < 0 || y >= ROWS) return;
+    grid[y * COLS + x] = type;
+  }
+
+  function generateTerrain() {
+    grid.fill(AIR);
+    const seed = Math.random() * 10000;
+    for (let x = 0; x < COLS; x++) {
+      // Simple noise-like terrain
+      let h = ROWS * 0.5;
+      h += Math.sin(x * 0.05 + seed) * 8;
+      h += Math.sin(x * 0.12 + seed * 2) * 3;
+      h += Math.sin(x * 0.02 + seed * 0.5) * 12;
+      const surfaceY = Math.floor(h);
+
+      for (let y = surfaceY; y < ROWS; y++) {
+        const depth = y - surfaceY;
+        if (depth === 0) {
+          setBlock(x, y, DIRT); // Surface
+        } else if (depth < 4) {
+          setBlock(x, y, DIRT);
+        } else {
+          setBlock(x, y, STONE);
+        }
+      }
+    }
+  }
+
+  // Block selection buttons
+  const blockButtons = {
+    'block-dirt': DIRT,
+    'block-stone': STONE,
+    'block-sand': SAND,
+    'block-water': WATER
+  };
+
+  for (const [id, type] of Object.entries(blockButtons)) {
+    document.getElementById(id).addEventListener('click', () => {
+      selectedBlock = type;
+      eraseMode = false;
+      document.querySelectorAll('#demo-blocks ~ .demo-controls button').forEach(b => b.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    });
+  }
+
+  document.getElementById('block-erase').addEventListener('click', () => {
+    eraseMode = true;
+    document.querySelectorAll('#demo-blocks ~ .demo-controls button').forEach(b => b.classList.remove('active'));
+    document.getElementById('block-erase').classList.add('active');
+  });
+
+  document.getElementById('block-clear').addEventListener('click', () => {
+    grid.fill(AIR);
+  });
+
+  document.getElementById('block-gen-terrain').addEventListener('click', generateTerrain);
+
+  // Drawing
+  let isDrawing = false;
+  let shiftHeld = false;
+
+  document.addEventListener('keydown', (e) => { if (e.key === 'Shift') shiftHeld = true; });
+  document.addEventListener('keyup', (e) => { if (e.key === 'Shift') shiftHeld = false; });
+
+  function handleDraw(e) {
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) * (W / rect.width);
+    const my = (e.clientY - rect.top) * (H / rect.height);
+    const gx = Math.floor(mx / BLOCK_SIZE);
+    const gy = Math.floor(my / BLOCK_SIZE);
+
+    if (gx >= 0 && gx < COLS && gy >= 0 && gy < ROWS) {
+      if (eraseMode || shiftHeld || e.button === 2) {
+        setBlock(gx, gy, AIR);
+      } else {
+        if (getBlock(gx, gy) === AIR) {
+          setBlock(gx, gy, selectedBlock);
+        }
+      }
+    }
+  }
+
+  canvas.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    isDrawing = true;
+    handleDraw(e);
+  });
+  canvas.addEventListener('mousemove', (e) => {
+    if (isDrawing) handleDraw(e);
+  });
+  canvas.addEventListener('mouseup', () => { isDrawing = false; });
+  canvas.addEventListener('mouseleave', () => { isDrawing = false; });
+  canvas.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    handleDraw({ ...e, button: 2 });
+  });
+
+  // Physics simulation
+  function simulate() {
+    // Process from bottom-up so falling blocks don't cascade in one frame
+    for (let y = ROWS - 2; y >= 0; y--) {
+      for (let x = 0; x < COLS; x++) {
+        const block = getBlock(x, y);
+
+        // Sand: falls down, slides diagonally
+        if (block === SAND) {
+          if (getBlock(x, y + 1) === AIR) {
+            setBlock(x, y, AIR);
+            setBlock(x, y + 1, SAND);
+          } else if (getBlock(x, y + 1) === WATER) {
+            // Sand sinks through water
+            setBlock(x, y, WATER);
+            setBlock(x, y + 1, SAND);
+          } else {
+            // Try sliding diagonally
+            const leftOpen = getBlock(x - 1, y + 1) === AIR;
+            const rightOpen = getBlock(x + 1, y + 1) === AIR;
+            if (leftOpen && rightOpen) {
+              const dir = Math.random() < 0.5 ? -1 : 1;
+              setBlock(x, y, AIR);
+              setBlock(x + dir, y + 1, SAND);
+            } else if (leftOpen) {
+              setBlock(x, y, AIR);
+              setBlock(x - 1, y + 1, SAND);
+            } else if (rightOpen) {
+              setBlock(x, y, AIR);
+              setBlock(x + 1, y + 1, SAND);
+            }
+          }
+        }
+
+        // Water: flows down, then spreads sideways
+        if (block === WATER) {
+          if (getBlock(x, y + 1) === AIR) {
+            setBlock(x, y, AIR);
+            setBlock(x, y + 1, WATER);
+          } else {
+            // Spread sideways with some randomness
+            const leftOpen = getBlock(x - 1, y) === AIR;
+            const rightOpen = getBlock(x + 1, y) === AIR;
+            if (leftOpen && rightOpen) {
+              if (Math.random() < 0.5) {
+                setBlock(x, y, AIR);
+                setBlock(x - 1, y, WATER);
+              } else {
+                setBlock(x, y, AIR);
+                setBlock(x + 1, y, WATER);
+              }
+            } else if (leftOpen && Math.random() < 0.3) {
+              setBlock(x, y, AIR);
+              setBlock(x - 1, y, WATER);
+            } else if (rightOpen && Math.random() < 0.3) {
+              setBlock(x, y, AIR);
+              setBlock(x + 1, y, WATER);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  function draw() {
+    // Sky
+    ctx.fillStyle = '#0f0f2e';
+    ctx.fillRect(0, 0, W, H);
+
+    // Draw blocks
+    for (let y = 0; y < ROWS; y++) {
+      for (let x = 0; x < COLS; x++) {
+        const block = getBlock(x, y);
+        if (block === AIR) continue;
+
+        const px = x * BLOCK_SIZE;
+        const py = y * BLOCK_SIZE;
+
+        if (block === WATER) {
+          ctx.fillStyle = '#3498db';
+          ctx.globalAlpha = 0.5;
+          ctx.fillRect(px, py, BLOCK_SIZE, BLOCK_SIZE);
+          ctx.globalAlpha = 1;
+        } else {
+          ctx.fillStyle = BLOCK_COLORS[block];
+          ctx.fillRect(px, py, BLOCK_SIZE, BLOCK_SIZE);
+
+          // Slight variation for visual interest
+          if (block === DIRT || block === STONE) {
+            const hash = (x * 7 + y * 13) % 5;
+            if (hash === 0) {
+              ctx.fillStyle = 'rgba(0,0,0,0.1)';
+              ctx.fillRect(px, py, BLOCK_SIZE, BLOCK_SIZE);
+            } else if (hash === 1) {
+              ctx.fillStyle = 'rgba(255,255,255,0.05)';
+              ctx.fillRect(px, py, BLOCK_SIZE, BLOCK_SIZE);
+            }
+          }
+
+          // Sand sparkle
+          if (block === SAND) {
+            const hash2 = (x * 17 + y * 23) % 8;
+            if (hash2 === 0) {
+              ctx.fillStyle = 'rgba(255,255,255,0.15)';
+              ctx.fillRect(px + 2, py + 2, 2, 2);
+            }
+          }
+        }
+      }
+    }
+
+    // Grid lines (very subtle)
+    ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+    ctx.lineWidth = 0.5;
+    for (let x = 0; x <= COLS; x++) {
+      ctx.beginPath();
+      ctx.moveTo(x * BLOCK_SIZE, 0);
+      ctx.lineTo(x * BLOCK_SIZE, H);
+      ctx.stroke();
+    }
+    for (let y = 0; y <= ROWS; y++) {
+      ctx.beginPath();
+      ctx.moveTo(0, y * BLOCK_SIZE);
+      ctx.lineTo(W, y * BLOCK_SIZE);
+      ctx.stroke();
+    }
+
+    // Block count
+    let counts = {};
+    for (let i = 0; i < grid.length; i++) {
+      if (grid[i] !== AIR) counts[grid[i]] = (counts[grid[i]] || 0) + 1;
+    }
+    ctx.fillStyle = '#888888';
+    ctx.font = '11px JetBrains Mono, monospace';
+    ctx.textAlign = 'right';
+    let infoY = 15;
+    for (const [type, count] of Object.entries(counts)) {
+      ctx.fillStyle = BLOCK_COLORS[type] || '#888888';
+      ctx.fillText(BLOCK_NAMES[type] + ': ' + count, W - 10, infoY);
+      infoY += 14;
+    }
+  }
+
+  let simTimer = 0;
+  let lastTime = performance.now();
+  function loop(now) {
+    const dt = (now - lastTime) / 1000;
+    lastTime = now;
+
+    simTimer += dt;
+    if (simTimer >= 0.05) { // 20 Hz simulation
+      simTimer = 0;
+      simulate();
+    }
+
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // Start with terrain
+  generateTerrain();
+  requestAnimationFrame(loop);
+})();
+</script>

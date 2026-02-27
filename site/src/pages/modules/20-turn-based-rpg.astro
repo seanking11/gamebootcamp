@@ -1,0 +1,1024 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 20: Turn-Based RPG (JRPG)">
+  <div class="container page-content">
+    <div class="module-header">
+      <div class="module-number">Module 20</div>
+      <h1>Turn-Based RPG (JRPG)</h1>
+      <p class="module-theme">Menus, math, and party management &mdash; your spreadsheet has a storyline.</p>
+    </div>
+
+    <blockquote>"In my experience, there is no such thing as luck." &mdash; Obi-Wan Kenobi</blockquote>
+
+    <hr />
+
+    <h2>Prerequisites</h2>
+    <table>
+      <thead><tr><th>Module</th><th>What You Used From It</th></tr></thead>
+      <tbody>
+        <tr><td>Module 07 - Roguelike</td><td>Turn-based input handling, discrete game states, tile-based world representation</td></tr>
+        <tr><td>Module 10 - Deckbuilder</td><td>Turn phase structure, hand/resource management per turn, sequential decision-making</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h2>Week 1: History &amp; Design Theory</h2>
+
+    <h3>The Origin</h3>
+    <p>The turn-based RPG crystallized in Japan during the late 1980s, when Dragon Quest (1986) and Final Fantasy (1987) translated Western tabletop RPG concepts &mdash; stats, levels, parties, random encounters &mdash; into a format designed for console controllers and television screens. The critical insight was replacing the freeform decision-making of tabletop games with menu-driven combat: the player selects from a fixed set of actions (Attack, Magic, Item, Defend), and the outcome is resolved through deterministic or semi-random formulas.</p>
+
+    <h3>How the Genre Evolved</h3>
+    <p><strong>Final Fantasy VI (1994):</strong> Squaresoft's masterpiece refined the Active Time Battle (ATB) system, where a per-character timer fills based on their Speed stat. FFVI also set the standard for ensemble casts &mdash; fourteen playable characters, each with unique abilities &mdash; proving that party management and character specialization could carry emotional and mechanical depth simultaneously.</p>
+
+    <p><strong>Chrono Trigger (1995):</strong> Squaresoft and Enix's collaboration eliminated random encounters entirely, showing enemies on the overworld. Its "Dual Tech" and "Triple Tech" system demonstrated that party composition was not just a stat optimization problem but a creative, expressive one.</p>
+
+    <p><strong>Persona 5 (2016):</strong> Atlus reimagined the JRPG for a modern audience. Its "One More" system &mdash; exploit an enemy's weakness and you get an extra turn &mdash; made elemental weakness tables feel dynamic and rewarding rather than rote. Persona 5 proved that turn-based combat could feel fast, flashy, and contemporary.</p>
+
+    <h3>What Makes a Turn-Based RPG "Great"</h3>
+    <p>A great JRPG makes every menu selection feel meaningful. The best entries ensure that "Attack" is rarely the optimal choice &mdash; the player must consider elemental weaknesses, party member roles, resource conservation (MP, items), status effects, and turn order to make the right call. Outside combat, the progression loop &mdash; gaining XP, leveling up, choosing equipment, building your party &mdash; must create a steady drumbeat of "I am getting stronger."</p>
+
+    <h3>The Essential Mechanic</h3>
+    <p><strong>Selecting actions from menus where stats, types, and party composition determine outcomes.</strong></p>
+
+    <hr />
+
+    <h2>Week 2: Build the MVP</h2>
+
+    <h3>What You're Building</h3>
+    <p>A combat encounter system where the player controls a party of 2-3 characters against groups of enemies, selecting actions from menus each turn. Characters have stats, elemental types, and abilities. Enemies have weaknesses. Victory grants XP that leads to level-ups.</p>
+
+    <h3>Core Concepts (Must Implement)</h3>
+
+    <h4>1. Turn Order / Initiative System</h4>
+    <p>A speed stat determines which characters and enemies act first each round. Fast characters act first but may be fragile; slow tanks hit hard but enemies may strike before them.</p>
+    <pre is:raw><code>function calculate_turn_order(all_combatants):
+    sorted = all_combatants.sort_by(c => c.stats.speed + random(0, 5), descending)
+    return sorted
+
+function run_combat_round():
+    turn_order = calculate_turn_order(party + enemies)
+    for combatant in turn_order:
+        if combatant.is_dead: continue
+        if combatant.is_player_controlled:
+            action = show_menu_and_wait_for_input(combatant)
+        else:
+            action = enemy_ai_choose_action(combatant)
+        execute_action(action)
+        check_for_battle_end()</code></pre>
+    <p><strong>Why it matters:</strong> Turn order transforms combat from simultaneous to sequential, creating information asymmetry. Speed becomes as important as raw power.</p>
+
+    <!-- Demo 1: Damage Formula Calculator -->
+    <div class="demo-container">
+      <div class="demo-label">Demo: Damage Formula Calculator</div>
+      <p class="demo-hint">Adjust the sliders to see how Attack, Defense, Elemental Multiplier, and Crit Chance affect the damage formula. Click "Roll Damage" to see a random outcome with crit/non-crit results. The formula is shown live.</p>
+      <canvas id="demo-damage" width="760" height="380"></canvas>
+    </div>
+
+    <h4>2. Stat-Based Damage Formulas</h4>
+    <p>The mathematical backbone of RPG combat. Attack power minus defense, multiplied by elemental modifiers, with variance for unpredictability.</p>
+    <pre is:raw><code>function calculate_damage(attacker, defender, skill):
+    base = (attacker.stats.attack * skill.power) / 100
+    reduced = base - (defender.stats.defense * 0.5)
+    reduced = max(reduced, 1)
+
+    type_mult = get_type_multiplier(skill.element, defender.element)
+    # 2.0 = weak to, 1.0 = neutral, 0.5 = resists
+
+    crit_roll = random(0, 100)
+    crit_mult = 1.5 if crit_roll &lt; attacker.stats.luck else 1.0
+
+    variance = random(0.9, 1.1)
+    final_damage = floor(reduced * type_mult * crit_mult * variance)
+    return { damage: final_damage, was_crit: crit_mult > 1.0 }</code></pre>
+    <p><strong>Why it matters:</strong> The damage formula is the contract between the game and the player. Transparent math builds trust; opaque math breeds frustration.</p>
+
+    <!-- Demo 2: Turn Order Visualizer -->
+    <div class="demo-container">
+      <div class="demo-label">Demo: Turn Order Visualizer</div>
+      <p class="demo-hint">Adjust speed stats with the sliders. The timeline shows turn order sorted by speed. Party members are blue, enemies are red. Watch how changing speeds rearranges the timeline in real time.</p>
+      <canvas id="demo-turnorder" width="760" height="340"></canvas>
+    </div>
+
+    <h4>3. Experience / Leveling System</h4>
+    <p>After each battle, characters earn experience points. When XP exceeds a threshold, the character levels up, stats increase, and new abilities may unlock.</p>
+    <pre is:raw><code>function xp_required_for_level(level):
+    return floor(100 * (level ^ 1.5))
+
+function award_xp(party, enemies_defeated):
+    total_xp = sum(e.xp_value for e in enemies_defeated)
+    per_member = floor(total_xp / len(party))
+    for character in party:
+        character.xp += per_member
+        while character.xp >= xp_required_for_level(character.level + 1):
+            character.xp -= xp_required_for_level(character.level + 1)
+            level_up(character)
+
+function level_up(character):
+    character.level += 1
+    character.stats.hp_max += character.growth_rates.hp
+    character.stats.attack += character.growth_rates.attack
+    character.stats.defense += character.growth_rates.defense
+    character.stats.speed += character.growth_rates.speed
+    character.stats.hp = character.stats.hp_max</code></pre>
+    <p><strong>Why it matters:</strong> The leveling system is the primary reward loop. It gives the player a tangible sense of growth.</p>
+
+    <h4>4. Party Management</h4>
+    <p>Multiple characters with different roles &mdash; a tank who absorbs damage, a healer who restores HP, a damage dealer who exploits weaknesses.</p>
+    <pre is:raw><code>warrior = {
+    name: "Kael", role: "tank",
+    stats: { hp: 120, attack: 15, defense: 18, speed: 6, mp: 10 },
+    skills: [
+        { name: "Shield Bash", power: 80, element: "physical", mp_cost: 0 },
+        { name: "Taunt", effect: "force_target_self", mp_cost: 5 }
+    ]
+}
+mage = {
+    name: "Lyra", role: "dps",
+    stats: { hp: 55, attack: 8, defense: 7, speed: 12, mp: 50 },
+    skills: [
+        { name: "Fireball", power: 120, element: "fire", mp_cost: 8 },
+        { name: "Ice Shard", power: 120, element: "ice", mp_cost: 8 }
+    ]
+}
+healer = {
+    name: "Sera", role: "healer",
+    stats: { hp: 70, attack: 6, defense: 10, speed: 10, mp: 40 },
+    skills: [
+        { name: "Heal", effect: "restore_hp", power: 50, mp_cost: 6 },
+        { name: "Cure", effect: "remove_status", mp_cost: 4 }
+    ]
+}</code></pre>
+    <p><strong>Why it matters:</strong> Party management is where strategy lives between battles.</p>
+
+    <h4>5. Elemental Weakness Tables</h4>
+    <p>A rock-paper-scissors system of types where fire beats ice, ice beats wind, wind beats earth, and so on.</p>
+    <pre is:raw><code>weakness_table = {
+    "fire":    { "fire": 0.5, "ice": 2.0, "wind": 1.0, "earth": 1.0 },
+    "ice":     { "fire": 0.5, "ice": 0.5, "wind": 2.0, "earth": 1.0 },
+    "wind":    { "fire": 1.0, "ice": 1.0, "wind": 0.5, "earth": 2.0 },
+    "earth":   { "fire": 2.0, "ice": 1.0, "wind": 0.5, "earth": 0.5 },
+    "physical":{ "fire": 1.0, "ice": 1.0, "wind": 1.0, "earth": 1.0 }
+}
+
+function get_type_multiplier(attack_element, defender_element):
+    if attack_element in weakness_table:
+        return weakness_table[attack_element].get(defender_element, 1.0)
+    return 1.0</code></pre>
+    <p><strong>Why it matters:</strong> Weakness tables add a knowledge layer to combat. This rewards learning and encourages experimentation.</p>
+
+    <h4>6. Menu-Based Combat UI</h4>
+    <pre is:raw><code>function show_combat_menu(character):
+    choice = show_menu(["Attack", "Magic", "Item", "Defend", "Flee"])
+
+    if choice == "Attack":
+        target = select_target(enemies_alive)
+        return { type: "attack", user: character, target: target }
+    elif choice == "Magic":
+        usable_spells = character.skills.filter(s => s.mp_cost &lt;= character.stats.mp)
+        spell = show_menu(usable_spells)
+        target = select_target(get_valid_targets(spell))
+        return { type: "magic", user: character, skill: spell, target: target }
+    elif choice == "Item":
+        item = show_menu(inventory.filter(i => i.usable_in_battle))
+        target = select_target(get_valid_targets(item))
+        return { type: "item", user: character, item: item, target: target }
+    elif choice == "Defend":
+        character.defending = true
+        return { type: "defend", user: character }</code></pre>
+    <p><strong>Why it matters:</strong> The menu IS the gameplay. Good menu design surfaces relevant information and allows quick navigation.</p>
+
+    <!-- Demo 3: Mini RPG Battle -->
+    <div class="demo-container">
+      <div class="demo-label">Demo: Mini RPG Battle</div>
+      <p class="demo-hint">A turn-based battle! Select Attack, Magic, or Defend for each party member. Exploit elemental weaknesses (fire beats ice, ice beats wind, wind beats earth). HP bars show health. Defeat all enemies to win!</p>
+      <canvas id="demo-battle" width="760" height="460"></canvas>
+    </div>
+
+    <h4>7. Random Encounters / Encounter Rate</h4>
+    <pre is:raw><code>function on_player_step(current_area):
+    steps_since_encounter += 1
+    encounter_chance = steps_since_encounter / area_data[current_area].base_encounter_rate
+    if random(0.0, 1.0) &lt; encounter_chance:
+        steps_since_encounter = 0
+        enemy_group = weighted_random(area_data[current_area].enemy_pool)
+        start_battle(enemy_group)</code></pre>
+    <p><strong>Why it matters:</strong> Encounter rate is one of the most delicate balance points in JRPG design. The distribution of encounters paces the entire game.</p>
+
+    <hr />
+
+    <h3>Stretch Goals</h3>
+    <ul>
+      <li><strong>Status effects:</strong> Poison (damage over time), sleep (skip turn), blind (reduced accuracy).</li>
+      <li><strong>Active Time Battle:</strong> Replace pure turn-based with per-character timers.</li>
+      <li><strong>Equipment system:</strong> Weapons and armor that modify stats.</li>
+      <li><strong>Boss encounter:</strong> A multi-phase boss with changing weaknesses.</li>
+    </ul>
+
+    <h3>MVP Spec</h3>
+    <table>
+      <thead><tr><th>Element</th><th>Minimum Viable Version</th></tr></thead>
+      <tbody>
+        <tr><td>Party</td><td>2-3 characters with distinct stats, roles, and 2-3 skills each</td></tr>
+        <tr><td>Enemies</td><td>3-4 enemy types with different elements, stats, and XP values</td></tr>
+        <tr><td>Combat</td><td>Turn-based with initiative, menu selection, damage formulas</td></tr>
+        <tr><td>Weakness Table</td><td>At least 3 elements with a clear strength/weakness cycle</td></tr>
+        <tr><td>Leveling</td><td>XP gain after battle, level-ups that increase stats</td></tr>
+        <tr><td>Encounters</td><td>3-4 sequential battles</td></tr>
+        <tr><td>UI</td><td>Combat menu with Attack / Magic / Item / Defend options</td></tr>
+        <tr><td>Win/Lose</td><td>Party wipe = game over, final battle victory = win screen</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliverable</h3>
+    <p>A playable turn-based combat game where the player commands a party through a sequence of battles. The final battle should require the player to use what they have learned about the weakness system and party roles to succeed.</p>
+
+    <hr />
+
+    <h2>Analogies by Background</h2>
+    <blockquote><p>These analogies map game dev concepts to patterns you already know.</p></blockquote>
+
+    <h3>For Backend Developers</h3>
+    <table>
+      <thead><tr><th>Core Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Turn Order / Initiative</td><td>Like a priority queue &mdash; tasks (combatants) are processed in order of priority (speed stat)</td></tr>
+        <tr><td>Stat-Based Damage Formulas</td><td>Like a business rules engine &mdash; multiple inputs processed through a deterministic formula</td></tr>
+        <tr><td>Experience / Leveling</td><td>Like cache warming &mdash; the system starts cold and gradually increases capacity (stats)</td></tr>
+        <tr><td>Party Management</td><td>Like microservice architecture &mdash; each service has a specialized role</td></tr>
+        <tr><td>Elemental Weakness Table</td><td>Like a routing table or compatibility matrix &mdash; given input type A and target type B, look up the multiplier</td></tr>
+        <tr><td>Menu-Based Combat UI</td><td>Like a CLI with nested subcommands</td></tr>
+        <tr><td>Random Encounters</td><td>Like a probabilistic rate limiter &mdash; the chance of an event increases over time</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Frontend Developers</h3>
+    <table>
+      <thead><tr><th>Core Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Turn Order / Initiative</td><td>Like z-index or rendering order &mdash; elements are processed in a specific stacking order</td></tr>
+        <tr><td>Stat-Based Damage Formulas</td><td>Like CSS specificity calculations &mdash; multiple properties combine through a formula</td></tr>
+        <tr><td>Experience / Leveling</td><td>Like progressive enhancement &mdash; capabilities are unlocked as the user demonstrates readiness</td></tr>
+        <tr><td>Party Management</td><td>Like component composition &mdash; each component has a responsibility</td></tr>
+        <tr><td>Elemental Weakness Table</td><td>Like a theme token lookup</td></tr>
+        <tr><td>Menu-Based Combat UI</td><td>Like a nested dropdown menu</td></tr>
+        <tr><td>Random Encounters</td><td>Like showing a modal after N scroll events</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Data / ML Engineers</h3>
+    <table>
+      <thead><tr><th>Core Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Turn Order / Initiative</td><td>Like job scheduling in a compute cluster &mdash; tasks with higher priority are allocated resources first</td></tr>
+        <tr><td>Stat-Based Damage Formulas</td><td>Like a linear regression with multiple features &mdash; the formula is the model</td></tr>
+        <tr><td>Experience / Leveling</td><td>Like training epochs &mdash; each battle is an epoch, level-up is crossing a performance threshold</td></tr>
+        <tr><td>Party Management</td><td>Like an ensemble model &mdash; each member specializes in a different aspect</td></tr>
+        <tr><td>Elemental Weakness Table</td><td>Like a confusion matrix or lookup table</td></tr>
+        <tr><td>Menu-Based Combat UI</td><td>Like a decision tree &mdash; at each node the player selects a branch</td></tr>
+        <tr><td>Random Encounters</td><td>Like Poisson process sampling</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li>JRPGs live or die on their damage formulas, yet most players never see the math. How transparent should the numbers be?</li>
+      <li>Random encounters were a hardware limitation solution. What does randomness add that visible enemies on the map do not?</li>
+      <li>The "holy trinity" of tank/healer/DPS appears everywhere. Can you design a compelling party system without these archetypes?</li>
+      <li>Persona 5's "One More" system makes the weakness table feel urgent. How does layering a bonus on top of a multiplier change behavior?</li>
+    </ol>
+
+    <nav class="module-nav">
+      <a href={`${base}modules/19-walking-simulator/`}>&larr; Module 19: Walking Simulator</a>
+      <a href={`${base}modules/21-action-rpg/`}>Module 21: Action RPG &rarr;</a>
+    </nav>
+  </div>
+
+  <script>
+    // Demo 1: Damage Formula Calculator
+    (function() {
+      const canvas = document.getElementById('demo-damage');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width, H = canvas.height;
+
+      let atk = 25, def = 12, elemMult = 1.0, critChance = 15;
+      let lastRoll = null;
+      let rolls = [];
+      let dragging = null;
+
+      const sliders = [
+        { label: 'Attack', min: 1, max: 60, get: function(){ return atk; }, set: function(v){ atk = v; }, y: 30, color: '#ff6644' },
+        { label: 'Defense', min: 0, max: 40, get: function(){ return def; }, set: function(v){ def = v; }, y: 75, color: '#4488ff' },
+        { label: 'Elem Mult', min: 0.5, max: 3, get: function(){ return elemMult; }, set: function(v){ elemMult = Math.round(v * 10) / 10; }, y: 120, color: '#44dd88', step: 0.1 },
+        { label: 'Crit %', min: 0, max: 100, get: function(){ return critChance; }, set: function(v){ critChance = Math.round(v); }, y: 165, color: '#ddaa44' },
+      ];
+
+      const SX = 130, SW = 240;
+
+      function calcDamage(crit) {
+        const base = atk * 1.0;
+        const reduced = Math.max(base - def * 0.5, 1);
+        const critMult = crit ? 1.5 : 1.0;
+        const variance = 0.9 + Math.random() * 0.2;
+        return Math.floor(reduced * elemMult * critMult * variance);
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, W, H);
+        ctx.fillStyle = '#111822';
+        ctx.fillRect(0, 0, W, H);
+
+        // Sliders
+        for (const s of sliders) {
+          ctx.fillStyle = '#aabbcc';
+          ctx.font = '13px monospace';
+          ctx.fillText(s.label + ':', 10, s.y + 15);
+
+          // Track
+          ctx.fillStyle = '#222a33';
+          ctx.fillRect(SX, s.y + 8, SW, 6);
+
+          // Filled
+          const ratio = (s.get() - s.min) / (s.max - s.min);
+          ctx.fillStyle = s.color;
+          ctx.fillRect(SX, s.y + 8, SW * ratio, 6);
+
+          // Thumb
+          const thumbX = SX + SW * ratio;
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath(); ctx.arc(thumbX, s.y + 11, 8, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = s.color;
+          ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(thumbX, s.y + 11, 8, 0, Math.PI * 2); ctx.stroke();
+
+          // Value
+          ctx.fillStyle = s.color;
+          ctx.font = 'bold 14px monospace';
+          ctx.fillText(s.get().toString(), SX + SW + 15, s.y + 16);
+        }
+
+        // Formula display
+        const fy = 220;
+        ctx.fillStyle = '#0d1520';
+        ctx.fillRect(10, fy, 370, 80);
+        ctx.strokeStyle = '#2a3a4a';
+        ctx.strokeRect(10, fy, 370, 80);
+
+        ctx.fillStyle = '#667788';
+        ctx.font = '12px monospace';
+        ctx.fillText('Formula:', 20, fy + 20);
+
+        const base = Math.max(atk - def * 0.5, 1);
+        ctx.fillStyle = '#ccddee';
+        ctx.font = '13px monospace';
+        ctx.fillText('base = max(ATK - DEF*0.5, 1) = ' + base.toFixed(1), 20, fy + 40);
+        ctx.fillText('dmg = base * elem * crit * rand', 20, fy + 58);
+
+        const noCrit = Math.floor(base * elemMult * 1.0);
+        const yesCrit = Math.floor(base * elemMult * 1.5);
+        ctx.fillStyle = '#aabbcc';
+        ctx.font = '12px monospace';
+        ctx.fillText('No crit: ~' + noCrit + '   Crit: ~' + yesCrit, 20, fy + 76);
+
+        // Roll button
+        const bx = 10, by = 315, bw = 150, bh = 36;
+        ctx.fillStyle = '#2a4a3a';
+        ctx.fillRect(bx, by, bw, bh);
+        ctx.strokeStyle = '#44bb66';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(bx, by, bw, bh);
+        ctx.fillStyle = '#88ffaa';
+        ctx.font = 'bold 14px monospace';
+        ctx.fillText('Roll Damage', bx + 15, by + 24);
+
+        // Last roll
+        if (lastRoll !== null) {
+          ctx.fillStyle = lastRoll.crit ? '#ffcc44' : '#ccddee';
+          ctx.font = 'bold 22px monospace';
+          ctx.fillText(lastRoll.dmg + (lastRoll.crit ? ' CRIT!' : ''), 180, by + 28);
+        }
+
+        // Roll history chart (right side)
+        const cx = 400, cw = 350, ch = H - 20;
+        ctx.fillStyle = '#0d1520';
+        ctx.fillRect(cx, 10, cw, ch);
+        ctx.strokeStyle = '#2a3a4a';
+        ctx.strokeRect(cx, 10, cw, ch);
+
+        ctx.fillStyle = '#667788';
+        ctx.font = '12px monospace';
+        ctx.fillText('Roll History (last 30)', cx + 10, 28);
+
+        if (rolls.length > 0) {
+          const maxDmg = Math.max(...rolls.map(function(r){ return r.dmg; }), 1);
+          const barW = Math.min(10, (cw - 20) / rolls.length - 1);
+          for (let i = 0; i < rolls.length; i++) {
+            const r = rolls[i];
+            const barH = (r.dmg / maxDmg) * (ch - 50);
+            const bx2 = cx + 10 + i * (barW + 1);
+            const by2 = ch + 10 - barH - 10;
+            ctx.fillStyle = r.crit ? '#ffcc44' : '#4488ff';
+            ctx.fillRect(bx2, by2, barW, barH);
+          }
+          // Avg line
+          const avg = rolls.reduce(function(s, r){ return s + r.dmg; }, 0) / rolls.length;
+          const avgY = ch + 10 - (avg / maxDmg) * (ch - 50) - 10;
+          ctx.strokeStyle = '#ff6644';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 3]);
+          ctx.beginPath(); ctx.moveTo(cx + 10, avgY); ctx.lineTo(cx + cw - 10, avgY); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = '#ff6644';
+          ctx.font = '10px monospace';
+          ctx.fillText('avg: ' + avg.toFixed(1), cx + cw - 70, avgY - 5);
+        }
+      }
+
+      function getSliderAt(mx, my) {
+        for (const s of sliders) {
+          if (my >= s.y && my <= s.y + 25 && mx >= SX - 10 && mx <= SX + SW + 10) return s;
+        }
+        return null;
+      }
+
+      function updateSlider(s, mx) {
+        const ratio = Math.max(0, Math.min(1, (mx - SX) / SW));
+        const range = s.max - s.min;
+        const step = s.step || 1;
+        const val = s.min + Math.round((ratio * range) / step) * step;
+        s.set(Math.max(s.min, Math.min(s.max, val)));
+      }
+
+      canvas.addEventListener('mousedown', function(e) {
+        const rect = canvas.getBoundingClientRect();
+        const mx = (e.clientX - rect.left) * (W / rect.width);
+        const my = (e.clientY - rect.top) * (H / rect.height);
+
+        // Check roll button
+        if (mx >= 10 && mx <= 160 && my >= 315 && my <= 351) {
+          const isCrit = Math.random() * 100 < critChance;
+          const dmg = calcDamage(isCrit);
+          lastRoll = { dmg: dmg, crit: isCrit };
+          rolls.push(lastRoll);
+          if (rolls.length > 30) rolls.shift();
+          draw();
+          return;
+        }
+
+        const s = getSliderAt(mx, my);
+        if (s) {
+          dragging = s;
+          updateSlider(s, mx);
+          draw();
+        }
+      });
+
+      canvas.addEventListener('mousemove', function(e) {
+        if (!dragging) return;
+        const rect = canvas.getBoundingClientRect();
+        const mx = (e.clientX - rect.left) * (W / rect.width);
+        updateSlider(dragging, mx);
+        draw();
+      });
+
+      canvas.addEventListener('mouseup', function() { dragging = null; });
+      canvas.addEventListener('mouseleave', function() { dragging = null; });
+
+      draw();
+    })();
+
+    // Demo 2: Turn Order Visualizer
+    (function() {
+      const canvas = document.getElementById('demo-turnorder');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width, H = canvas.height;
+
+      const combatants = [
+        { name: 'Kael', team: 'party', speed: 6, color: '#4488ff', icon: 'K' },
+        { name: 'Lyra', team: 'party', speed: 12, color: '#44bbff', icon: 'L' },
+        { name: 'Sera', team: 'party', speed: 10, color: '#44ddaa', icon: 'S' },
+        { name: 'Goblin', team: 'party', speed: 8, color: '#44dd88', icon: 'G' },
+        { name: 'Orc A', team: 'enemy', speed: 5, color: '#ff5544', icon: 'O' },
+        { name: 'Orc B', team: 'enemy', speed: 7, color: '#ff6655', icon: 'O' },
+        { name: 'Mage', team: 'enemy', speed: 14, color: '#dd44aa', icon: 'M' },
+      ];
+
+      let dragging = null;
+      const SX = 120, SW = 180;
+
+      function getOrder() {
+        const copy = combatants.slice();
+        copy.sort(function(a, b) { return b.speed - a.speed; });
+        return copy;
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, W, H);
+        ctx.fillStyle = '#111822';
+        ctx.fillRect(0, 0, W, H);
+
+        // Sliders on left
+        ctx.fillStyle = '#667788';
+        ctx.font = 'bold 13px monospace';
+        ctx.fillText('Speed Stats', 10, 22);
+
+        for (let i = 0; i < combatants.length; i++) {
+          const c = combatants[i];
+          const sy = 40 + i * 40;
+
+          ctx.fillStyle = c.color;
+          ctx.font = '12px monospace';
+          ctx.fillText(c.name, 10, sy + 15);
+
+          // Track
+          ctx.fillStyle = '#222a33';
+          ctx.fillRect(SX, sy + 8, SW, 6);
+          const ratio = c.speed / 20;
+          ctx.fillStyle = c.color;
+          ctx.fillRect(SX, sy + 8, SW * ratio, 6);
+
+          // Thumb
+          const tx = SX + SW * ratio;
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath(); ctx.arc(tx, sy + 11, 7, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = c.color;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          // Value
+          ctx.fillStyle = '#ccddee';
+          ctx.font = 'bold 13px monospace';
+          ctx.fillText(c.speed.toString(), SX + SW + 12, sy + 16);
+        }
+
+        // Timeline on right
+        const tlx = 370, tly = 20, tlw = 370, tlh = H - 40;
+        ctx.fillStyle = '#0d1520';
+        ctx.fillRect(tlx, tly, tlw, tlh);
+        ctx.strokeStyle = '#2a3a4a';
+        ctx.strokeRect(tlx, tly, tlw, tlh);
+
+        ctx.fillStyle = '#667788';
+        ctx.font = 'bold 13px monospace';
+        ctx.fillText('Turn Order (top = first)', tlx + 10, tly + 22);
+
+        const order = getOrder();
+        const slotH = Math.min(38, (tlh - 40) / order.length);
+
+        for (let i = 0; i < order.length; i++) {
+          const c = order[i];
+          const oy = tly + 35 + i * slotH;
+
+          // Bar
+          const barW = (c.speed / 20) * (tlw - 100);
+          ctx.fillStyle = c.team === 'party' ? 'rgba(68, 136, 255, 0.2)' : 'rgba(255, 85, 68, 0.2)';
+          ctx.fillRect(tlx + 10, oy, barW, slotH - 4);
+          ctx.strokeStyle = c.color;
+          ctx.lineWidth = 1;
+          ctx.strokeRect(tlx + 10, oy, barW, slotH - 4);
+
+          // Icon circle
+          ctx.fillStyle = c.color;
+          ctx.beginPath();
+          ctx.arc(tlx + 30, oy + slotH / 2 - 2, 12, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#000';
+          ctx.font = 'bold 12px monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText(c.icon, tlx + 30, oy + slotH / 2 + 2);
+          ctx.textAlign = 'left';
+
+          // Name and speed
+          ctx.fillStyle = '#ccddee';
+          ctx.font = '12px monospace';
+          ctx.fillText(c.name + ' (spd:' + c.speed + ')', tlx + 48, oy + slotH / 2 + 2);
+
+          // Position number
+          ctx.fillStyle = '#556677';
+          ctx.font = 'bold 14px monospace';
+          ctx.fillText('#' + (i + 1), tlx + tlw - 40, oy + slotH / 2 + 2);
+        }
+      }
+
+      function getSliderAt(mx, my) {
+        for (let i = 0; i < combatants.length; i++) {
+          const sy = 40 + i * 40;
+          if (my >= sy && my <= sy + 28 && mx >= SX - 10 && mx <= SX + SW + 10) {
+            return combatants[i];
+          }
+        }
+        return null;
+      }
+
+      canvas.addEventListener('mousedown', function(e) {
+        const rect = canvas.getBoundingClientRect();
+        const mx = (e.clientX - rect.left) * (W / rect.width);
+        const my = (e.clientY - rect.top) * (H / rect.height);
+        const s = getSliderAt(mx, my);
+        if (s) {
+          dragging = s;
+          const ratio = Math.max(0, Math.min(1, (mx - SX) / SW));
+          s.speed = Math.max(1, Math.min(20, Math.round(ratio * 20)));
+          draw();
+        }
+      });
+
+      canvas.addEventListener('mousemove', function(e) {
+        if (!dragging) return;
+        const rect = canvas.getBoundingClientRect();
+        const mx = (e.clientX - rect.left) * (W / rect.width);
+        const ratio = Math.max(0, Math.min(1, (mx - SX) / SW));
+        dragging.speed = Math.max(1, Math.min(20, Math.round(ratio * 20)));
+        draw();
+      });
+
+      canvas.addEventListener('mouseup', function() { dragging = null; });
+      canvas.addEventListener('mouseleave', function() { dragging = null; });
+
+      draw();
+    })();
+
+    // Demo 3: Mini RPG Battle
+    (function() {
+      const canvas = document.getElementById('demo-battle');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width, H = canvas.height;
+
+      const elements = { fire:'#ff5533', ice:'#44bbff', wind:'#44dd88', earth:'#bb8844', physical:'#aaaaaa' };
+      const weakTo = { fire:'ice', ice:'wind', wind:'earth', earth:'fire' };
+
+      function makeChar(name, hp, atk, def, spd, elem, skills, icon) {
+        return { name:name, hp:hp, maxHp:hp, atk:atk, def:def, spd:spd, elem:elem, skills:skills, icon:icon, alive:true, defending:false };
+      }
+
+      let party, enemies, turnOrder, turnIdx, phase, selectedAction, battleLog, won, lost;
+
+      function initBattle() {
+        party = [
+          makeChar('Kael', 120, 18, 16, 6, 'earth', [
+            { name:'Slash', power:90, elem:'physical', mp:0 },
+            { name:'Quake', power:110, elem:'earth', mp:5 },
+          ], 'K'),
+          makeChar('Lyra', 65, 12, 8, 13, 'fire', [
+            { name:'Strike', power:70, elem:'physical', mp:0 },
+            { name:'Fireball', power:130, elem:'fire', mp:8 },
+          ], 'L'),
+          makeChar('Sera', 80, 8, 12, 10, 'ice', [
+            { name:'Staff Hit', power:60, elem:'physical', mp:0 },
+            { name:'Heal', power:0, elem:'heal', mp:6, heal:50 },
+          ], 'S'),
+        ];
+        party.forEach(function(c){ c.mp = 30; c.maxMp = 30; c.team = 'party'; });
+
+        enemies = [
+          makeChar('Ice Golem', 90, 14, 10, 5, 'ice', [{ name:'Frost', power:100, elem:'ice', mp:0 }], 'IG'),
+          makeChar('Wind Sprite', 50, 10, 6, 15, 'wind', [{ name:'Gust', power:90, elem:'wind', mp:0 }], 'WS'),
+          makeChar('Fire Imp', 60, 16, 5, 9, 'fire', [{ name:'Burn', power:95, elem:'fire', mp:0 }], 'FI'),
+        ];
+        enemies.forEach(function(c){ c.mp = 99; c.maxMp = 99; c.team = 'enemy'; });
+
+        turnOrder = [];
+        turnIdx = 0;
+        phase = 'menu'; // menu, targeting, animating, enemyturn, victory, defeat
+        selectedAction = null;
+        battleLog = ['Battle Start!'];
+        won = false; lost = false;
+        computeTurnOrder();
+      }
+
+      function computeTurnOrder() {
+        const all = party.concat(enemies).filter(function(c){ return c.alive; });
+        all.sort(function(a, b){ return (b.spd + Math.random()*3) - (a.spd + Math.random()*3); });
+        turnOrder = all;
+        turnIdx = 0;
+        // skip to first alive
+        advanceToAlive();
+      }
+
+      function advanceToAlive() {
+        while (turnIdx < turnOrder.length && !turnOrder[turnIdx].alive) turnIdx++;
+        if (turnIdx >= turnOrder.length) {
+          computeTurnOrder();
+          return;
+        }
+        const cur = turnOrder[turnIdx];
+        cur.defending = false;
+        if (cur.team === 'enemy') {
+          phase = 'enemyturn';
+          setTimeout(doEnemyTurn, 600);
+        } else {
+          phase = 'menu';
+        }
+      }
+
+      function calcDmg(atk2, def2, power, atkElem, defElem) {
+        const base = (atk2 * power) / 100;
+        const red = Math.max(base - def2 * 0.5, 1);
+        let mult = 1.0;
+        if (weakTo[defElem] && weakTo[defElem] === atkElem) mult = 0.5;
+        if (weakTo[atkElem] && weakTo[atkElem] === defElem) mult = 2.0;
+        const v = 0.9 + Math.random() * 0.2;
+        const dmg = Math.floor(red * mult * v);
+        return { dmg: dmg, mult: mult };
+      }
+
+      function doAction(user, skill, target) {
+        if (skill.heal) {
+          const amt = Math.min(skill.heal, target.maxHp - target.hp);
+          target.hp += amt;
+          user.mp -= skill.mp;
+          addLog(user.name + ' heals ' + target.name + ' for ' + amt + ' HP');
+        } else {
+          const def2 = target.defending ? target.def * 2 : target.def;
+          const result = calcDmg(user.atk, def2, skill.power, skill.elem, target.elem);
+          target.hp -= result.dmg;
+          user.mp -= skill.mp;
+          let msg = user.name + ' uses ' + skill.name + ' on ' + target.name + ' for ' + result.dmg + ' dmg';
+          if (result.mult >= 2) msg += ' SUPER EFFECTIVE!';
+          else if (result.mult <= 0.5) msg += ' resisted...';
+          addLog(msg);
+          if (target.hp <= 0) {
+            target.hp = 0;
+            target.alive = false;
+            addLog(target.name + ' is defeated!');
+          }
+        }
+        checkWinLose();
+      }
+
+      function doEnemyTurn() {
+        const cur = turnOrder[turnIdx];
+        if (!cur || !cur.alive) { nextTurn(); return; }
+        const aliveParty = party.filter(function(c){ return c.alive; });
+        if (aliveParty.length === 0) { checkWinLose(); return; }
+        const target = aliveParty[Math.floor(Math.random() * aliveParty.length)];
+        const skill = cur.skills[0];
+        doAction(cur, skill, target);
+        if (!won && !lost) nextTurn();
+      }
+
+      function nextTurn() {
+        turnIdx++;
+        advanceToAlive();
+        draw();
+      }
+
+      function checkWinLose() {
+        if (enemies.every(function(e){ return !e.alive; })) {
+          won = true;
+          phase = 'victory';
+          addLog('VICTORY!');
+        }
+        if (party.every(function(p){ return !p.alive; })) {
+          lost = true;
+          phase = 'defeat';
+          addLog('DEFEAT...');
+        }
+        draw();
+      }
+
+      function addLog(msg) {
+        battleLog.push(msg);
+        if (battleLog.length > 6) battleLog.shift();
+      }
+
+      function drawHpBar(x, y, w, h, hp, maxHp, color) {
+        ctx.fillStyle = '#222a33';
+        ctx.fillRect(x, y, w, h);
+        const ratio = hp / maxHp;
+        ctx.fillStyle = ratio > 0.5 ? color : ratio > 0.25 ? '#ddaa22' : '#dd3322';
+        ctx.fillRect(x, y, w * ratio, h);
+        ctx.strokeStyle = '#556677';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x, y, w, h);
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, W, H);
+        ctx.fillStyle = '#111822';
+        ctx.fillRect(0, 0, W, H);
+
+        // Battle scene
+        // Enemies (top)
+        for (let i = 0; i < enemies.length; i++) {
+          const e = enemies[i];
+          const ex = 180 + i * 160, ey = 60;
+          if (!e.alive) {
+            ctx.fillStyle = '#333';
+            ctx.font = '11px monospace';
+            ctx.fillText('(defeated)', ex - 20, ey + 20);
+            continue;
+          }
+          // Enemy body
+          ctx.fillStyle = elements[e.elem] || '#888';
+          ctx.beginPath();
+          ctx.moveTo(ex, ey - 25);
+          ctx.lineTo(ex - 22, ey + 15);
+          ctx.lineTo(ex + 22, ey + 15);
+          ctx.closePath();
+          ctx.fill();
+          ctx.fillStyle = '#fff';
+          ctx.font = 'bold 14px monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText(e.icon, ex, ey + 5);
+          ctx.textAlign = 'left';
+          ctx.fillStyle = '#aabbcc';
+          ctx.font = '11px monospace';
+          ctx.fillText(e.name + ' [' + e.elem + ']', ex - 35, ey + 32);
+          drawHpBar(ex - 35, ey + 36, 70, 8, e.hp, e.maxHp, elements[e.elem]);
+          ctx.fillStyle = '#889';
+          ctx.font = '9px monospace';
+          ctx.fillText(e.hp + '/' + e.maxHp, ex - 35, ey + 56);
+        }
+
+        // Party (bottom)
+        for (let i = 0; i < party.length; i++) {
+          const p = party[i];
+          const px = 120 + i * 200, py = 190;
+          if (!p.alive) {
+            ctx.fillStyle = '#444';
+            ctx.font = '11px monospace';
+            ctx.fillText('(KO)', px + 5, py + 20);
+            continue;
+          }
+          const isCurrent = (phase === 'menu' || phase === 'targeting') && turnOrder[turnIdx] === p;
+          ctx.fillStyle = isCurrent ? '#335577' : '#1a2a3a';
+          ctx.fillRect(px, py, 150, 80);
+          ctx.strokeStyle = isCurrent ? '#6699cc' : '#334455';
+          ctx.lineWidth = isCurrent ? 2 : 1;
+          ctx.strokeRect(px, py, 150, 80);
+
+          ctx.fillStyle = elements[p.elem];
+          ctx.font = 'bold 13px monospace';
+          ctx.fillText(p.name + ' [' + p.elem + ']', px + 5, py + 18);
+          drawHpBar(px + 5, py + 24, 100, 10, p.hp, p.maxHp, '#44aa66');
+          ctx.fillStyle = '#aabbcc';
+          ctx.font = '10px monospace';
+          ctx.fillText('HP:' + p.hp + '/' + p.maxHp, px + 5, py + 48);
+          ctx.fillText('MP:' + p.mp + '/' + p.maxMp, px + 5, py + 62);
+          if (p.defending) {
+            ctx.fillStyle = '#ffcc44';
+            ctx.fillText('DEFENDING', px + 80, py + 62);
+          }
+        }
+
+        // Battle log
+        ctx.fillStyle = '#0d1520';
+        ctx.fillRect(10, 280, W - 20, 80);
+        ctx.strokeStyle = '#2a3a4a';
+        ctx.strokeRect(10, 280, W - 20, 80);
+        ctx.font = '11px monospace';
+        for (let i = 0; i < battleLog.length; i++) {
+          const msg = battleLog[i];
+          ctx.fillStyle = msg.includes('SUPER') ? '#ffcc44' : msg.includes('resisted') ? '#886644' : msg.includes('VICTORY') ? '#44ff88' : msg.includes('DEFEAT') ? '#ff4444' : '#aabbcc';
+          ctx.fillText(battleLog[i], 20, 298 + i * 13);
+        }
+
+        // Menu
+        if (phase === 'menu') {
+          const cur = turnOrder[turnIdx];
+          if (cur && cur.team === 'party') {
+            const my = 375;
+            ctx.fillStyle = '#ffdd88';
+            ctx.font = 'bold 13px monospace';
+            ctx.fillText(cur.name + "'s turn - choose action:", 10, my);
+
+            const actions = [];
+            for (const sk of cur.skills) {
+              actions.push({ label: sk.name + ' (' + sk.elem + ', MP:' + sk.mp + ')', skill: sk, enabled: cur.mp >= sk.mp });
+            }
+            actions.push({ label: 'Defend (halve damage this round)', type: 'defend', enabled: true });
+
+            for (let i = 0; i < actions.length; i++) {
+              const a = actions[i];
+              const ax = 10 + i * 240, ay = my + 10;
+              ctx.fillStyle = a.enabled ? '#1a2a3a' : '#1a1a22';
+              ctx.fillRect(ax, ay, 225, 30);
+              ctx.strokeStyle = a.enabled ? '#3a5a7a' : '#2a2a33';
+              ctx.lineWidth = 1;
+              ctx.strokeRect(ax, ay, 225, 30);
+              ctx.fillStyle = a.enabled ? '#88ccee' : '#555';
+              ctx.font = '12px monospace';
+              ctx.fillText(a.label, ax + 8, ay + 20);
+            }
+          }
+        }
+
+        if (phase === 'targeting') {
+          ctx.fillStyle = '#ffdd88';
+          ctx.font = '13px monospace';
+          const cur = turnOrder[turnIdx];
+          const isHeal = selectedAction && selectedAction.heal;
+          ctx.fillText(isHeal ? 'Click a party member to heal:' : 'Click an enemy to target:', 10, 375);
+
+          const targets = isHeal ? party.filter(function(c){ return c.alive; }) : enemies.filter(function(c){ return c.alive; });
+          for (let i = 0; i < targets.length; i++) {
+            const t = targets[i];
+            const tx = isHeal ? 120 + party.indexOf(t) * 200 : 180 + enemies.indexOf(t) * 160;
+            const ty = isHeal ? 190 : 60;
+            ctx.strokeStyle = '#ffdd88';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 3]);
+            ctx.strokeRect(tx - 40, ty - 30, isHeal ? 150 : 80, isHeal ? 80 : 70);
+            ctx.setLineDash([]);
+          }
+        }
+
+        if (won || lost) {
+          ctx.fillStyle = 'rgba(0,0,0,0.5)';
+          ctx.fillRect(0, 0, W, H);
+          ctx.fillStyle = won ? '#44ff88' : '#ff4444';
+          ctx.font = 'bold 30px monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText(won ? 'VICTORY!' : 'DEFEAT...', W/2, H/2 - 10);
+          ctx.fillStyle = '#aabbcc';
+          ctx.font = '14px monospace';
+          ctx.fillText('Click to restart', W/2, H/2 + 25);
+          ctx.textAlign = 'left';
+        }
+      }
+
+      canvas.addEventListener('click', function(e) {
+        const rect = canvas.getBoundingClientRect();
+        const mx = (e.clientX - rect.left) * (W / rect.width);
+        const my2 = (e.clientY - rect.top) * (H / rect.height);
+
+        if (won || lost) { initBattle(); draw(); return; }
+
+        if (phase === 'menu') {
+          const cur = turnOrder[turnIdx];
+          if (!cur || cur.team !== 'party') return;
+          const menuY = 375 + 10;
+          if (my2 >= menuY && my2 <= menuY + 30) {
+            const actions = [];
+            for (const sk of cur.skills) {
+              actions.push({ skill: sk, enabled: cur.mp >= sk.mp });
+            }
+            actions.push({ type: 'defend', enabled: true });
+
+            for (let i = 0; i < actions.length; i++) {
+              const ax = 10 + i * 240;
+              if (mx >= ax && mx <= ax + 225 && actions[i].enabled) {
+                if (actions[i].type === 'defend') {
+                  cur.defending = true;
+                  addLog(cur.name + ' defends!');
+                  nextTurn();
+                  draw();
+                  return;
+                }
+                selectedAction = actions[i].skill;
+                phase = 'targeting';
+                draw();
+                return;
+              }
+            }
+          }
+        }
+
+        if (phase === 'targeting' && selectedAction) {
+          const cur = turnOrder[turnIdx];
+          const isHeal = selectedAction.heal;
+
+          if (isHeal) {
+            for (let i = 0; i < party.length; i++) {
+              const p = party[i];
+              if (!p.alive) continue;
+              const px = 120 + i * 200, py = 190;
+              if (mx >= px && mx <= px + 150 && my2 >= py && my2 <= py + 80) {
+                doAction(cur, selectedAction, p);
+                selectedAction = null;
+                if (!won && !lost) nextTurn();
+                draw();
+                return;
+              }
+            }
+          } else {
+            for (let i = 0; i < enemies.length; i++) {
+              const en = enemies[i];
+              if (!en.alive) continue;
+              const ex = 180 + i * 160, ey = 60;
+              if (mx >= ex - 40 && mx <= ex + 40 && my2 >= ey - 30 && my2 <= ey + 40) {
+                doAction(cur, selectedAction, en);
+                selectedAction = null;
+                if (!won && !lost) nextTurn();
+                draw();
+                return;
+              }
+            }
+          }
+        }
+      });
+
+      initBattle();
+      draw();
+    })();
+  </script>
+</BaseLayout>
