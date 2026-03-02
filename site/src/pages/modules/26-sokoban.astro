@@ -697,9 +697,18 @@ function isDemoActive(canvasId) { return activeDemoCanvasId === canvasId; }
   const S = window._sokoban;
 
   const LEVELS = [
-    '#######\n#     #\n# .$. #\n# $.$ #\n# .$. #\n#  @  #\n#######',
+    // Level 1: 2 boxes — gentle intro
+    '######\n#    #\n# $. #\n# .$ #\n# @  #\n######',
+    // Level 2: 3 boxes — L-shaped push
     '########\n#      #\n# .$   #\n# #.## #\n#  $ $ #\n# .# @ #\n#      #\n########',
-    '#######\n##   ##\n#  $ .#\n# #$#.#\n#  $ .#\n#  @  #\n#######'
+    // Level 3: 3 boxes — corridor pushes
+    '#######\n##   ##\n#  $ .#\n# #$#.#\n#  $ .#\n#  @  #\n#######',
+    // Level 4: 3 boxes — tight room
+    '#######\n#     #\n#.$$  #\n#.#   #\n#.$ @ #\n#     #\n#######',
+    // Level 5: 4 boxes — open room
+    '########\n#  .   #\n# $.#. #\n# .$$  #\n#  $ @ #\n########',
+    // Level 6: 4 boxes — winding
+    '  #####\n###   #\n# $ # #\n# .$.@#\n# $ . #\n## .  #\n #  ###\n ####'
   ];
 
   let levelIdx = 0;
