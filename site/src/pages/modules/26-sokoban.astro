@@ -392,7 +392,7 @@ function isDemoActive(canvasId) { return activeDemoCanvasId === canvasId; }
     return (wallUp || wallDown) && (wallLeft || wallRight);
   }
 
-  window._sokoban = { parseLevel, cloneState, tryMove, isSolved, isDeadlock, hasBox, isTarget };
+  window._sokoban = { parseLevel, cloneState, tryMove, isSolved, isDeadlock, hasBox, isTarget, LEVELS: null };
 })();
 
 // ==================== Demo 1: Push Mechanics (simple 5x5) ====================
@@ -519,6 +519,19 @@ function isDemoActive(canvasId) { return activeDemoCanvasId === canvasId; }
     requestAnimationFrame(draw);
   }
   draw();
+
+  // Test hook
+  if (!window.__test) window.__test = {};
+  window.__test['demo-push'] = {
+    getState: () => ({ state: S.cloneState(state), moves, solved }),
+    move: (dr, dc) => {
+      if (solved) return false;
+      const result = S.tryMove(state, dr, dc);
+      if (result) { state = result.state; moves++; if (S.isSolved(state)) solved = true; return true; }
+      return false;
+    },
+    reset: () => reset(),
+  };
 })();
 
 // ==================== Demo 2: Undo System ====================
@@ -681,6 +694,26 @@ function isDemoActive(canvasId) { return activeDemoCanvasId === canvasId; }
     requestAnimationFrame(draw);
   }
   draw();
+
+  // Test hook
+  if (!window.__test) window.__test = {};
+  window.__test['demo-undo'] = {
+    getState: () => ({ state: S.cloneState(state), moves, pushes, solved, historyLength: history.length }),
+    move: (dr, dc) => {
+      if (solved) return false;
+      const result = S.tryMove(state, dr, dc);
+      if (result) {
+        history.push(S.cloneState(state));
+        state = result.state; moves++;
+        if (result.pushed) pushes++;
+        if (S.isSolved(state)) solved = true;
+        return true;
+      }
+      return false;
+    },
+    undo: () => doUndo(),
+    reset: () => reset(),
+  };
 })();
 
 // ==================== Demo 3: Playable Sokoban (full puzzle) ====================
@@ -699,16 +732,16 @@ function isDemoActive(canvasId) { return activeDemoCanvasId === canvasId; }
   const LEVELS = [
     // Level 1: 2 boxes — gentle intro
     '######\n#    #\n# $. #\n# .$ #\n# @  #\n######',
-    // Level 2: 3 boxes — L-shaped push
-    '########\n#      #\n# .$   #\n# #.## #\n#  $ $ #\n# .# @ #\n#      #\n########',
+    // Level 2: 3 boxes — ordering matters
+    '#######\n# .   #\n# $$  #\n# .@  #\n# $ # #\n# .   #\n#######',
     // Level 3: 3 boxes — corridor pushes
     '#######\n##   ##\n#  $ .#\n# #$#.#\n#  $ .#\n#  @  #\n#######',
     // Level 4: 3 boxes — tight room
     '#######\n#     #\n#.$$  #\n#.#   #\n#.$ @ #\n#     #\n#######',
     // Level 5: 4 boxes — open room
-    '########\n#  .   #\n# $.#. #\n# .$$  #\n#  $ @ #\n########',
-    // Level 6: 4 boxes — winding
-    '  #####\n###   #\n# $ # #\n# .$.@#\n# $ . #\n## .  #\n #  ###\n ####'
+    '########\n# .  . #\n# $  $ #\n#  @   #\n# $  $ #\n# .  . #\n########',
+    // Level 6: 2 boxes — winding corridors
+    '######\n#    #\n#.$  #\n#  # #\n# .$ #\n# @  #\n######'
   ];
 
   let levelIdx = 0;
@@ -873,5 +906,34 @@ function isDemoActive(canvasId) { return activeDemoCanvasId === canvasId; }
     requestAnimationFrame(draw);
   }
   draw();
+
+  // Expose LEVELS on the shared engine for content tests
+  window._sokoban.LEVELS = LEVELS;
+
+  // Test hook
+  if (!window.__test) window.__test = {};
+  window.__test['demo-sokoban'] = {
+    getState: () => ({ state: S.cloneState(state), moves, pushes, solved, levelIdx, levelCount: LEVELS.length }),
+    move: (dr, dc) => {
+      if (solved) return false;
+      const result = S.tryMove(state, dr, dc);
+      if (result) {
+        history.push({ state: S.cloneState(state), moves, pushes });
+        state = result.state; moves++;
+        if (result.pushed) pushes++;
+        if (S.isSolved(state)) { solved = true; }
+        return true;
+      }
+      return false;
+    },
+    undo: () => {
+      if (history.length > 0 && !solved) {
+        const prev = history.pop();
+        state = prev.state; moves = prev.moves; pushes = prev.pushes;
+      }
+    },
+    reset: () => loadLevel(levelIdx),
+    loadLevel: (idx) => loadLevel(idx),
+  };
 })();
 </script>

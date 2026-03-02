@@ -242,7 +242,7 @@ ball   = { x, y, vx, vy, radius }</code></pre>
     <!-- Module Navigation -->
     <div class="module-nav">
       <a href={`${base}modules/`}>&larr; All Modules</a>
-      <a href={`${base}modules/`}>Next Module &rarr;</a>
+      <a href={`${base}modules/02-platformer/`}>Module 02: 2D Platformer &rarr;</a>
     </div>
 
   </div>
@@ -1124,5 +1124,16 @@ ball   = { x, y, vx, vy, radius }</code></pre>
 
   init();
   requestAnimationFrame(loop);
+
+  // Test hook
+  if (!window.__test) window.__test = {};
+  window.__test['demo-pong'] = {
+    getState: () => ({ state, scoreL, scoreR, ball: { ...ball }, p1: { ...p1 }, p2: { ...p2 }, msg }),
+    restart: () => init(),
+    setBallPos: (x, y) => { ball.x = x; ball.y = y; },
+    setBallVel: (vx, vy) => { ball.vx = vx; ball.vy = vy; },
+    setMouseY: (y) => { mouseY = y; },
+    tick: () => update(),
+  };
 })();
 </script>

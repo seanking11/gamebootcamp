@@ -6,11 +6,19 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "test:content": "node scripts/validate-all.js",
+    "test:smoke": "npx playwright test tests/smoke.spec.js",
+    "test:interaction": "npx playwright test tests/modules/",
+    "test:browser": "npx playwright test",
+    "test": "npm run test:content && npm run test:browser"
   },
   "dependencies": {
     "@astrojs/mdx": "^4.3.13",
     "astro": "^5.17.1",
     "marked": "^17.0.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2"
   }
 }

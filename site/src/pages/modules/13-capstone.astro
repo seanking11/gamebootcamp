@@ -1,0 +1,616 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Module 13: Capstone">
+  <div class="container page-content">
+    <div class="module-header">
+      <div class="module-number">Module 13</div>
+      <h1>Capstone</h1>
+      <p class="module-theme">Build your own game &mdash; everything you've learned, applied to something original</p>
+    </div>
+
+    <blockquote>
+      <p>"The best way to learn game development is to finish a game. Not a perfect game. A finished one."</p>
+    </blockquote>
+
+    <hr />
+
+    <h2>Prerequisites</h2>
+    <table>
+      <thead><tr><th>Module</th><th>What You Used From It</th></tr></thead>
+      <tbody>
+        <tr><td>Any completed learning path</td><td>At least one full path gives you the technical vocabulary and patterns to build something original. You don't need all of them &mdash; depth in one area beats shallow coverage of many.</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h2>Week 1: Planning &amp; Scoping</h2>
+
+    <h3>The Hard Part</h3>
+    <p>You know how to build a game loop, handle input, detect collisions, manage state. You've implemented specific genres with specific mechanics. Now comes the hardest part of game development: deciding what to build and &mdash; more importantly &mdash; what <em>not</em> to build.</p>
+
+    <p>Every successful indie game started with a scope that was aggressively smaller than the developer's ambition. <strong>Undertale</strong> (Toby Fox, 2015) was one person working for nearly three years on what is essentially a turn-based RPG with a bullet-hell twist. <strong>Celeste</strong> (Matt Thorson &amp; Noel Berry, 2018) started as a game jam entry &mdash; a 2D platformer with a single mechanic (the dash) that they polished relentlessly. <strong>Papers, Please</strong> (Lucas Pope, 2013) is a document-checking simulation. None of these games tried to do everything. They each did one thing extraordinarily well.</p>
+
+    <h3>Choosing Your Project</h3>
+    <p>Your capstone is a game you design and build from scratch. It can be a single genre or a blend of genres &mdash; Hades blends roguelike + action RPG + narrative, Baba Is You blends Sokoban + meta-puzzle, FTL blends roguelike + real-time strategy. The genre encyclopedia on this site covers dozens of possibilities.</p>
+
+    <p>Pick something you are genuinely excited to play, not just to build. If you wouldn't play a game like this, you'll lose motivation halfway through.</p>
+
+    <h3>Core Concepts (Must Implement)</h3>
+
+    <h4>1. Scope Management</h4>
+    <p>The single most important skill in game development is knowing what to cut. Every feature you add multiplies the complexity of your project &mdash; not additively, but combinatorially. Five features don't make a game five times harder to build; they make it ten or twenty times harder, because each feature interacts with every other feature.</p>
+    <pre is:raw><code>project_scope = {
+    "core_mechanic":     "The ONE thing the player does most",
+    "win_condition":     "How the player knows they succeeded",
+    "lose_condition":    "How the player knows they failed (if applicable)",
+    "content_units":     "How many levels / rounds / scenarios",
+    "art_style":         "Minimalist, pixel, geometric, text-based",
+    "audio":             "None, SFX only, SFX + music",
+    "menus":             "Title screen, pause, game over",
+}
+
+// If your core mechanic isn't fun in isolation, no amount
+// of features will save the game. Test the core loop FIRST.</code></pre>
+    <p><strong>Why it matters:</strong> Professional studios with hundreds of employees still fail at scoping. As a solo developer or small team, your only advantage is agility &mdash; the ability to cut scope fast and ship something real.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Scope Visualizer</div>
+      <p class="demo-hint">Toggle features on and off to see how project complexity grows. Notice how each additional feature multiplies rather than adds to the total complexity.</p>
+      <canvas id="demo-scope" width="760" height="420"></canvas>
+      <div class="demo-controls">
+        <button id="scope-reset-btn">Reset All</button>
+        <span class="value-display" id="scope-complexity">Complexity: 1</span>
+      </div>
+    </div>
+
+    <h4>2. The Iterative Loop</h4>
+    <p>Build in layers, not in sequence. Don't build the menu system, then the game, then polish. Instead: build the ugliest possible version of the core loop, playtest it, improve it, repeat. Each pass adds a layer of quality.</p>
+    <pre is:raw><code>iteration_0:  "Gray boxes moving on screen. Core mechanic works."
+iteration_1:  "Basic art. Sound on key actions. One level/scenario."
+iteration_2:  "Three levels/scenarios. Difficulty progression. Score."
+iteration_3:  "Title screen. Game over. Restart. It's a complete game."
+iteration_4:  "Polish. Juice. Screen shake. Particles. The feel."
+
+// Each iteration produces a PLAYABLE game.
+// You can stop at any point and have something finished.</code></pre>
+    <p><strong>Why it matters:</strong> If you build linearly (art first, then code, then levels, then polish), you won't know if the game is fun until it's too late to change course. Iterative development means you always have a playable game and you find problems early.</p>
+
+    <div class="demo-container">
+      <div class="demo-label">Interactive: Iteration Planner</div>
+      <p class="demo-hint">Drag tasks between iteration columns to plan your build order. The first iteration should contain only the absolute minimum needed for the core loop to be playable.</p>
+      <canvas id="demo-plan" width="760" height="460"></canvas>
+      <div class="demo-controls">
+        <button id="plan-reset-btn">Reset</button>
+        <span class="value-display" id="plan-iteration">Drag tasks to plan iterations</span>
+      </div>
+    </div>
+
+    <h4>3. Playtesting</h4>
+    <p>Watch someone play your game without saying a word. Don't explain the controls. Don't say "oh, that's a bug." Just watch. Where do they get confused? Where do they get bored? Where do they smile? Those observations are worth more than a hundred hours of solo development.</p>
+    <pre is:raw><code>playtest_protocol = {
+    "setup":     "Hand them the game. Say nothing.",
+    "observe":   "Note where they hesitate, fail, or disengage.",
+    "ask_after": "What was confusing? What was fun? What would you change?",
+    "never":     "Never explain or defend your design during the test.",
+    "fix":       "Prioritize fixes by frequency: if 3/5 testers hit the same wall, fix that first.",
+}</code></pre>
+    <p><strong>Why it matters:</strong> You can't playtest your own game objectively. You know where every hidden path is, what every button does, how every enemy moves. Your testers don't. Their confusion is your design flaw.</p>
+
+    <hr />
+
+    <h2>Week 2: Build Your Game</h2>
+
+    <h3>What You're Building</h3>
+    <p>An original, complete, playable game. "Complete" means: it has a start, gameplay, and an end state. "Original" means: you designed it, not followed a tutorial step-by-step. You may use any genre, any combination of genres, or invent something new.</p>
+
+    <h3>The MVP Checklist</h3>
+    <table>
+      <thead><tr><th>Element</th><th>Requirement</th></tr></thead>
+      <tbody>
+        <tr><td>Core Mechanic</td><td>One clear, polished interaction the player performs repeatedly</td></tr>
+        <tr><td>Game Loop</td><td>The player can start, play, and reach an end state (win, lose, or score)</td></tr>
+        <tr><td>Content</td><td>At least 3 levels, rounds, or scenarios &mdash; enough to show progression</td></tr>
+        <tr><td>Feedback</td><td>The player always knows what happened and why (visual, audio, or both)</td></tr>
+        <tr><td>Restart</td><td>The player can restart or replay without refreshing the page</td></tr>
+        <tr><td>Polish</td><td>At least one "juice" element: screen shake, particles, easing, sound</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Stretch Goals</h3>
+    <ul>
+      <li><strong>Genre blending:</strong> Combine two genres you studied into something new. Roguelike + rhythm game? Tower defense + deckbuilder?</li>
+      <li><strong>Persistent progression:</strong> Save high scores or unlocks to localStorage.</li>
+      <li><strong>Procedural content:</strong> Generate levels, enemies, or items so every playthrough feels different.</li>
+      <li><strong>Accessibility:</strong> Add key remapping, colorblind modes, or difficulty options.</li>
+      <li><strong>Postmortem write-up:</strong> Document what you planned vs. what you built vs. what you'd change.</li>
+    </ul>
+
+    <h3>Deliverable</h3>
+    <p>A playable game hosted online (itch.io, GitHub Pages, or any web host) with a short write-up covering: what you built, what you learned, and what you'd do differently with another week.</p>
+
+    <hr />
+
+    <h2>Analogies by Background</h2>
+
+    <h3>For Backend Developers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Scope Management</td><td>Like defining an API contract before writing implementation &mdash; decide the interface first, build the minimum behind it.</td></tr>
+        <tr><td>Iterative Development</td><td>Like deploying a service with feature flags &mdash; ship the skeleton, then enable functionality incrementally.</td></tr>
+        <tr><td>Playtesting</td><td>Like monitoring production logs after a deploy &mdash; real user behavior reveals bugs and UX issues your tests never caught.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Frontend Developers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Scope Management</td><td>Like choosing a component library wisely &mdash; each dependency adds bundle size and maintenance burden exponentially.</td></tr>
+        <tr><td>Iterative Development</td><td>Like progressive enhancement &mdash; make it work first (HTML), make it look right (CSS), make it interactive (JS).</td></tr>
+        <tr><td>Playtesting</td><td>Like usability testing &mdash; watching a real user struggle with your navigation is more valuable than any design review.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>For Data / ML Engineers</h3>
+    <table>
+      <thead><tr><th>Concept</th><th>Analogy</th></tr></thead>
+      <tbody>
+        <tr><td>Scope Management</td><td>Like choosing which features to include in a model &mdash; more features means more overfitting risk, not necessarily better performance.</td></tr>
+        <tr><td>Iterative Development</td><td>Like training in epochs &mdash; each pass over the problem space improves the result, and you can stop when the loss plateaus.</td></tr>
+        <tr><td>Playtesting</td><td>Like A/B testing in production &mdash; the only way to know if your model works is to observe real users interacting with it.</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h3>Discussion Questions</h3>
+    <ol>
+      <li><strong>The Scope Knife:</strong> You're two-thirds through development and realize one of your three core features isn't fun. Do you cut it, rework it, or ship it anyway? What factors inform that decision?</li>
+      <li><strong>Originality vs. Familiarity:</strong> Players need to understand your game within seconds. How do you balance doing something new with leveraging genre conventions players already know?</li>
+      <li><strong>When Is It Done?</strong> A game is never truly "finished" &mdash; you just stop working on it. How do you decide when a project is ready to ship?</li>
+      <li><strong>The Postmortem:</strong> Professional studios write postmortems after every project. Why is reflecting on what went wrong (and right) more valuable than the project itself?</li>
+    </ol>
+
+    <nav class="module-nav">
+      <a href={`${base}modules/12-3d-platformer/`}>&larr; Module 12: 3D Platformer</a>
+      <a href={`${base}modules/14-metroidvania/`}>Module 14: Metroidvania &rarr;</a>
+    </nav>
+  </div>
+</BaseLayout>
+
+<script>
+// ==================== Demo 1: Scope Visualizer ====================
+(function() {
+  const canvas = document.getElementById('demo-scope');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const resetBtn = document.getElementById('scope-reset-btn');
+  const complexityDisplay = document.getElementById('scope-complexity');
+
+  const features = [
+    { name: 'Core Mechanic', on: true, locked: true, cost: 1 },
+    { name: 'Win/Lose State', on: false, locked: false, cost: 1.3 },
+    { name: 'Multiple Levels', on: false, locked: false, cost: 1.5 },
+    { name: 'Enemy AI', on: false, locked: false, cost: 1.8 },
+    { name: 'Power-ups', on: false, locked: false, cost: 1.4 },
+    { name: 'Sound Effects', on: false, locked: false, cost: 1.2 },
+    { name: 'Particle Effects', on: false, locked: false, cost: 1.3 },
+    { name: 'Save System', on: false, locked: false, cost: 1.6 },
+    { name: 'Multiplayer', on: false, locked: false, cost: 2.5 },
+    { name: 'Level Editor', on: false, locked: false, cost: 2.0 },
+  ];
+
+  const COL_X = 30;
+  const COL_W = 220;
+  const ROW_H = 34;
+  const START_Y = 50;
+
+  function getComplexity() {
+    let c = 1;
+    for (const f of features) {
+      if (f.on) c *= f.cost;
+    }
+    return c;
+  }
+
+  function getCanvasPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left) * (W / rect.width),
+      y: (e.clientY - rect.top) * (H / rect.height)
+    };
+  }
+
+  canvas.addEventListener('click', (e) => {
+    const p = getCanvasPos(e);
+    for (let i = 0; i < features.length; i++) {
+      const y = START_Y + i * ROW_H;
+      if (p.x >= COL_X && p.x <= COL_X + COL_W && p.y >= y && p.y <= y + ROW_H - 4) {
+        if (!features[i].locked) {
+          features[i].on = !features[i].on;
+        }
+      }
+    }
+  });
+
+  // Touch support
+  canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const p = {
+      x: (e.touches[0].clientX - rect.left) * (W / rect.width),
+      y: (e.touches[0].clientY - rect.top) * (H / rect.height)
+    };
+    for (let i = 0; i < features.length; i++) {
+      const y = START_Y + i * ROW_H;
+      if (p.x >= COL_X && p.x <= COL_X + COL_W && p.y >= y && p.y <= y + ROW_H - 4) {
+        if (!features[i].locked) features[i].on = !features[i].on;
+      }
+    }
+  }, { passive: false });
+
+  resetBtn.addEventListener('click', () => {
+    for (const f of features) { if (!f.locked) f.on = false; }
+  });
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Title
+    ctx.fillStyle = '#ccc';
+    ctx.font = 'bold 14px "JetBrains Mono", monospace';
+    ctx.fillText('FEATURES', COL_X, 30);
+    ctx.fillText('COMPLEXITY', 310, 30);
+
+    const complexity = getComplexity();
+    const activeCount = features.filter(f => f.on).length;
+
+    // Feature list
+    for (let i = 0; i < features.length; i++) {
+      const f = features[i];
+      const y = START_Y + i * ROW_H;
+
+      // Checkbox
+      ctx.strokeStyle = f.on ? '#f59e0b' : '#3f3f46';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(COL_X, y + 4, 18, 18);
+      if (f.on) {
+        ctx.fillStyle = '#f59e0b';
+        ctx.fillRect(COL_X + 3, y + 7, 12, 12);
+      }
+
+      // Label
+      ctx.fillStyle = f.on ? '#fafafa' : '#71717a';
+      ctx.font = (f.locked ? 'bold ' : '') + '13px Inter, sans-serif';
+      ctx.fillText(f.name, COL_X + 26, y + 18);
+
+      // Cost multiplier
+      ctx.fillStyle = '#71717a';
+      ctx.font = '11px "JetBrains Mono", monospace';
+      ctx.fillText('x' + f.cost.toFixed(1), COL_X + 180, y + 18);
+    }
+
+    // Complexity bar chart
+    const barX = 310;
+    const barMaxW = 400;
+    const barH = 30;
+    const barY = 50;
+
+    // Background scale markers
+    const maxDisplayComplexity = 30;
+    for (let mark = 5; mark <= maxDisplayComplexity; mark += 5) {
+      const mx = barX + (mark / maxDisplayComplexity) * barMaxW;
+      ctx.strokeStyle = '#1c1c20';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(mx, barY);
+      ctx.lineTo(mx, barY + 340);
+      ctx.stroke();
+      ctx.fillStyle = '#3f3f46';
+      ctx.font = '10px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(mark + 'x', mx, barY + 355);
+    }
+    ctx.textAlign = 'left';
+
+    // Complexity bar
+    const barW = Math.min((complexity / maxDisplayComplexity) * barMaxW, barMaxW);
+    const dangerThreshold = 10;
+    const warningThreshold = 5;
+
+    let barColor;
+    if (complexity > dangerThreshold) barColor = '#ef4444';
+    else if (complexity > warningThreshold) barColor = '#f59e0b';
+    else barColor = '#22c55e';
+
+    // Draw bar with glow
+    ctx.fillStyle = barColor + '22';
+    ctx.fillRect(barX, barY + 150, barW, barH);
+    ctx.fillStyle = barColor;
+    ctx.fillRect(barX, barY + 150, barW, barH);
+
+    // Complexity label
+    ctx.fillStyle = barColor;
+    ctx.font = 'bold 20px "JetBrains Mono", monospace';
+    const labelX = barX + barW + 10;
+    ctx.fillText(complexity.toFixed(1) + 'x', Math.min(labelX, W - 60), barY + 172);
+
+    // Zone labels
+    ctx.font = '11px Inter, sans-serif';
+    const greenEnd = (warningThreshold / maxDisplayComplexity) * barMaxW;
+    const yellowEnd = (dangerThreshold / maxDisplayComplexity) * barMaxW;
+
+    ctx.fillStyle = '#22c55e';
+    ctx.fillText('Achievable', barX + 4, barY + 200);
+    ctx.fillStyle = '#f59e0b';
+    ctx.fillText('Ambitious', barX + greenEnd + 4, barY + 200);
+    ctx.fillStyle = '#ef4444';
+    ctx.fillText('Danger zone', barX + yellowEnd + 4, barY + 200);
+
+    // Advice text
+    ctx.font = '12px Inter, sans-serif';
+    ctx.fillStyle = '#a1a1aa';
+    let advice;
+    if (activeCount <= 1) advice = 'Start here. Get the core mechanic working first.';
+    else if (complexity <= warningThreshold) advice = 'Good scope. This is buildable in 2 weeks.';
+    else if (complexity <= dangerThreshold) advice = 'Getting ambitious. Consider cutting one feature.';
+    else advice = 'This scope will take months. Cut aggressively.';
+    ctx.fillText(advice, barX, barY + 240);
+
+    // Interaction count
+    ctx.fillStyle = '#71717a';
+    ctx.font = '11px "JetBrains Mono", monospace';
+    const interactions = activeCount * (activeCount - 1) / 2;
+    ctx.fillText(activeCount + ' features = ' + interactions + ' potential interactions', barX, barY + 270);
+
+    complexityDisplay.textContent = 'Complexity: ' + complexity.toFixed(1) + 'x';
+
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+// ==================== Demo 2: Iteration Planner ====================
+(function() {
+  const canvas = document.getElementById('demo-plan');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const resetBtn = document.getElementById('plan-reset-btn');
+  const infoDisplay = document.getElementById('plan-iteration');
+
+  const TASKS = [
+    { name: 'Core mechanic', iteration: 0, color: '#ef4444' },
+    { name: 'Player input', iteration: 0, color: '#ef4444' },
+    { name: 'Win condition', iteration: 0, color: '#ef4444' },
+    { name: 'Basic rendering', iteration: 0, color: '#f59e0b' },
+    { name: 'Enemy / obstacle', iteration: 1, color: '#f59e0b' },
+    { name: 'Score tracking', iteration: 1, color: '#f59e0b' },
+    { name: 'Level 2 & 3', iteration: 1, color: '#3b82f6' },
+    { name: 'Difficulty curve', iteration: 2, color: '#3b82f6' },
+    { name: 'Sound effects', iteration: 2, color: '#3b82f6' },
+    { name: 'Title screen', iteration: 2, color: '#a855f7' },
+    { name: 'Game over screen', iteration: 2, color: '#a855f7' },
+    { name: 'Screen shake', iteration: 3, color: '#22c55e' },
+    { name: 'Particles', iteration: 3, color: '#22c55e' },
+    { name: 'High score save', iteration: 3, color: '#22c55e' },
+  ];
+
+  const COLUMNS = ['Iteration 0\nCore Loop', 'Iteration 1\nGameplay', 'Iteration 2\nComplete', 'Iteration 3\nPolish'];
+  const COL_W = (W - 40) / COLUMNS.length;
+  const COL_X = 20;
+  const HEADER_H = 55;
+  const TASK_H = 28;
+  const TASK_PAD = 4;
+
+  let dragging = null;
+  let dragOffX = 0, dragOffY = 0;
+  let dragScreenX = 0, dragScreenY = 0;
+
+  function getTasksInColumn(col) {
+    return TASKS.filter(t => t.iteration === col);
+  }
+
+  function getTaskRect(task) {
+    const col = task.iteration;
+    const tasksInCol = getTasksInColumn(col);
+    const idx = tasksInCol.indexOf(task);
+    const x = COL_X + col * COL_W + 8;
+    const y = HEADER_H + 15 + idx * (TASK_H + TASK_PAD);
+    return { x, y, w: COL_W - 16, h: TASK_H };
+  }
+
+  function getCanvasPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left) * (W / rect.width),
+      y: (e.clientY - rect.top) * (H / rect.height)
+    };
+  }
+
+  canvas.addEventListener('mousedown', (e) => {
+    const p = getCanvasPos(e);
+    for (let i = TASKS.length - 1; i >= 0; i--) {
+      const r = getTaskRect(TASKS[i]);
+      if (p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h) {
+        dragging = TASKS[i];
+        dragOffX = p.x - r.x;
+        dragOffY = p.y - r.y;
+        dragScreenX = p.x;
+        dragScreenY = p.y;
+        break;
+      }
+    }
+  });
+
+  canvas.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    const p = getCanvasPos(e);
+    dragScreenX = p.x;
+    dragScreenY = p.y;
+  });
+
+  canvas.addEventListener('mouseup', () => {
+    if (dragging) {
+      // Determine which column to drop into
+      const col = Math.floor((dragScreenX - COL_X) / COL_W);
+      if (col >= 0 && col < COLUMNS.length) {
+        dragging.iteration = col;
+      }
+      dragging = null;
+    }
+  });
+
+  canvas.addEventListener('mouseleave', () => { dragging = null; });
+
+  // Touch support
+  canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const p = {
+      x: (e.touches[0].clientX - rect.left) * (W / rect.width),
+      y: (e.touches[0].clientY - rect.top) * (H / rect.height)
+    };
+    for (let i = TASKS.length - 1; i >= 0; i--) {
+      const r = getTaskRect(TASKS[i]);
+      if (p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h) {
+        dragging = TASKS[i];
+        dragOffX = p.x - r.x;
+        dragOffY = p.y - r.y;
+        dragScreenX = p.x;
+        dragScreenY = p.y;
+        break;
+      }
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (!dragging) return;
+    const rect = canvas.getBoundingClientRect();
+    dragScreenX = (e.touches[0].clientX - rect.left) * (W / rect.width);
+    dragScreenY = (e.touches[0].clientY - rect.top) * (H / rect.height);
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', () => {
+    if (dragging) {
+      const col = Math.floor((dragScreenX - COL_X) / COL_W);
+      if (col >= 0 && col < COLUMNS.length) dragging.iteration = col;
+      dragging = null;
+    }
+  });
+
+  resetBtn.addEventListener('click', () => {
+    const defaults = [0,0,0,0,1,1,1,2,2,2,2,3,3,3];
+    for (let i = 0; i < TASKS.length; i++) TASKS[i].iteration = defaults[i];
+  });
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Column backgrounds and headers
+    for (let c = 0; c < COLUMNS.length; c++) {
+      const x = COL_X + c * COL_W;
+
+      // Background
+      ctx.fillStyle = c === 0 ? 'rgba(239,68,68,0.05)' : '#0d0d0f';
+      ctx.fillRect(x, 0, COL_W, H);
+
+      // Border
+      ctx.strokeStyle = '#1c1c20';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x, 0, COL_W, H);
+
+      // Header
+      const headerLines = COLUMNS[c].split('\n');
+      ctx.fillStyle = '#ccc';
+      ctx.font = 'bold 12px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(headerLines[0], x + COL_W / 2, 20);
+      if (headerLines[1]) {
+        ctx.fillStyle = '#71717a';
+        ctx.font = '10px Inter, sans-serif';
+        ctx.fillText(headerLines[1], x + COL_W / 2, 38);
+      }
+      ctx.textAlign = 'left';
+
+      // Count
+      const count = getTasksInColumn(c).length;
+      ctx.fillStyle = '#3f3f46';
+      ctx.font = '10px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(count + ' task' + (count !== 1 ? 's' : ''), x + COL_W / 2, H - 10);
+      ctx.textAlign = 'left';
+    }
+
+    // Separator line
+    ctx.strokeStyle = '#27272a';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(COL_X, HEADER_H);
+    ctx.lineTo(W - 20, HEADER_H);
+    ctx.stroke();
+
+    // Draw tasks (non-dragged first)
+    for (const task of TASKS) {
+      if (task === dragging) continue;
+      const r = getTaskRect(task);
+      ctx.fillStyle = task.color + '18';
+      ctx.strokeStyle = task.color + '66';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(r.x, r.y, r.w, r.h, 4);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#ddd';
+      ctx.font = '11px Inter, sans-serif';
+      ctx.fillText(task.name, r.x + 8, r.y + 18);
+    }
+
+    // Draw dragged task on top
+    if (dragging) {
+      const x = dragScreenX - dragOffX;
+      const y = dragScreenY - dragOffY;
+      ctx.globalAlpha = 0.85;
+      ctx.fillStyle = dragging.color + '33';
+      ctx.strokeStyle = dragging.color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(x, y, COL_W - 16, TASK_H, 4);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 11px Inter, sans-serif';
+      ctx.fillText(dragging.name, x + 8, y + 18);
+      ctx.globalAlpha = 1;
+
+      // Highlight target column
+      const col = Math.floor((dragScreenX - COL_X) / COL_W);
+      if (col >= 0 && col < COLUMNS.length) {
+        ctx.strokeStyle = dragging.color + '44';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(COL_X + col * COL_W + 1, 1, COL_W - 2, H - 2);
+      }
+    }
+
+    // Update info
+    const iter0 = getTasksInColumn(0).length;
+    if (iter0 === 0) {
+      infoDisplay.textContent = 'Warning: Iteration 0 is empty!';
+    } else {
+      infoDisplay.textContent = 'Iteration 0 has ' + iter0 + ' tasks — ' + (iter0 <= 4 ? 'good focus' : 'consider moving some to later');
+    }
+
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+</script>
