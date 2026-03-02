@@ -306,6 +306,22 @@ function parse_level(level_string):
 </BaseLayout>
 
 <script>
+// ==================== Focus Management ====================
+// Click a demo canvas to "activate" it — keyboard input routes to the active demo
+let activeDemoCanvasId = null;
+document.addEventListener('click', (e) => {
+  const canvas = e.target.closest('.demo-container canvas') || e.target.closest('.demo-container')?.querySelector('canvas');
+  if (canvas) {
+    activeDemoCanvasId = canvas.id;
+    document.querySelectorAll('.demo-container').forEach(d => d.style.outline = 'none');
+    canvas.closest('.demo-container').style.outline = '2px solid #f59e0b';
+  } else {
+    activeDemoCanvasId = null;
+    document.querySelectorAll('.demo-container').forEach(d => d.style.outline = 'none');
+  }
+});
+function isDemoActive(canvasId) { return activeDemoCanvasId === canvasId; }
+
 // ==================== Shared Sokoban Engine ====================
 (function() {
   const WALL = '#', FLOOR = ' ', TARGET = '.', BOX = '$', PLAYER = '@', BOX_ON_TARGET = '*', PLAYER_ON_TARGET = '+';
@@ -403,7 +419,7 @@ function parse_level(level_string):
 
   window.addEventListener('keydown', (e) => {
     if (solved) return;
-    if (!canvas.closest('.demo-container').querySelector(':hover') && document.activeElement !== document.body) return;
+    if (!isDemoActive('demo-push')) return;
     let dr = 0, dc = 0;
     if (e.key === 'ArrowUp') dr = -1;
     else if (e.key === 'ArrowDown') dr = 1;
@@ -411,11 +427,6 @@ function parse_level(level_string):
     else if (e.key === 'ArrowRight') dc = 1;
     else return;
     e.preventDefault();
-
-    // Only respond if this is the first demo (push)
-    const focusedDemo = document.querySelector('.demo-container:hover canvas');
-    if (focusedDemo && focusedDemo.id !== 'demo-push') return;
-    if (!focusedDemo) return;
 
     const result = S.tryMove(state, dr, dc);
     if (result) {
@@ -554,9 +565,7 @@ function parse_level(level_string):
 
   window.addEventListener('keydown', (e) => {
     if (solved) return;
-    const focusedDemo = document.querySelector('.demo-container:hover canvas');
-    if (focusedDemo && focusedDemo.id !== 'demo-undo') return;
-    if (!focusedDemo) return;
+    if (!isDemoActive('demo-undo')) return;
 
     if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); doUndo(); return; }
 
@@ -722,9 +731,7 @@ function parse_level(level_string):
 
   window.addEventListener('keydown', (e) => {
     if (solved) return;
-    const focusedDemo = document.querySelector('.demo-container:hover canvas');
-    if (focusedDemo && focusedDemo.id !== 'demo-sokoban') return;
-    if (!focusedDemo) return;
+    if (!isDemoActive('demo-sokoban')) return;
 
     if (e.key === 'z' || e.key === 'Z') {
       e.preventDefault();
